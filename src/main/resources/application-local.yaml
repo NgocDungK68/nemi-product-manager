@@ -1,0 +1,53 @@
+spring:
+  application:
+    name: nemi-product-manager
+  main:
+    allow-bean-definition-overriding: true
+  datasource:
+    url: jdbc:postgresql://db-nemi-dev.cbwe2q8wsga5.ap-southeast-1.rds.amazonaws.com:5432/devinfra
+    username: nemidev
+    password: "%lFBKM+oVBJQfvVU"
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  jpa:
+    #    show-sql: true
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 1000
+          order_inserts: true
+          order_updates: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  #        format_sql: true
+
+server:
+  port: 5200
+  error:
+    include-stacktrace: never
+secret:
+  jwt-public-key: "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxRSRqGDZJt6kkOwwZTwgkEaEP1qpQz7YcKAZ8eVszkHbj7yhjVztbFz5gQyj22pQBB2kTAuscUTuV1Qx4oANpmcM18249w40mgjv/KqlYWPITh09+NV6TAnGqcft8/ZU9wfGPN8OvfmFfT5ITF+aC8T7yGqgBKJfzGvlFAmZf5b2Rk/dzqPy5HYNihoBAsaIlFzYp1TC4tqIEYUH8TR6bI49PRADwpj77rMkvVUCduDWawbHJ2OEyJ5rmbysXtoBRGqrDKhR41TtU2xUTtWB5xJtp8eWOg5OChMEczlDuKxE/i+Arf0JgWZUlY97cNMz4zQ83zZ9rubmfT+rppTF4QIDAQAB"
+  service-username: "nemi"
+  service-password: "Nemi@2025@"
+logging:
+  level:
+    root: info
+    org.apache: off
+  file:
+    name: /tmp/log/nemi.log
+  logback:
+    rollingpolicy:
+      file-name-pattern: /tmp/log/nemi.%d{yyyy-MM-dd}.%i.log
+      max-history: 30
+      max-file-size: 10MB
+      total-size-cap: 1GB
+      clean-history-on-start: false
+
+
+
+
+
+

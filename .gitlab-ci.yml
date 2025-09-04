@@ -1,0 +1,147 @@
+image: docker:24.0.7
+
+services:
+  - docker:dind
+
+variables:
+  DEPLOY_SERVER_IP: "13.212.48.23"
+  AWS_DEFAULT_REGION: $AWS_REGION
+  MAVEN_OPTS: "-Djava.awt.headless=true -Dmaven.repo.local=./.m2/repository"
+  ECR_REGISTRY: "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+  ECR_REPOSITORY_URI: "${ECR_REGISTRY}/${ECR_REPOSITORY}"
+  ENV_NAME: "develop"
+  ARGOCD_BRANCH: "release/dev"
+stages:
+  - build
+  - dockerize
+  - argocd
+  - deploy
+
+build:
+  stage: build
+  image: maven:3.9.6-eclipse-temurin-17
+  cache:
+    key: maven-cache
+    paths:
+      - .m2/repository
+  before_script:
+    - mkdir -p ~/.m2
+    - printf "%s" "$SETTINGS_MAVEN" > ~/.m2/settings.xml
+  script:
+    - mvn clean package -DskipTests
+    - export PROJECT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+    - echo $PROJECT_VERSION > version.txt
+    - export PROJECT_NAME=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+    - echo "Project name is $PROJECT_NAME"
+    - echo $PROJECT_NAME > project-name.txt
+    - export COMMIT_HASH_SHORT="${CI_COMMIT_SHA:0:7}"
+    - echo $COMMIT_HASH_SHORT > commit-hash.txt
+    - echo "Commit hash is $COMMIT_HASH_SHORT"
+    - mkdir -p build-artifacts
+    - cp target/${PROJECT_NAME}-${PROJECT_VERSION}.jar build-artifacts/${PROJECT_NAME}.jar
+
+  artifacts:
+    paths:
+      - build-artifacts/
+      - version.txt
+      - project-name.txt
+      - docker-compose.yml
+      - commit-hash.txt
+    expire_in: 1 hour
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+dockerize:
+  stage: dockerize
+  image: docker:24.0.7
+  services:
+    - docker:dind
+  dependencies:
+    - build
+  before_script:
+    - apk add --no-cache python3 py3-pip git
+    - pip3 install --break-system-packages awscli
+    - aws --version
+    - docker version
+    - export PROJECT_VERSION=$(cat version.txt)
+    - export PROJECT_NAME=$(cat project-name.txt)
+    - export COMMIT_HASH_SHORT=$(cat commit-hash.txt)
+    - export IMAGE_TAG="${PROJECT_NAME}-${ENV_NAME}-${PROJECT_VERSION}-${COMMIT_HASH_SHORT}"
+    - aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+    - echo "ECR login successful"
+    - ls
+  script:
+    - docker build -t ${ECR_REPOSITORY_URI}:${IMAGE_TAG} .
+    - docker push ${ECR_REPOSITORY_URI}:${IMAGE_TAG}
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+argocd:
+  stage: argocd
+  image: alpine:latest
+  dependencies:
+    - build  # Để lấy các artifacts
+  before_script:
+    - apk add --no-cache git curl jq yq
+    - export PROJECT_VERSION=$(cat version.txt)
+    - export PROJECT_NAME=$(cat project-name.txt)
+    - export COMMIT_HASH_SHORT=$(cat commit-hash.txt)
+    - export IMAGE_TAG="${PROJECT_NAME}-${ENV_NAME}-${PROJECT_VERSION}-${COMMIT_HASH_SHORT}"
+    - git config --global user.email "gitlab-ci@example.com"
+    - git config --global user.name "GitLab CI"
+  script:
+    - git clone https://argocd:${ARGOCD_TOKEN}@gitlab.com/dube2/srs-nemi-tool-argocd.git
+    - cd srs-nemi-tool-argocd
+    - ls
+    - git checkout $ARGOCD_BRANCH
+    - yq eval ".image.tag = \"$IMAGE_TAG\"" -i charts/${PROJECT_NAME}/values.yaml
+    - echo "=== Updated values.yaml ==="
+    - cat charts/${PROJECT_NAME}/values.yaml
+    - git add charts/${PROJECT_NAME}/values.yaml
+    - git commit -m "Update image tag to $IMAGE_TAG"
+    - git push origin $ARGOCD_BRANCH
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+deploy:
+  stage: deploy
+  image: alpine:latest
+  dependencies:
+    - build
+  before_script:
+    - apk add --no-cache openssh-client
+    - mkdir -p ~/.ssh
+    - echo "$SSH_PRIVATE_KEY_DEV" | tr -d '\r' > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - ssh-keyscan $DEPLOY_SERVER_IP >> ~/.ssh/known_hosts
+    - export PROJECT_VERSION=$(cat version.txt)
+    - export PROJECT_NAME=$(cat project-name.txt)
+    - export COMMIT_HASH_SHORT=$(cat commit-hash.txt)
+    - export IMAGE_TAG="${PROJECT_NAME}-${ENV_NAME}-${PROJECT_VERSION}-${COMMIT_HASH_SHORT}"
+  script:
+    - sed "s|\${IMAGE_URI}|${ECR_REPOSITORY_URI}:$IMAGE_TAG|g; s|\${IMAGE_NAME}|${IMAGE_TAG}|g" docker-compose.yml > docker-compose-deploy.yml
+    - echo "=== Generated docker-compose-deploy.yml ==="
+    - cat docker-compose-deploy.yml
+    - ssh -T -i ~/.ssh/id_rsa ec2-user@$DEPLOY_SERVER_IP "mkdir -p ./nemi-product-manager"
+    - scp -i ~/.ssh/id_rsa docker-compose-deploy.yml ec2-user@$DEPLOY_SERVER_IP:~/nemi-product-manager/docker-compose.yml
+    - |
+      ssh -i ~/.ssh/id_rsa ec2-user@$DEPLOY_SERVER_IP \
+        "AWS_REGION='$AWS_REGION' \
+         ECR_REGISTRY='$ECR_REGISTRY' \
+         bash -s" << 'EOS'
+      set -euo pipefail
+      echo "🚀 Starting deployment with Docker Compose"
+
+      # Login to ECR
+      aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+
+      # Deploy with Docker Compose
+      cd ~/nemi-product-manager
+      docker compose up -d
+      
+      # Cleanup old images
+      docker image prune -af
+      echo "✅ Successfully deployed with Docker Compose"
+      EOS
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
