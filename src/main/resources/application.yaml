@@ -23,7 +23,7 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
   config:
     import:
-      - optional:aws-parameterstore:/config/$srs-nemi-tool_${spring.profiles.active:default}/
+      - optional:aws-parameterstore:/config/srs-nemi-tool_${spring.profiles.active:default}/
   cloud:
     aws:
       region:
