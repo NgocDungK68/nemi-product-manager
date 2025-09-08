@@ -26,7 +26,7 @@ build:
       - .m2/repository
   before_script:
     - mkdir -p ~/.m2
-    - printf "%s" "$SETTINGS_MAVEN" > ~/.m2/settings.xml
+    - cp settings.xml ~/.m2/settings.xml
   script:
     - mvn clean package -DskipTests
     - export PROJECT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
@@ -49,7 +49,7 @@ build:
       - commit-hash.txt
     expire_in: 1 hour
   rules:
-    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH =~ /^feature\/.*/'
 
 dockerize:
   stage: dockerize
@@ -74,7 +74,7 @@ dockerize:
     - docker build -t ${ECR_REPOSITORY_URI}:${IMAGE_TAG} .
     - docker push ${ECR_REPOSITORY_URI}:${IMAGE_TAG}
   rules:
-    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH =~ /^feature\/.*/'
 
 argocd:
   stage: argocd
@@ -93,7 +93,7 @@ argocd:
     - git clone https://argocd:${ARGOCD_TOKEN}@gitlab.com/dube2/srs-nemi-tool-argocd.git
     - cd srs-nemi-tool-argocd
     - ls
-    - git checkout $ARGOCD_BRANCH
+    - git checkout -B $ARGOCD_BRANCH
     - yq eval ".image.tag = \"$IMAGE_TAG\"" -i charts/${PROJECT_NAME}/values.yaml
     - echo "=== Updated values.yaml ==="
     - cat charts/${PROJECT_NAME}/values.yaml
@@ -101,7 +101,7 @@ argocd:
     - git commit -m "Update image tag to $IMAGE_TAG"
     - git push origin $ARGOCD_BRANCH
   rules:
-    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH =~ /^feature\/.*/'
 
 # deploy:
 #   stage: deploy
