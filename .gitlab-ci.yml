@@ -26,7 +26,7 @@ build:
       - .m2/repository
   before_script:
     - mkdir -p ~/.m2
-    - cp settings.xml ~/.m2/settings.xml
+    - printf "%s" "$SETTINGS_MAVEN" > ~/.m2/settings.xml
   script:
     - mvn clean package -DskipTests
     - export PROJECT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
