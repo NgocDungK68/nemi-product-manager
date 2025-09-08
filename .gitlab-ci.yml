@@ -26,7 +26,20 @@ build:
       - .m2/repository
   before_script:
     - mkdir -p ~/.m2
-    - printf "%s" "$SETTINGS_MAVEN" > ~/.m2/settings.xml
+    - |
+      cat > ~/.m2/settings.xml <<'XML'
+      <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
+        <servers>
+          <server>
+            <id>gitlab-group-maven</id>
+            <username>${env.GITLAB_MAVEN_USERNAME}</username>
+            <password>${env.GITLAB_MAVEN_PASSWORD}</password>
+          </server>
+        </servers>
+      </settings>
+      XML
   script:
     - mvn clean package -DskipTests
     - export PROJECT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
