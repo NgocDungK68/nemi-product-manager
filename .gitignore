@@ -1,0 +1,46 @@
+# Java / Maven build
+/target/
+**/target/
+*.class
+*.jar
+*.war
+*.ear
+
+# Spring Boot
+*.log
+/logs/
+/tmp/
+
+# Maven local settings (avoid committing secrets)
+settings.xml
+.mvn/wrapper/maven-wrapper.jar
+
+# IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+.vscode/
+/.metadata/
+/out/
+/build/
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Node/NPM leftovers (if any UI bits appear later)
+node_modules/
+
+# Docker artifacts
+/docker-compose-deploy.yml
+
+# Generated files
+**/*.generated.*
+
+# Others
+*.swp
+*.swo
