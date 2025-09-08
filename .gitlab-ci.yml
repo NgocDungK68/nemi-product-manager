@@ -32,19 +32,19 @@ build:
       else
         USERNAME="${GITLAB_MAVEN_USERNAME:-gitlab-ci-token}"
         PASSWORD="${GITLAB_MAVEN_PASSWORD:-$CI_JOB_TOKEN}"
-        cat > ~/.m2/settings.xml <<XML
-        <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                  xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
-          <servers>
-            <server>
-              <id>gitlab-maven</id>
-              <username>${USERNAME}</username>
-              <password>${PASSWORD}</password>
-            </server>
-          </servers>
-        </settings>
-        XML
+        {
+          printf '%s\n' "<settings xmlns=\"http://maven.apache.org/SETTINGS/1.0.0\"";
+          printf '%s\n' "          xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"";
+          printf '%s\n' "          xsi:schemaLocation=\"http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd\">";
+          printf '%s\n' "  <servers>";
+          printf '%s\n' "    <server>";
+          printf '%s\n' "      <id>gitlab-maven</id>";
+          printf '%s\n' "      <username>${USERNAME}</username>";
+          printf '%s\n' "      <password>${PASSWORD}</password>";
+          printf '%s\n' "    </server>";
+          printf '%s\n' "  </servers>";
+          printf '%s\n' "</settings>";
+        } > ~/.m2/settings.xml
       fi
   script:
     - mvn clean package -DskipTests
