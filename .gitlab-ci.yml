@@ -10,7 +10,7 @@ variables:
   ECR_REGISTRY: "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
   ECR_REPOSITORY_URI: "${ECR_REGISTRY}/${ECR_REPOSITORY}"
   ENV_NAME: "develop"
-  ARGOCD_BRANCH: "feature/webhook-manager-service"
+  ARGOCD_BRANCH: "$CI_COMMIT_REF_NAME"
 stages:
   - build
   - dockerize
