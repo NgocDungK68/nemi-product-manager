@@ -11,7 +11,6 @@ variables:
   ECR_REPOSITORY_URI: "${ECR_REGISTRY}/${ECR_REPOSITORY}"
   ENV_NAME: "feature/webhook-manager-service"
   ARGOCD_BRANCH: "release/dev"
-  GITLAB_MAVEN_TOKEN: $GITLAB_MAVEN_TOKEN
 stages:
   - build
   - dockerize
@@ -27,30 +26,7 @@ build:
       - .m2/repository
   before_script:
     - mkdir -p ~/.m2
-    - |
-      cat > ~/.m2/settings.xml <<'EOF'
-      <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-           xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
-                               https://maven.apache.org/xsd/settings-1.0.0.xsd">
-
-        <mirrors>
-          <mirror>
-            <id>maven-central</id>
-            <url>https://repo.maven.apache.org/maven2</url>
-            <mirrorOf>central</mirrorOf>
-          </mirror>
-        </mirrors>
-
-        <servers>
-          <server>
-            <id>gitlab-maven</id>
-            <username>oauth2</username>
-            <password>glpat-TkdafIsGT3Ulu8awUAmv7G86MQp1OmczcWEzCw.01.1201zxu4t</password>
-          </server>
-        </servers>
-      </settings>
-      EOF
+    - printf "%s" "$SETTINGS_MAVEN" > ~/.m2/settings.xml
   script:
     - mvn clean package -DskipTests
     - export PROJECT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
