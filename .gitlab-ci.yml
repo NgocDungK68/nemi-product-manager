@@ -89,6 +89,9 @@ dockerize:
     - pip3 install --break-system-packages awscli
     - aws --version
     - docker version
+    - aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+    - aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+    - aws configure set default.region $AWS_REGION
     - export PROJECT_VERSION=$(cat version.txt)
     - export PROJECT_NAME=$(cat project-name.txt)
     - export COMMIT_HASH_SHORT=$(cat commit-hash.txt)
