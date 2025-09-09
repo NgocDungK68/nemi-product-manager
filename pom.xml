@@ -41,7 +41,6 @@
 	<build>
 
 	</build>
-
 	<repositories>
 		<repository>
 			<id>gitlab-group-maven</id>
