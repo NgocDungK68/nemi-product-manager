@@ -10,7 +10,7 @@ variables:
   ECR_REGISTRY: "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
   ECR_REPOSITORY_URI: "${ECR_REGISTRY}/${ECR_REPOSITORY}"
   ENV_NAME: "develop"
-  ARGOCD_BRANCH: "$CI_COMMIT_REF_NAME"
+  ARGOCD_BRANCH: "release/dev"
 stages:
   - build
   - dockerize
@@ -26,26 +26,7 @@ build:
       - .m2/repository
   before_script:
     - mkdir -p ~/.m2
-    - |
-      if [ -n "$SETTINGS_MAVEN" ]; then
-        printf "%s" "$SETTINGS_MAVEN" > ~/.m2/settings.xml
-      else
-        USERNAME="${GITLAB_MAVEN_USERNAME:-gitlab-ci-token}"
-        PASSWORD="${GITLAB_MAVEN_PASSWORD:-$CI_JOB_TOKEN}"
-        {
-          printf '%s\n' "<settings xmlns=\"http://maven.apache.org/SETTINGS/1.0.0\"";
-          printf '%s\n' "          xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"";
-          printf '%s\n' "          xsi:schemaLocation=\"http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd\">";
-          printf '%s\n' "  <servers>";
-          printf '%s\n' "    <server>";
-          printf '%s\n' "      <id>gitlab-maven</id>";
-          printf '%s\n' "      <username>${USERNAME}</username>";
-          printf '%s\n' "      <password>${PASSWORD}</password>";
-          printf '%s\n' "    </server>";
-          printf '%s\n' "  </servers>";
-          printf '%s\n' "</settings>";
-        } > ~/.m2/settings.xml
-      fi
+    - printf "%s" "$SETTINGS_MAVEN" > ~/.m2/settings.xml
   script:
     - mvn clean package -DskipTests
     - export PROJECT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
@@ -68,7 +49,7 @@ build:
       - commit-hash.txt
     expire_in: 1 hour
   rules:
-    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH =~ /^feature\/.*/'
+    - if: '$CI_COMMIT_BRANCH == "develop"'
 
 dockerize:
   stage: dockerize
@@ -93,7 +74,7 @@ dockerize:
     - docker build -t ${ECR_REPOSITORY_URI}:${IMAGE_TAG} .
     - docker push ${ECR_REPOSITORY_URI}:${IMAGE_TAG}
   rules:
-    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH =~ /^feature\/.*/'
+    - if: '$CI_COMMIT_BRANCH == "develop"'
 
 argocd:
   stage: argocd
@@ -112,7 +93,7 @@ argocd:
     - git clone https://argocd:${ARGOCD_TOKEN}@gitlab.com/dube2/srs-nemi-tool-argocd.git
     - cd srs-nemi-tool-argocd
     - ls
-    - git checkout -B $ARGOCD_BRANCH
+    - git checkout $ARGOCD_BRANCH
     - yq eval ".image.tag = \"$IMAGE_TAG\"" -i charts/${PROJECT_NAME}/values.yaml
     - echo "=== Updated values.yaml ==="
     - cat charts/${PROJECT_NAME}/values.yaml
@@ -120,7 +101,7 @@ argocd:
     - git commit -m "Update image tag to $IMAGE_TAG"
     - git push origin $ARGOCD_BRANCH
   rules:
-    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH =~ /^feature\/.*/'
+    - if: '$CI_COMMIT_BRANCH == "develop"'
 
 # deploy:
 #   stage: deploy
