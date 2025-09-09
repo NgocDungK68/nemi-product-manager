@@ -7,7 +7,7 @@ variables:
   DEPLOY_SERVER_IP: "13.212.48.23"
   AWS_REGION: "ap-southeast-1"
   AWS_DEFAULT_REGION: "ap-southeast-1"
-  AWS_ACCOUNT_ID: "${AWS_ACCOUNT_ID}"
+  AWS_ACCOUNT_ID: "1733-4236-1670"
   ECR_REPOSITORY: "nemi-product-manager"
   MAVEN_OPTS: "-Djava.awt.headless=true -Dmaven.repo.local=./.m2/repository"
   ECR_REGISTRY: "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
