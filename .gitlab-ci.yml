@@ -53,10 +53,6 @@ build:
       EOF
   script:
     - mvn clean package -DskipTests
-
-
-  script:
-    - mvn clean package -DskipTests
     - export PROJECT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
     - echo $PROJECT_VERSION > version.txt
     - export PROJECT_NAME=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
