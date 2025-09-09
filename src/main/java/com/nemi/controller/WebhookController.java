@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/webhooks")
+@RequestMapping("/webhooks")
 public class WebhookController {
     private static final Logger logger = LoggerFactory.getLogger(WebhookService.class);
 
