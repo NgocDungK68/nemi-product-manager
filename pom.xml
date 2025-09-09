@@ -44,7 +44,7 @@
 
 	<repositories>
 		<repository>
-			<id>gitlab-maven</id>
+			<id>gitlab-group-maven</id>
 			<url>https://gitlab.com/api/v4/groups/112488156/-/packages/maven</url>
 		</repository>
 	</repositories>
