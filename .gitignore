@@ -44,3 +44,4 @@ node_modules/
 # Others
 *.swp
 *.swo
+.idea/
