@@ -52,6 +52,27 @@ keycloak:
   client-realm: nemi-dev
   password-pattern: ^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,20}$
 
-
-
-
+management:
+  server:
+    port: 8081                    # Cổng quản lý
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always       # Luôn hiển thị chi tiết
+      probes:
+        enabled: true
+    metrics:
+      enabled: true
+    info:
+      enabled: true
+    prometheus:
+      enabled: true              # Cho Prometheus nếu cần
+  health:
+    readiness-state:
+      enabled: true
+    liveness-state:
+      enabled: true
