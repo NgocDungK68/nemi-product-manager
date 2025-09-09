@@ -14,7 +14,7 @@ variables:
   MAVEN_OPTS: "-Djava.awt.headless=true -Dmaven.repo.local=./.m2/repository"
   ECR_REGISTRY: "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
   ECR_REPOSITORY_URI: "${ECR_REGISTRY}/${ECR_REPOSITORY}"
-  ENV_NAME: "feature/webhook-manager-service"
+  ENV_NAME: "feature-webhook-manager-service"
   ARGOCD_BRANCH: "release/dev"
 stages:
   - build
@@ -97,7 +97,8 @@ dockerize:
     - export PROJECT_VERSION=$(cat version.txt)
     - export PROJECT_NAME=$(cat project-name.txt)
     - export COMMIT_HASH_SHORT=$(cat commit-hash.txt)
-    - export IMAGE_TAG="${PROJECT_NAME}-${ENV_NAME}-${PROJECT_VERSION}-${COMMIT_HASH_SHORT}"
+    - export ENV_NAME_CLEAN=$(echo "$ENV_NAME" | sed 's/\//-/g')
+    - export IMAGE_TAG="${PROJECT_NAME}-${ENV_NAME_CLEAN}-${PROJECT_VERSION}-${COMMIT_HASH_SHORT}"
     - echo "Debug AWS variables:"
     - echo "AWS_REGION=$AWS_REGION"
     - echo "AWS_ACCOUNT_ID=$AWS_ACCOUNT_ID" 
@@ -123,7 +124,8 @@ argocd:
     - export PROJECT_VERSION=$(cat version.txt)
     - export PROJECT_NAME=$(cat project-name.txt)
     - export COMMIT_HASH_SHORT=$(cat commit-hash.txt)
-    - export IMAGE_TAG="${PROJECT_NAME}-${ENV_NAME}-${PROJECT_VERSION}-${COMMIT_HASH_SHORT}"
+    - export ENV_NAME_CLEAN=$(echo "$ENV_NAME" | sed 's/\//-/g')
+    - export IMAGE_TAG="${PROJECT_NAME}-${ENV_NAME_CLEAN}-${PROJECT_VERSION}-${COMMIT_HASH_SHORT}"
     - git config --global user.email "gitlab-ci@example.com"
     - git config --global user.name "GitLab CI"
   script:
