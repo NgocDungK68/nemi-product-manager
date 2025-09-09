@@ -5,6 +5,7 @@ import com.nemi.service.WebhookService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,6 +19,12 @@ public class WebhookController {
 
     // Thay YOUR_VERIFY_TOKEN bằng token bạn đặt trong app Nhanh.vn
     private static final String VERIFY_TOKEN = "nemiWebhook123!@#";
+
+    @GetMapping("/test")
+    public ResponseEntity<String> testWebhook() {
+        logger.info("Webhook test endpoint called");
+        return ResponseEntity.ok("Webhook service is working! Current time: " + java.time.LocalDateTime.now());
+    }
 
     @PostMapping("/nhanh")
     public ResponseEntity<String> receiveWebhook(@RequestBody WebhookRequest webhookRequest) {
