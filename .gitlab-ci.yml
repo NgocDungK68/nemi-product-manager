@@ -5,7 +5,10 @@ services:
 
 variables:
   DEPLOY_SERVER_IP: "13.212.48.23"
-  AWS_DEFAULT_REGION: $AWS_REGION
+  AWS_REGION: "ap-southeast-1"
+  AWS_DEFAULT_REGION: "ap-southeast-1"
+  AWS_ACCOUNT_ID: "${AWS_ACCOUNT_ID}"
+  ECR_REPOSITORY: "nemi-product-manager"
   MAVEN_OPTS: "-Djava.awt.headless=true -Dmaven.repo.local=./.m2/repository"
   ECR_REGISTRY: "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
   ECR_REPOSITORY_URI: "${ECR_REGISTRY}/${ECR_REPOSITORY}"
@@ -90,6 +93,12 @@ dockerize:
     - export PROJECT_NAME=$(cat project-name.txt)
     - export COMMIT_HASH_SHORT=$(cat commit-hash.txt)
     - export IMAGE_TAG="${PROJECT_NAME}-${ENV_NAME}-${PROJECT_VERSION}-${COMMIT_HASH_SHORT}"
+    - echo "Debug AWS variables:"
+    - echo "AWS_REGION=$AWS_REGION"
+    - echo "AWS_ACCOUNT_ID=$AWS_ACCOUNT_ID" 
+    - echo "ECR_REGISTRY=$ECR_REGISTRY"
+    - echo "ECR_REPOSITORY=$ECR_REPOSITORY"
+    - echo "ECR_REPOSITORY_URI=$ECR_REPOSITORY_URI"
     - aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
     - echo "ECR login successful"
     - ls
