@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/nemi-product-manager/webhook")
+@RequestMapping("/webhook")
 public class WebhookController {
     private static final Logger logger = LoggerFactory.getLogger(WebhookController.class);
     
