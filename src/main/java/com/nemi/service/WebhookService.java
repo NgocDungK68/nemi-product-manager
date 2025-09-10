@@ -85,6 +85,7 @@ public class WebhookService {
      */
     private void handleOrderAdd(WebhookRequest request) {
         logger.info("New order received for BusinessId: {}", request.getBusinessId());
+        logger.debug("Order data: {}", request.getData());
 
         // TODO: Thêm logic xử lý đơn hàng mới
         // Ví dụ:

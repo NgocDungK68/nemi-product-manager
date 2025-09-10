@@ -4,6 +4,7 @@ import com.nemi.model.request.WebhookRequest;
 import com.nemi.service.WebhookService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,7 +15,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/webhook")
 public class WebhookController {
-    private static final Logger logger = LoggerFactory.getLogger(WebhookService.class);
+    private static final Logger logger = LoggerFactory.getLogger(WebhookController.class);
+    
+    @Autowired
+    private WebhookService webhookService;
 
 
     // Thay YOUR_VERIFY_TOKEN bằng token bạn đặt trong app Nhanh.vn
@@ -29,47 +33,30 @@ public class WebhookController {
 
     @PostMapping("/nhanh")
     public ResponseEntity<String> receiveWebhook(@RequestBody WebhookRequest webhookRequest) {
-
-        logger.info("Received webhook - Event: {}, BusinessId: {}",
+        logger.info("=== WEBHOOK RECEIVED ===");
+        logger.info("Received webhook - Event: {}, BusinessId: {}", 
                 webhookRequest.getEvent(), webhookRequest.getBusinessId());
-
-        // Verify token
-        if (!VERIFY_TOKEN.equals(webhookRequest.getWebhooksVerifyToken())) {
-            logger.warn("Invalid webhook token");
-            return ResponseEntity.status(401).body("Invalid token");
-        }
-
-        // Log data để debug
+        logger.info("Received webhook - Token: {}", webhookRequest.getWebhooksVerifyToken());
         logger.info("Webhook data: {}", webhookRequest.getData());
 
-        // TODO: Xử lý logic của bạn ở đây
-        processWebhook(webhookRequest);
+        try {
+            // Verify token
+            if (!VERIFY_TOKEN.equals(webhookRequest.getWebhooksVerifyToken())) {
+                logger.warn("Invalid webhook token. Expected: {}, Received: {}", 
+                        VERIFY_TOKEN, webhookRequest.getWebhooksVerifyToken());
+                return ResponseEntity.status(401).body("Invalid token");
+            }
 
-        return ResponseEntity.ok("OK");
-    }
-
-    private void processWebhook(WebhookRequest request) {
-        // Xử lý đơn giản theo event type
-        String eventType = request.getEvent();
-
-        switch (eventType) {
-            case "webhooksEnabled":
-                logger.info("Webhooks đã được bật");
-                break;
-            case "orderAdd":
-                logger.info("Có đơn hàng mới");
-                break;
-            case "orderUpdate":
-                logger.info("Đơn hàng được cập nhật");
-                break;
-            case "productAdd":
-                logger.info("Có sản phẩm mới");
-                break;
-            case "inventoryChange":
-                logger.info("Tồn kho thay đổi");
-                break;
-            default:
-                logger.info("Event khác: {}", eventType);
+            // Sử dụng WebhookService để xử lý
+            webhookService.processWebhook(webhookRequest);
+            
+            logger.info("Webhook processed successfully");
+            return ResponseEntity.ok("OK");
+            
+        } catch (Exception e) {
+            logger.error("Error processing webhook", e);
+            return ResponseEntity.status(500).body("Internal Server Error");
         }
     }
+
 }
