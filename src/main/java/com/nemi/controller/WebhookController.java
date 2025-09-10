@@ -1,6 +1,6 @@
 package com.nemi.controller;
 
-import com.nemi.model.request.WebhookRequest;
+import com.nemi.model.request.webhook.WebhookRequest;
 import com.nemi.service.WebhookService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
