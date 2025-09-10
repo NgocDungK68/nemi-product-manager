@@ -1,5 +1,6 @@
 package com.nemi.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.model.request.webhook.WebhookRequest;
 import com.nemi.service.WebhookService;
 import org.slf4j.Logger;
@@ -20,10 +21,11 @@ public class WebhookController {
     @Autowired
     private WebhookService webhookService;
 
+    @Autowired
+    private ObjectMapper objectMapper;
 
     // Thay YOUR_VERIFY_TOKEN bằng token bạn đặt trong app Nhanh.vn
     private static final String VERIFY_TOKEN = "nemiWebhook123!@#";
-
 
     @GetMapping("/test")
     public ResponseEntity<String> testWebhook() {
@@ -32,14 +34,20 @@ public class WebhookController {
     }
 
     @PostMapping("/nhanh")
-    public ResponseEntity<String> receiveWebhook(@RequestBody WebhookRequest webhookRequest) {
-        logger.info("=== WEBHOOK RECEIVED ===");
-        logger.info("Received webhook - Event: {}, BusinessId: {}", 
-                webhookRequest.getEvent(), webhookRequest.getBusinessId());
-        logger.info("Received webhook - Token: {}", webhookRequest.getWebhooksVerifyToken());
-        logger.info("Webhook data: {}", webhookRequest.getData());
-
+    public ResponseEntity<String> receiveWebhook(@RequestBody String rawBody) {
+        logger.info("=== RAW WEBHOOK RECEIVED ===");
+        logger.info("Raw webhook body: {}", rawBody);
+        
         try {
+            // Parse raw body to WebhookRequest
+            WebhookRequest webhookRequest = objectMapper.readValue(rawBody, WebhookRequest.class);
+            
+            logger.info("=== WEBHOOK PARSED SUCCESSFULLY ===");
+            logger.info("Received webhook - Event: {}, BusinessId: {}", 
+                    webhookRequest.getEvent(), webhookRequest.getBusinessId());
+            logger.info("Received webhook - Token: {}", webhookRequest.getWebhooksVerifyToken());
+            logger.info("Webhook data: {}", webhookRequest.getData());
+
             // Verify token
             if (!VERIFY_TOKEN.equals(webhookRequest.getWebhooksVerifyToken())) {
                 logger.warn("Invalid webhook token. Expected: {}, Received: {}", 
@@ -54,9 +62,9 @@ public class WebhookController {
             return ResponseEntity.ok("OK");
             
         } catch (Exception e) {
-            logger.error("Error processing webhook", e);
+            logger.error("Error parsing or processing webhook", e);
+            logger.error("Raw body that caused error: {}", rawBody);
             return ResponseEntity.status(500).body("Internal Server Error");
         }
     }
-
 }
