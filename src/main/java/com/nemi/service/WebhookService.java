@@ -88,11 +88,11 @@ public class WebhookService {
     private void handleOrderAdd(WebhookRequest request) {
         logger.info("=== NEW ORDER WEBHOOK RECEIVED ===");
         logger.info("Processing new order for BusinessId: {}", request.getBusinessId());
-        
+
         try {
             // Convert webhook data to OrderWebhook object
             OrderWebhook orderData = objectMapper.convertValue(request.getData(), OrderWebhook.class);
-            
+
             logger.info("=== ORDER DETAILS ===");
             logger.info("OrderId: {}", orderData.getOrderId());
             logger.info("Customer Name: {}", orderData.getCustomerName());
@@ -101,30 +101,30 @@ public class WebhookService {
             logger.info("Customer Address: {}", orderData.getCustomerAddress());
             logger.info("Order Status: {}", orderData.getStatus());
             logger.info("Total Price: {}", orderData.getTotalPrice());
-            
+
             // Log product details
             if (orderData.getProducts() != null && !orderData.getProducts().isEmpty()) {
                 logger.info("=== ORDER PRODUCTS ({} items) ===", orderData.getProducts().size());
                 for (int i = 0; i < orderData.getProducts().size(); i++) {
                     OrderWebhook.ProductItem product = orderData.getProducts().get(i);
-                    logger.info("Product {}: ID={}, Name={}, Quantity={}, Price={}", 
-                        i + 1, product.getProductId(), product.getProductName(), 
-                        product.getQuantity(), product.getPrice());
+                    logger.info("Product {}: ID={}, Name={}, Quantity={}, Price={}",
+                            i + 1, product.getProductId(), product.getProductName(),
+                            product.getQuantity(), product.getPrice());
                 }
             } else {
                 logger.warn("No products found in order!");
             }
-            
+
             logger.info("=== ORDER PROCESSING COMPLETED ===");
-            logger.info("Order {} has been logged successfully for BusinessId: {}", 
+            logger.info("Order {} has been logged successfully for BusinessId: {}",
                     orderData.getOrderId(), request.getBusinessId());
-            
+
         } catch (IllegalArgumentException e) {
             logger.error("Invalid order data format in webhook: {}", e.getMessage());
             logger.error("Raw webhook data: {}", request.getData());
             throw new RuntimeException("Invalid order data format", e);
         } catch (Exception e) {
-            logger.error("Failed to process new order webhook for BusinessId: {}", 
+            logger.error("Failed to process new order webhook for BusinessId: {}",
                     request.getBusinessId(), e);
             logger.error("Raw webhook data: {}", request.getData());
             throw new RuntimeException("Failed to process new order webhook", e);
