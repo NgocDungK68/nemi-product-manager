@@ -16,7 +16,7 @@ public class PancakeWebhookTestController {
     private static final Logger logger = LoggerFactory.getLogger(PancakeWebhookTestController.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Value("${pancake.x-api-key}")
+    @Value("${pancake.secret}")
     private String screetApiKey;
 
     @GetMapping("/test")

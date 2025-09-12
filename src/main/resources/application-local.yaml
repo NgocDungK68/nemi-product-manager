@@ -28,6 +28,9 @@ server:
   port: 5200
   error:
     include-stacktrace: never
+
+pancake:
+  secret: elqsF9ERiFWGacWQO9Gg5XC4kXojot
 secret:
   jwt-public-key: "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxRSRqGDZJt6kkOwwZTwgkEaEP1qpQz7YcKAZ8eVszkHbj7yhjVztbFz5gQyj22pQBB2kTAuscUTuV1Qx4oANpmcM18249w40mgjv/KqlYWPITh09+NV6TAnGqcft8/ZU9wfGPN8OvfmFfT5ITF+aC8T7yGqgBKJfzGvlFAmZf5b2Rk/dzqPy5HYNihoBAsaIlFzYp1TC4tqIEYUH8TR6bI49PRADwpj77rMkvVUCduDWawbHJ2OEyJ5rmbysXtoBRGqrDKhR41TtU2xUTtWB5xJtp8eWOg5OChMEczlDuKxE/i+Arf0JgWZUlY97cNMz4zQ83zZ9rubmfT+rppTF4QIDAQAB"
   service-username: "nemi"
