@@ -2,12 +2,18 @@ package com.nemi.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/webhook/pancake")
@@ -16,67 +22,74 @@ public class PancakeWebhookTestController {
     private static final Logger logger = LoggerFactory.getLogger(PancakeWebhookTestController.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Value("${pancake.secret}")
-    private String screetApiKey;
-
-    @GetMapping("/test")
-    public ResponseEntity<String> testWebhook() {
-        logger.info("Pancake Webhook test endpoint called");
-        return ResponseEntity.ok("Pancake Webhook service is working! Current time: " + java.time.LocalDateTime.now());
-    }
-
     @PostMapping
-    public ResponseEntity<String> receiveWebhook(@RequestHeader (value = "X-API-KEY") String apiKey,
-                                                 @RequestBody String payload) {
-        // 1. Verify API key
-        if (!screetApiKey.equals(apiKey)) {
-         return ResponseEntity.status(401).body("Invalid API key");
-        }
-
+    public ResponseEntity<String> receiveWebhook(HttpServletRequest request) {
+        // Log headers
+        Map<String, String> headers = extractHeaders(request);
         logger.info("=== Pancake Webhook received ===");
-        logger.info("Payload body: {}", payload);
+        headers.forEach((k, v) -> logger.info("Header: {} = {}", k, v));
 
-        // 2. Try parse JSON
+        // Read raw body
+        String body = readBody(request);
+        logger.info("Payload body: {}", body);
+
+        // Try parse JSON
+        JsonNode root = null;
         try {
-            // 2. Parse JSON payload
-            ObjectMapper mapper = new ObjectMapper();
-            JsonNode root = mapper.readTree(payload);
-
-            // 3. Check loại event
-            String eventType = root.path("event").asText();
-            JsonNode data = root.path("data");
-
-            switch (eventType) {
-                case "order.created":
-                    handleOrderCreated(data);
-                    break;
-                case "order.updated":
-                    handleOrderUpdated(data);
-                    break;
-                default:
-                    System.out.println("Unhandled event: " + eventType);
-            }
-
-            // 4. Trả về 200
-            return ResponseEntity.ok("Received");
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error processing webhook");
+            root = objectMapper.readTree(body);
+        } catch (IOException e) {
+            logger.error("Error parsing JSON body", e);
         }
+
+        if (root != null) {
+            // Log possible fields
+            if (root.has("event")) {
+                logger.info("Field event: {}", root.get("event").asText());
+            }
+            if (root.has("topic")) {
+                logger.info("Field topic: {}", root.get("topic").asText());
+            }
+            if (root.has("data")) {
+                logger.info("Field data: {}", root.get("data").toString());
+            }
+            if (root.has("order")) {
+                logger.info("Field order: {}", root.get("order").toString());
+            }
+            if (root.has("customer")) {
+                logger.info("Field customer: {}", root.get("customer").toString());
+            }
+            // Log full tree
+            logger.info("Full JSON tree: {}", root.toPrettyString());
+        }
+
+        // Return OK so Pancake knows you got the webhook
+        return ResponseEntity.ok("OK");
     }
 
-    private void handleOrderCreated(JsonNode data) {
-        // Ví dụ: Lấy order_id, total_price
-        String orderId = data.path("order_id").asText();
-        double totalPrice = data.path("total_price").asDouble();
-        System.out.printf("New order: %s - total: %.2f%n", orderId, totalPrice);
-
-        // TODO: Lưu DB hoặc xử lý business logic
+    private Map<String, String> extractHeaders(HttpServletRequest request) {
+        Map<String, String> map = new HashMap<>();
+        Enumeration<String> names = request.getHeaderNames();
+        if (names == null) {
+            return Collections.emptyMap();
+        }
+        while (names.hasMoreElements()) {
+            String name = names.nextElement();
+            String value = request.getHeader(name);
+            map.put(name, value);
+        }
+        return map;
     }
 
-    private void handleOrderUpdated(JsonNode data) {
-        // Xử lý cập nhật đơn hàng
+    private String readBody(HttpServletRequest request) {
+        StringBuilder sb = new StringBuilder();
+        try (BufferedReader reader = request.getReader()) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line);
+            }
+        } catch (IOException e) {
+            logger.error("Error reading request body", e);
+        }
+        return sb.toString();
     }
 }
