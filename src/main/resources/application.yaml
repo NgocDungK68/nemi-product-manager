@@ -36,6 +36,10 @@ spring:
 app:
   prefix: dev.
 
+
+pancake:
+    secret: elqsF9ERiFWGacWQO9Gg5XC4kXojot
+
 server:
   port: 8080
   error:

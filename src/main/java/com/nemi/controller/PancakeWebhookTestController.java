@@ -19,6 +19,12 @@ public class PancakeWebhookTestController {
     @Value("${pancake.x-api-key}")
     private String screetApiKey;
 
+    @GetMapping("/test")
+    public ResponseEntity<String> testWebhook() {
+        logger.info("Pancake Webhook test endpoint called");
+        return ResponseEntity.ok("Pancake Webhook service is working! Current time: " + java.time.LocalDateTime.now());
+    }
+
     @PostMapping
     public ResponseEntity<String> receiveWebhook(@RequestHeader (value = "X-API-KEY") String apiKey,
                                                  @RequestBody String payload) {
