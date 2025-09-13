@@ -41,10 +41,8 @@ public class WebhookController {
         logger.info("Request URI: {}", request.getRequestURI());
         logger.info("Request method: {}", request.getMethod());
         
-        try {
             // Get appropriate webhook service using factory
             WebhookService webhookService = webhookFactory.getWebhookService(webhookType);
-            
             logger.info("Using webhook service: {}", webhookService.getClass().getSimpleName());
             
             // Process webhook using the appropriate service
@@ -52,19 +50,6 @@ public class WebhookController {
             
             logger.info("Webhook processed successfully by {}", webhookService.getClass().getSimpleName());
             return ResponseEntity.ok("OK");
-            
-        } catch (RuntimeException e) {
-            if (e.getMessage().contains("not supported")) {
-                logger.warn("Unsupported webhook type: {}", webhookType);
-                return ResponseEntity.status(400).body("Unsupported webhook type: " + webhookType);
-            } else {
-                logger.error("Error processing webhook of type: {}", webhookType, e);
-                return ResponseEntity.status(500).body("Internal Server Error");
-            }
-        } catch (Exception e) {
-            logger.error("Unexpected error processing webhook of type: {}", webhookType, e);
-            return ResponseEntity.status(500).body("Internal Server Error");
-        }
     }
 
     /**
