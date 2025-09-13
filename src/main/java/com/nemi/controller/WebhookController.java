@@ -1,4 +1,4 @@
-package com.nemi.controller.webhook;
+package com.nemi.controller;
 
 import com.nemi.service.factory.WebhookFactory;
 import com.nemi.service.WebhookService;
@@ -11,9 +11,9 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/webhook")
-public class UnifiedWebhookController {
+public class WebhookController {
     
-    private static final Logger logger = LoggerFactory.getLogger(UnifiedWebhookController.class);
+    private static final Logger logger = LoggerFactory.getLogger(WebhookController.class);
     
     @Autowired
     private WebhookFactory webhookFactory;
