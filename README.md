@@ -17,6 +17,8 @@
 - Redirect URL: `https://nemi-dev.ecombase.net/redirect_url_1`
 ![alt text](/docs/images/image.png)
 
+> ⚠️ **Lưu ý**: Tài khoản Nhanh.vn sẽ hết hạn sau 30 ngày, nếu không gia hạn hệ thống sẽ tự động tính phí duy trì
+
 ### 3. Lấy Access Code
 Truy cập link sau:
 
