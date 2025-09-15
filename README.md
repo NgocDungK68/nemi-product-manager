@@ -15,7 +15,7 @@
 - BusinessID: `214415`  
 - SecretKey: (xem trong app) [NhanhVN App Detail](https://open.nhanh.vn/app/detail?id=76158)  
 - Redirect URL: `https://nemi-dev.ecombase.net/redirect_url_1`
-![alt text](image.png)
+![alt text](/docs/images/image.png)
 
 ### 3. Lấy Access Code
 Truy cập link sau:
@@ -56,7 +56,7 @@ Ví dụ Access Token trả về:
 ## II. Pancake
 
 ### 1. Lấy API Key
-![alt text](/images/image-1.png)
+![alt text](/docs/images/image-1.png)
 - API Key: `10b76cf31be245848c8361287cee2adf`
 
 ### 2. Gọi API đơn hàng
@@ -102,14 +102,14 @@ Response ví dụ:
 
 ### 1. Lấy chứng chỉ Client
 Truy cập: [Sapo Developer - API Clients](https://developers.sapo.vn/services/partners/api_clients)
-![alt text](/images/image-2.png)
-![alt text](/images/image-3.png)
+![alt text](/docs/images/image-2.png)
+![alt text](/docs/images/image-3.png)
 Ví dụ:
 - API key: `50f184d93c834ebaa764cc17c25e31fa`
 - Secret key: `50ce6b4d47a04ca18aa6f972b698779a`
 
 Tạo shop tại: [Dev Shop](https://developers.sapo.vn/services/partners/dev_shop)  
-![alt text](/images/image-4.png)
+![alt text](/docs/images/image-4.png)
 - Shop: `Nemi`  
 - Tài khoản: `nncuong377@gmail.com`  
 - Mật khẩu: `Cuong?432000`
@@ -127,7 +127,7 @@ Ví dụ với store `nemi`:
 https://nemi.mysapo.net/admin/oauth/authorize?client_id=50f184d93c834ebaa764cc17c25e31fa&scope=read_content,write_content,read_themes,write_themes,read_products,write_products,read_customers,write_customers,read_orders,write_orders,read_script_tags,write_script_tags,read_price_rules,write_price_rules,read_draft_orders,write_draft_orders&redirect_uri=https://nemi-dev.ecombase.net/
 ```
 
-![alt text](/images/image-6.png)
+![alt text](/docs/images/image-6.png)
 
 Khi người dùng đồng ý, hệ thống sẽ redirect về:
 
@@ -152,7 +152,7 @@ Response:
   "scope": "read_content read_customers read_draft_orders read_orders read_price_rules read_products read_script_tags read_themes write_content write_customers write_draft_orders write_orders write_price_rules write_products write_script_tags write_themes"
 }
 ```
-![alt text](/images/image-7.png)
+![alt text](/docs/images/image-7.png)
 
 👉 Access Token có hiệu lực **vĩnh viễn**.
 
