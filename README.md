@@ -177,9 +177,54 @@ X-Sapo-Access-Token: {access_token}
 
 
 
-## Webhook Hands-on
+# Webhook Hands-on
 
 ### Nhanh.vn
+- Workflow Diagram (Nhanh.vn) 
+```lua
++-------------------+
+|   App in Nhanh.vn  |
+|   (Enable Webhooks)|
++---------+----------+
+          |
+          | 1. Admin bật Webhooks: 
+          |    - cấu hình callback URL (HTTPS, POST) 
+          |    - nhập verify token
+          |    - chọn event types (productAdd, orderUpdate, etc.)
+          v
++---------------------------+
+|  Nhanh.vn system          |
+|---------------------------|
+| - gửi event "webhooksEnabled"  --> tests URL, kèm verify token  |
++---------------------------+
+          |
+          | 2. Khi sự kiện phát sinh (ví dụ: SP mới, đơn mới, cập nhật SP/ĐH,…)
+          v
++---------------------------+
+|  Webhook POST JSON        |
+|  tới callback URL         |
+|  Nội dung có:             |
+|     - event name          |
+|     - webhooksVerifyToken |
+|     - data (payload)      |
++---------------------------+
+          |
+          | 3. Server bạn nhận payload
+          |    - verify token match
+          |    - xử lý dữ liệu phù hợp event
+          v
++---------------------------+
+|  Your backend / App       |
+|  - Xử lý, mapping dữ liệu | |
++---------------------------+
+          ^
+          |
+          | Nếu HTTP status != 200 hoặc timeout → Nhanh.vn retry tới 3 lần
+          |
++---------------------------+
+|  Callback response 200    |
++---------------------------+
+```
 
 - **Cấu hình webhook trên app:**
 
@@ -197,6 +242,49 @@ X-Sapo-Access-Token: {access_token}
 ---
 
 ### Pancake
+![alt text](./docs/images/pancake-webhook.png)
+- Hiện tại thì pancake chỉ hỗ trợ được 3 loai dữ liệu: Đơn hàng(Order), Khách Hàng(Customers), Tồn kho (Inventory)
+
+- Workflow Diagram (Pancake)
+```lua
++---------------------------+
+| Pancake POS / Pancake System |
+| (Settings → Webhook setup)   |
++-------------+-------------+
+              |
+              | 1. Admin cài đặt:
+              |    - nhập callback URL
+              |    - chọn event types cần nhận
+              |    
+              v
++-----------------------------+
+| Pancake system              |
++-----------------------------+
+              |
+              | 2. Khi event xảy ra (order mới, cập nhật đơn, thay đổi trạng thái,…)
+              v
++-----------------------------+
+| HTTP POST tới callback URL   |
+| Payload chứa event + data    |
+| Có thể test qua webhook UI   |
++-----------------------------+
+              |
+              | 3. Server bạn nhận POST
+              |    - verify token nếu có
+              |    - xử lý payload
+              |    - trả về HTTP status 200 nếu thành công
+              v
++-----------------------------+
+| Your backend / DB / App       |
++-----------------------------+
+              ^
+              |
+              | Nếu HTTP status !=200 hoặc timeout thì Pancake có retry (tùy event / cấu hình)
+              |
++-----------------------------+
+| Callback Response 200         |
++-----------------------------+
+```
 
 - **Cấu hình webhook trên app:**
 
@@ -253,6 +341,48 @@ curl --location --request PUT 'https://pos.pages.fm/api/v1/shops/1720119150/orde
 ### Sapo
 - Đăng ký webhook cho từng chức năng (topic), callback url là **address**
 ![Sapo Webhook Config](./docs/images/sapo-config.png)
+
+- Workflow Diagram (Sapo)
+```lua
++-------------------+
+|   Sapo Admin / App |
+|   (tạo Webhook)    |
++---------+----------+
+          |
+          | 1. Request tạo webhook:
+          |    - chọn event(s) 
+          |    - định dạng (json/xml)
+          |    - URL nhận sự kiện (address)
+          v
++---------------------------+
+|  Sapo system              |
++---------------------------+
+          |
+          | 2. Khi event xảy ra (ví dụ: order.create, product.update, refund.create,…)
+          v
++---------------------------+
+|  Webhook POST             |
+|  gửi tới address          |
+|  Payload event + data     |
++---------------------------+
+          |
+          | 3. Your server nhận POST
+          |    - parse JSON/XML
+          |    - respond HTTP status 200 nếu ok
+          |    
+          v
++---------------------------+
+|  Your backend / DB / App   |
++---------------------------+
+          ^
+          |
+          | Nếu trả về ≠200 hoặc lỗi → Sapo có thể retry (tuỳ event / thiết lập)
+          |
++---------------------------+
+| Callback Response 200      |
++---------------------------+
+
+```
 
 - **Call API tạo mới webhook:**
 
@@ -363,7 +493,3 @@ curl --location --request PUT 'https://nemi.mysapo.net/admin/orders/54918075.jso
 curl --location --request DELETE 'https://nemi.mysapo.net/admin/orders/54918075.json' \
 --header 'X-Sapo-Access-Token: 59d0c4eea0fc497e81733f693d3e4641'
 ```
-
-3. **Pancake**
-![alt text](./docs/images/pancake-webhook.png)
-- Hiện tại thì pancake chỉ hỗ trợ được 3 loai dữ liệu: Đơn hàng(Order), Khách Hàng(Customers), Tồn kho (Inventory)
