@@ -201,22 +201,71 @@ X-Sapo-Access-Token: {access_token}
 - **Cấu hình webhook trên app:**
 
 ![Pancake Webhook Config](./docs/images/pancake-config.png)
+1. Add Order
+```http
+curl --location 'https://pos.pages.fm/api/v1/shops/1720119150/orders?api_key=10b76cf31be245848c8361287cee2adf' \
+--header 'Content-Type: application/json' \
+--data '{
+  "bill_full_name": "Test Customer",
+  "bill_phone_number": "09123456789",
+  "is_free_shipping": false,
+  "received_at_shop": false,
+  "page_id": "1234191921173353",
+  "shop_id": 1720119150,
+  "warehouse_id": "410404e4-3d4c-4674-8081-e6f1334cd344",
+  "items": [
+    {
+      "quantity": 1,
+      "product_id": "ec96ab3b-e5aa-4050-bf96-7f0340695ba4",
+      "variation_id": "de9e281f-137a-413f-9ae2-f2b792bcb902"
+    }
+  ],
+  "shipping_address": {
+    "full_name": "Test Customer",
+    "phone_number": "09123456789",
+    "address": "Test Address",
+    "full_address": "Test Address, Santa ana, Taguig, Metro-manila",
+    "province_id": "63219",
+    "district_id": "632191611",
+    "commune_id": "6321916115836"
+  },
+  "shipping_fee": 0,
+  "total_discount": 0,
+  "custom_id": "TEST008"
+}
+'
+```
+
+2. Update Order
+```http
+curl --location --request PUT 'https://pos.pages.fm/api/v1/shops/1720119150/orders/TEST007?api_key=10b76cf31be245848c8361287cee2adf' \
+--header 'Content-Type: application/json' \
+--data '{
+    "status": 1,
+    "shipping_fee": 50000,
+    "bill_full_name": "Test Customer Updated",
+    "bill_phone_number": "09999999999"
+  }'
+```
 
 ---
 
 ### Sapo
+- Đăng ký webhook cho từng chức năng (topic), callback url là **address**
+![Sapo Webhook Config](./docs/images/sapo-config.png)
 
 - **Call API tạo mới webhook:**
 
 ```http
-POST /admin/webhooks.json
-{
+curl --location 'https://nemi.mysapo.net/admin/webhooks.json' \
+--header 'X-Sapo-Access-Token: 59d0c4eea0fc497e81733f693d3e4641' \
+--data '{
   "webhook": {
     "topic": "orders/create",
-    "address": "http://whatever.hostname.com/",
+    "address": "https://nemi-dev.ecombase.net/",
     "format": "json"
   }
-}
+}'
 ```
 
 - **Response tạo webhook thành công:**
@@ -224,13 +273,93 @@ POST /admin/webhooks.json
 ```
 HTTP/1.1 201 Created
 {
-  "webhook": {
-    "id": 987911590,
-    "address": "http://whatever.hostname.com/",
-    "topic": "orders/create",
-    "created_on": "2016-01-20T13:01:10Z",
-    "modified_on": "2016-01-20T13:01:10Z",
-    "format": "json"
-  }
+    "webhook": {
+        "id": 1451977,
+        "address": "https://nemi-dev.ecombase.net/",
+        "format": "json",
+        "topic": "orders/create",
+        "created_on": "2025-09-08T15:12:51Z",
+        "modified_on": "2025-09-08T15:12:51Z"
+    }
 }
+```
+
+1. **Product**
+- Add product:
+```http
+curl --location 'https://nemi.mysapo.net/admin/products.json' \
+--header 'X-Sapo-Access-Token: 59d0c4eea0fc497e81733f693d3e4641' \
+--header 'Content-Type: application/json' \
+--data '{
+  "product": {
+    "name": "Burton Custom Freestlye 151",
+    "content": "<strong>Good snowboard!<\/strong>",
+    "vendor": "Burton",
+    "product_type": "Snowboard",
+    "images": [
+      {
+        "src": "http:\/\/example.com\/rails_logo.gif"
+      }
+    ]
+  }
+}'
+```
+
+- Update Product:
+```http
+curl --location --request PUT 'https://nemi.mysapo.net/admin/products/58423224.json' \
+--header 'X-Sapo-Access-Token: 59d0c4eea0fc497e81733f693d3e4641' \
+--header 'Content-Type: application/json' \
+--data '{
+  "product": {
+    "id": 58423224,
+    "name": "New NAME"
+  }
+}'
+```
+
+- Delete Product:
+```http
+curl --location --request DELETE 'https://nemi.mysapo.net/admin/products/58423627.json' \
+--header 'X-Sapo-Access-Token: 59d0c4eea0fc497e81733f693d3e4641'
+```
+
+2. **Order**
+- Add Order
+```http
+curl --location 'https://nemi.mysapo.net/admin/orders.json' \
+--header 'X-Sapo-Access-Token: 59d0c4eea0fc497e81733f693d3e4641' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+  "order": {
+    "email": "foo@example.com",
+    "send_receipt": true,
+    "send_fulfillment_receipt": true,
+    "line_items": [
+      {
+        "variant_id": 166621634,
+        "quantity": 1
+      }
+    ]
+  }
+}'
+```
+
+- Update Order
+```http
+curl --location --request PUT 'https://nemi.mysapo.net/admin/orders/54918075.json' \
+--header 'X-Sapo-Access-Token: 59d0c4eea0fc497e81733f693d3e4641' \
+--header 'Content-Type: application/json' \
+--data '{
+  "order": {
+    "id": 450789469,
+    "note": "Customer contacted us about a custom engraving on this iPod."
+  }
+}'
+```
+
+- Delete Order
+```http
+curl --location --request DELETE 'https://nemi.mysapo.net/admin/orders/54918075.json' \
+--header 'X-Sapo-Access-Token: 59d0c4eea0fc497e81733f693d3e4641'
 ```
