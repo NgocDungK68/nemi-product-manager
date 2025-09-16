@@ -26,7 +26,7 @@ public class NhanhWebhookService implements WebhookService {
 
     @Autowired
     private ObjectMapper objectMapper;
-    private static final String VERIFY_TOKEN = "nemiWebhook123!@#22";
+    private static final String VERIFY_TOKEN = "nemiWebhook123!@#";
 
     @Override
     public String getWebhookType() {
@@ -137,30 +137,38 @@ public class NhanhWebhookService implements WebhookService {
         
         switch (eventType.toLowerCase()) {
             case "addorder":
+            case "orderadd":
                 processAddOrderEvent(payload);
                 break;
             case "updateorder":
+            case "orderupdate":
                 processUpdateOrderEvent(payload);
                 break;
             case "addproduct":
+            case "productadd":
                 processAddProductEvent(payload);
                 break;
             case "updateproduct":
+            case "productupdate":
                 processUpdateProductEvent(payload);
                 break;
             case "addcustomer":
+            case "customeradd":
                 processAddCustomerEvent(payload);
                 break;
             case "updatecustomer":
+            case "customerupdate":
                 processUpdateCustomerEvent(payload);
                 break;
             case "webhooksenabled":
                 processWebhooksEnabledEvent(payload);
                 break;
             case "addcategory":
+            case "categoryadd":
                 processAddCategoryEvent(payload);
                 break;
             case "updatecategory":
+            case "categoryupdate":
                 processUpdateCategoryEvent(payload);
                 break;
             default:
@@ -481,7 +489,7 @@ public class NhanhWebhookService implements WebhookService {
         // Log timestamp for webhook debugging
         logger.info("Webhook received at: {}", java.time.LocalDateTime.now());
         logger.info("Webhook URL endpoint: /webhook/nhanh");
-        logger.info("Expected events: addOrder, updateOrder, addProduct, updateProduct, addCustomer, updateCustomer");
+        logger.info("Expected events: addOrder/orderAdd, updateOrder/orderUpdate, addProduct/productAdd, updateProduct/productUpdate, addCustomer/customerAdd, updateCustomer/customerUpdate");
     }
 
     /**
