@@ -63,9 +63,9 @@ public class NhanhWebhookService implements WebhookService {
 
         if (root != null) {
             //log possible fields
-            if (root.has("event")) {
-                logger.info("Field event: {}", root.get("event").asText());
-            }
+            String eventType = root.has("event") ? root.get("event").asText() : "unknown";
+            logger.info("Processing event type: {}", eventType);
+
             if (root.has("businessId")) {
                 logger.info("Field businessId: {}", root.get("businessId").asText());
             }
@@ -78,11 +78,20 @@ public class NhanhWebhookService implements WebhookService {
                     throw new RuntimeException("Invalid token");
                 }
             }
-            if (root.has("data")) {
-                logger.info("Field data: {}", root.get("data").toString());
+            JsonNode data = root.get("data");
+            switch (eventType) {
+                case "webhooksEnabled":
+                    handleWebhooksEnabled(data);
+                    break;
+                case "productAdd":
+                    handleProductAdd(data);
+                    break;
+                case "productUpdate":
+                    handleProductUpdate(data);
+                    break;
             }
-        }
             logger.info("=== NHANH.VN WEBHOOK PROCESSING COMPLETE ===");
+        }
     }
 
     private Map<String, String> extractHeaders(HttpServletRequest request) {
@@ -110,5 +119,37 @@ public class NhanhWebhookService implements WebhookService {
             logger.error("Error reading request body", e);
         }
         return sb.toString();
+    }
+
+    private void handleWebhooksEnabled(JsonNode data) {
+        logger.info("Handling webhooksEnabled event");
+        // Implement your logic here
+        if (data != null && data.has("registeredEvents")) {
+            logger.info("Registered events: {}", data.get("registeredEvents").toString());
+        }
+    }
+
+    private void handleProductAdd(JsonNode data) {
+        logger.info("Handling productAdd event");
+        // Implement your logic here
+        try {
+            if (data != null) {
+                logger.info("Product added: {}", data.toPrettyString());
+            }
+        } catch (Exception e) {
+            logger.error("Error processing productAdd event", e);
+        }
+    }
+
+    private void handleProductUpdate(JsonNode data) {
+    logger.info("Handling productUpdate event");
+        // Implement your logic here
+        try {
+            if (data != null) {
+                logger.info("Product updated: {}", data.toPrettyString());
+            }
+        } catch (Exception e) {
+            logger.error("Error processing productUpdate event", e);
+        }
     }
 }
