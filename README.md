@@ -1,93 +1,236 @@
 # Nemi product manager service
 
+## Hướng dẫn tích hợp API: NhanhVN, Pancake, Sapo
 
+- Tài liệu này hướng dẫn chi tiết các bước khởi tạo ứng dụng, lấy Access Token và gọi API từ 3 nền tảng: **NhanhVN**, **Pancake**, và **Sapo**.
+---
 
-## Getting started
+## I. NhanhVN
+### 1. Tạo và đăng nhập tài khoản
+- Tài khoản: `0904858995`  
+- Mật khẩu: `Dung@2005`
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+### 2. Tạo App
+- AppID: `76158`  
+- BusinessID: `214415`  
+- SecretKey: (xem trong app) [NhanhVN App Detail](https://open.nhanh.vn/app/detail?id=76158)  
+- Redirect URL: `https://nemi-dev.ecombase.net/redirect_url_1`
+![alt text](/docs/images/image.png)
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+> ⚠️ **Lưu ý**: Tài khoản Nhanh.vn sẽ hết hạn sau 7 ngày, nếu không gia hạn hệ thống sẽ tự động tính phí duy trì
 
-## Add your files
+### 3. Lấy Access Code
+Truy cập link sau:
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+```bash
+https://nhanh.vn/oauth?version=3.0&appId=76158&returnLink=https://nemi-dev.ecombase.net/redirect_url_1
+```
+
+Kết quả trả về (ví dụ):
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/dube2/nemi-product-manager-service.git
-git branch -M develop
-git push -uf origin develop
+https://nemi-dev.ecombase.net/redirect_url_1?accessCode=0DECuIHCpplrYkvpRoGa441HDsZa0lCUhRA5Gvb128gNcoFT9M7ZUIm9x8gLKvXY
 ```
 
-## Integrate with your tools
+> ⚠️ **Lưu ý**: Access code chỉ có hiệu lực **10 phút** và sẽ hết hạn ngay khi đổi sang Access Token.
 
-- [ ] [Set up project integrations](https://gitlab.com/dube2/nemi-product-manager-service/-/settings/integrations)
+### 4. Đổi sang Access Token
+Request bằng **cURL**:
 
-## Collaborate with your team
+```bash
+curl --location --globoff 'https://pos.open.nhanh.vn/v3.0/app/getaccesstoken?appId={{appId}}&businessId={{businessId}}' --header 'Content-Type: application/json' --data '{
+    "accessCode": "ACCESS_CODE",
+    "secretKey": "APP_SECRET_KEY"
+}'
+```
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+Ví dụ Access Token trả về:
 
-## Test and Deploy
+```bash
+7HAh4AlUmvO9f67EhWaFFPFdGR0YOM57AGpJSpOONiqn6HDdovYcZaWAo19D2qB9tYZNNfUhUjqtDgBlWu8AhLNlSXw0Oaq11tCETJ1srFNu6nKDecPmAkpSlGYTrJtGQtv8lUqwGUeLEvE8PutVcuo5pDiQqcc9PrI5FznfnfGQj1IPpKOYRUvyufl6tBZ4z7wO6E86zkfCJmDXUPvMNyvetrG6y2MNlQwv6UYh3
+```
 
-Use the built-in continuous integration in GitLab.
+### 5. Tài liệu API
+- Các trạng thái tham khảo: [Model Constant](https://apidocs.nhanh.vn/v3/modelconstant#product-type)
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+---
 
-***
+## II. Pancake
 
-# Editing this README
+### 1. Lấy API Key
+![alt text](/docs/images/image-1.png)
+- API Key: `10b76cf31be245848c8361287cee2adf`
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+### 2. Gọi API đơn hàng
+Ví dụ request:
 
-## Suggestions for a good README
+```bash
+https://pos.pages.fm/api/v1/shops/1720119150/orders/8668902978?api_key=10b76cf31be245848c8361287cee2adf
+```
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+Trong đó:
+- `{shop_id} = 1720119150`
+- `{order_id} = 8668902978`
+- `{api_key} = 10b76cf31be245848c8361287cee2adf`
 
-## Name
-Choose a self-explaining name for your project.
+### 3. Proxy qua Localhost
+```bash
+http://localhost:8080/pancake/1720119150/orders/8668902978
+```
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+Response ví dụ:
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+```json
+{
+  "status": "pending",
+  "order_id": "22776",
+  "order_code": "22776",
+  "customer_name": "José Referente",
+  "customer_phone": "09982393388",
+  "shipping_address": "4INT Rizal Avenue Pob2 Nagcarlan Laguna back municipal building , Poblacion ii (pob.), Nagcarlan, Laguna",
+  "payment_method": "COD",
+  "shipping_method": "Standard",
+  "total_price": 649.0,
+  "shipping_fee": 0.0,
+  "discount_amount": 0.0,
+  "created_at": "2025-09-02T20:09:01.587660",
+  "updated_at": "2025-09-03T10:13:45.370008"
+}
+```
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+---
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+## III. Sapo
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+### 1. Lấy chứng chỉ Client
+Truy cập: [Sapo Developer - API Clients](https://developers.sapo.vn/services/partners/api_clients)
+![alt text](/docs/images/image-2.png)
+![alt text](/docs/images/image-3.png)
+Ví dụ:
+- API key: `50f184d93c834ebaa764cc17c25e31fa`
+- Secret key: `50ce6b4d47a04ca18aa6f972b698779a`
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+Tạo shop tại: [Dev Shop](https://developers.sapo.vn/services/partners/dev_shop)  
+![alt text](/docs/images/image-4.png)
+- Shop: `Nemi`  
+- Tài khoản: `nncuong377@gmail.com`  
+- Mật khẩu: `Cuong?432000`
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+### 2. Xin cấp quyền (Authorization)
+Redirect user đến URL:
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+```bash
+https://{store}.mysapo.net/admin/oauth/authorize?client_id={api_key}&scope={scopes}&redirect_uri={redirect_uri}
+```
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+Ví dụ với store `nemi`:
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+```bash
+https://nemi.mysapo.net/admin/oauth/authorize?client_id=50f184d93c834ebaa764cc17c25e31fa&scope=read_content,write_content,read_themes,write_themes,read_products,write_products,read_customers,write_customers,read_orders,write_orders,read_script_tags,write_script_tags,read_price_rules,write_price_rules,read_draft_orders,write_draft_orders&redirect_uri=https://nemi-dev.ecombase.net/
+```
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+![alt text](/docs/images/image-6.png)
 
-## License
-For open source projects, say how it is licensed.
+Khi người dùng đồng ý, hệ thống sẽ redirect về:
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+```bash
+https://nemi-dev.ecombase.net/?code=1dce6443b2284b7185e39d8065d5cd88&hmac=xxx&store=nemi.mysapo.net&timestamp=1757243040
+```
+
+- `code`: Authorization Code (dùng để lấy Access Token)
+
+### 3. Lấy Access Token
+Dùng `code`, `client_id`, và `client_secret`:
+
+```bash
+curl --location --request POST 'https://nemi.mysapo.net/admin/oauth/access_token?client_id=50f184d93c834ebaa764cc17c25e31fa&client_secret=50ce6b4d47a04ca18aa6f972b698779a&code=104ae3ce8c754b509e510021d660d3d4'
+```
+
+Response:
+
+```json
+{
+  "access_token": "59d0c4eea0fc497e81733f693d3e4641",
+  "scope": "read_content read_customers read_draft_orders read_orders read_price_rules read_products read_script_tags read_themes write_content write_customers write_draft_orders write_orders write_price_rules write_products write_script_tags write_themes"
+}
+```
+![alt text](/docs/images/image-7.png)
+
+👉 Access Token có hiệu lực **vĩnh viễn**.
+
+### 4. Tạo request xác thực
+Tất cả request gửi kèm header:
+
+```http
+X-Sapo-Access-Token: {access_token}
+```
+
+
+---
+
+# Kết luận
+
+- **NhanhVN**: OAuth 2 bước (Access Code → Access Token, ngắn hạn).  
+- **Pancake**: Chỉ cần API Key, gọi trực tiếp.  
+- **Sapo**: OAuth, nhưng Access Token vĩnh viễn.  
+
+
+
+
+## Webhook Hands-on
+
+### Nhanh.vn
+
+- **Cấu hình webhook trên app:**
+
+![Nhanhvn Webhook Config](./docs/images/nhanhvn-config.png)
+
+➡️ Sau khi cấu hình thành công sẽ nhận response **`webhooksEnabled`**
+
+- **Webhook data:**
+    - `event` (string): Tên sự kiện
+    - `businessId`
+    - `data` (json string)
+
+![Nhanhvn Webhook Data](./docs/images/nhanhvn-data.png)
+
+---
+
+### Pancake
+
+- **Cấu hình webhook trên app:**
+
+![Pancake Webhook Config](./docs/images/pancake-config.png)
+
+---
+
+### Sapo
+
+- **Call API tạo mới webhook:**
+
+```http
+POST /admin/webhooks.json
+{
+  "webhook": {
+    "topic": "orders/create",
+    "address": "http://whatever.hostname.com/",
+    "format": "json"
+  }
+}
+```
+
+- **Response tạo webhook thành công:**
+
+```
+HTTP/1.1 201 Created
+{
+  "webhook": {
+    "id": 987911590,
+    "address": "http://whatever.hostname.com/",
+    "topic": "orders/create",
+    "created_on": "2016-01-20T13:01:10Z",
+    "modified_on": "2016-01-20T13:01:10Z",
+    "format": "json"
+  }
+}
+```
