@@ -363,3 +363,7 @@ curl --location --request PUT 'https://nemi.mysapo.net/admin/orders/54918075.jso
 curl --location --request DELETE 'https://nemi.mysapo.net/admin/orders/54918075.json' \
 --header 'X-Sapo-Access-Token: 59d0c4eea0fc497e81733f693d3e4641'
 ```
+
+3. **Pancake**
+![alt text](./docs/images/pancake-webhook.png)
+- Hiện tại thì pancake chỉ hỗ trợ được 3 loai dữ liệu: Đơn hàng(Order), Khách Hàng(Customers), Tồn kho (Inventory)
