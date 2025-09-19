@@ -3,80 +3,9 @@ spring:
     name: nemi-product-manager
   profiles:
       active: dev
-  main:
-    allow-bean-definition-overriding: true
-  datasource:
-    driver-class-name: org.postgresql.Driver
-    hikari:
-      maximum-pool-size: 10
-      connection-timeout: 30000
-      idle-timeout: 600000
-      max-lifetime: 1800000
-  jpa:
-#    show-sql: true
-    properties:
-      hibernate:
-        jdbc:
-          batch_size: 1000
-          order_inserts: true
-          order_updates: true
-        dialect: org.hibernate.dialect.PostgreSQLDialect
   config:
     import:
+      - optional:configserver:http://localhost:8888
+      - optional:aws-parameterstore:/config/${spring.application.name}_${spring.profiles.active:default}/
       - optional:aws-parameterstore:/config/srs-nemi-tool_${spring.profiles.active:default}/
-  cloud:
-    aws:
-      region:
-        static: ${AWS_REGION:ap-southeast-1}
-      credentials:
-        instance-profile: true
-      stack:
-        auto: false
 
-app:
-  prefix: dev.
-
-
-pancake:
-    secret: elqsF9ERiFWGacWQO9Gg5XC4kXojot
-
-server:
-  port: 8080
-  error:
-    include-stacktrace: never
-
-keycloak:
-  base-url: https://keycloak.ecombase.net
-  login-admin-path: /realms/master/protocol/openid-connect/token
-  admin-users-path: /admin/realms/${keycloak.client-realm}/users
-  admin-user-path: /admin/realms/${keycloak.client-realm}/users/{userId}
-  reset-password-path: /admin/realms/${keycloak.client-realm}/users/{userId}/reset-password
-  admin-username: admin
-  admin-password: admin01
-  client-realm: nemi-dev
-  password-pattern: ^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,20}$
-
-management:
-  server:
-    port: 8081                    # Cổng quản lý
-  endpoints:
-    web:
-      base-path: /actuator
-      exposure:
-        include: "*"
-  endpoint:
-    health:
-      show-details: always       # Luôn hiển thị chi tiết
-      probes:
-        enabled: true
-    metrics:
-      enabled: true
-    info:
-      enabled: true
-    prometheus:
-      enabled: true              # Cho Prometheus nếu cần
-  health:
-    readiness-state:
-      enabled: true
-    liveness-state:
-      enabled: true
