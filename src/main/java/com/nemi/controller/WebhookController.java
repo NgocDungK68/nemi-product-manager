@@ -1,5 +1,6 @@
 package com.nemi.controller;
 
+import com.nemi.model.response.PosConnectionResponse;
 import com.nemi.service.factory.WebhookFactory;
 import com.nemi.service.WebhookService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -10,7 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/webhook")
+@RequestMapping("/webhook/v1")
 public class WebhookController {
     
     private static final Logger logger = LoggerFactory.getLogger(WebhookController.class);
@@ -59,5 +60,12 @@ public class WebhookController {
     @PostMapping("/nhanh")
     public ResponseEntity<String> receiveNhanhWebhook(HttpServletRequest request) {
         return receiveWebhook("nhanh", request);
+    }
+
+    @GetMapping("/{posName}/auth")
+    public PosConnectionResponse authWebhook(@PathVariable String posName,
+                                             @RequestParam String accessCode,
+                                             @RequestParam String code) {
+        return null;
     }
 }

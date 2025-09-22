@@ -6,7 +6,6 @@ import com.nemi.model.response.PosConnectionResponse;
 import java.util.List;
 
 public interface PosManagementService {
-
     String getPosName();
     String getPosStatus(String transactionId);
 

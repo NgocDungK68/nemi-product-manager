@@ -4,9 +4,9 @@ spring:
   main:
     allow-bean-definition-overriding: true
   datasource:
-    url: jdbc:postgresql://db-nemi-dev.cbwe2q8wsga5.ap-southeast-1.rds.amazonaws.com:5432/devinfra
-    username: nemidev
-    password: "%lFBKM+oVBJQfvVU"
+    url: jdbc:postgresql://nemi-uat.cbwe2q8wsga5.ap-southeast-1.rds.amazonaws.com:5432/dev_nemi
+    username: dev_nemi_product_manager
+    password: Nemi123#
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10

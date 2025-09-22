@@ -1,4 +1,4 @@
-package com.nemi.model;
+package com.nemi.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.MappedSuperclass;
@@ -11,13 +11,15 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @MappedSuperclass
-public class BaseEntity  {
+public class BaseEntity {
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    private String createdBy;
 
     @PrePersist
     protected void onCreate() {

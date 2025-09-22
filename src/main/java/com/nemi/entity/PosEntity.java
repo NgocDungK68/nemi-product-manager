@@ -1,4 +1,4 @@
-package com.nemi.model;
+package com.nemi.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -18,14 +18,16 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "pos_connection")
-public class PosConnection extends BaseEntity {
+@Table(name = "pos")
+public class PosEntity extends BaseEntity {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;  // PK
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private String id;  // PK
 
     @Column(name = "user_id", nullable = false)
     private String userId;  // FK sang bảng user (nếu có quan hệ thì dùng @ManyToOne)
+
+    private String companyId;
 
     @Column(name = "pos_name", nullable = false, length = 100)
     private String posName;
