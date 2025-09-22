@@ -17,6 +17,6 @@ public class WebhookFactory {
         return Objects.requireNonNull(this.webhookServices.stream()
                 .filter(service -> service.supports(webhookType))
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("Webhook type not supported: " + webhookType)));
+                .orElseThrow(() -> new RuntimeException("Webhook type not supported: " + webhookType))); // update enum exception sau
     }
 }
