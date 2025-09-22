@@ -1,13 +1,19 @@
 package com.nemi.service.impl.sapo;
 
-import com.nemi.model.PosConnection;
+import com.nemi.model.request.PosConnectionRequest;
+import com.nemi.model.response.PosConnectionResponse;
 import com.nemi.service.PosManagementService;
 
 import java.util.List;
 
 public class SapoServiceImpl implements PosManagementService {
     @Override
-    public String getPosManagementType() {
+    public String getPosName() {
+        return null;
+    }
+
+    @Override
+    public String getPosStatus(String transactionId) {
         return null;
     }
 
@@ -17,7 +23,12 @@ public class SapoServiceImpl implements PosManagementService {
     }
 
     @Override
-    public List<PosConnection> listPosConnection(String posName, Long userId) {
+    public List<PosConnectionResponse> listPosConnection(String userId) {
+        return null;
+    }
+
+    @Override
+    public PosConnectionResponse connectPos(PosConnectionRequest posConnectionRequest) {
         return null;
     }
 }

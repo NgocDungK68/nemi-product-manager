@@ -1,6 +1,6 @@
 package com.nemi.constant.enums;
 
-public enum Platform {
+public enum PosName {
     NHANHVN,
     SAPO,
     PANCAKE
