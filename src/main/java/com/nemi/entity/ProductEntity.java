@@ -1,6 +1,6 @@
 package com.nemi.entity;
 
-import com.nemi.constant.enums.Platform;
+import com.nemi.constant.enums.PosName;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -60,5 +60,5 @@ public class ProductEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "platform", length = 50, nullable = false)
-    private Platform platform;
+    private PosName posName;
 }

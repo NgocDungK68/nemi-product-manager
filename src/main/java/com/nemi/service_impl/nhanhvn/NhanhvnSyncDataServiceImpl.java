@@ -1,6 +1,6 @@
 package com.nemi.service_impl.nhanhvn;
 
-import com.nemi.constant.enums.Platform;
+import com.nemi.constant.enums.PosName;
 import com.nemi.entity.ProductEntity;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
 import com.nemi.repository.ProductRepository;
@@ -124,7 +124,7 @@ public class NhanhvnSyncDataServiceImpl implements NhanhvnSyncDataService {
         product.setSku(apiProducts.getCode());
         product.setTitle(apiProducts.getName());
         product.setStatus(apiProducts.getStatus());
-        product.setPlatform(Platform.NHANHVN);
+        product.setPosName(PosName.NHANHVN);
         product.setCategoryId(
                 apiProducts.getCategory() != null ? String.valueOf(apiProducts.getCategory().getId()) : null
         );
