@@ -9,7 +9,7 @@ public interface PosManagementService {
     String getPosName();
     String getPosStatus(String transactionId);
 
-    String setPosStatus(String status);
+    String setPosStatus(String id, String status);
 
     List<PosConnectionResponse> listPosConnection(String userId);
 
@@ -31,5 +31,5 @@ public interface PosManagementService {
      * get accessCode + exchange accesstoken + sync + save db
      * @return
      */
-    PosConnectionResponse connectPos();
+    PosConnectionResponse connectPos(String accessCode);
 }

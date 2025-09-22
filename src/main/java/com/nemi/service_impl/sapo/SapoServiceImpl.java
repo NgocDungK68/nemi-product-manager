@@ -1,4 +1,4 @@
-package com.nemi.service.impl.sapo;
+package com.nemi.service_impl.sapo;
 
 import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.response.PosConnectionResponse;
@@ -18,7 +18,7 @@ public class SapoServiceImpl implements PosManagementService {
     }
 
     @Override
-    public String setPosStatus(String status) {
+    public String setPosStatus(String id, String status) {
         return null;
     }
 
@@ -33,7 +33,7 @@ public class SapoServiceImpl implements PosManagementService {
     }
 
     @Override
-    public PosConnectionResponse connectPos() {
+    public PosConnectionResponse connectPos(String accessCode) {
         return null;
     }
 }
