@@ -28,7 +28,12 @@ public class NhanhvnServiceImpl implements PosManagementService {
     }
 
     @Override
-    public PosConnectionResponse connectPos(PosConnectionRequest posConnectionRequest) {
+    public PosConnectionResponse registerPos(PosConnectionRequest posConnectionRequest) {
+        return null;
+    }
+
+    @Override
+    public PosConnectionResponse connectPos() {
         return null;
     }
 }
