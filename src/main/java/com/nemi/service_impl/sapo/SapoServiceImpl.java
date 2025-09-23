@@ -33,7 +33,5 @@ public class SapoServiceImpl implements PosManagementService {
     }
 
     @Override
-    public PosConnectionResponse connectPos(String accessCode) {
-        return null;
-    }
+    public PosConnectionResponse connectPos(PosConnectionRequest posConnectionRequest){return null;}
 }

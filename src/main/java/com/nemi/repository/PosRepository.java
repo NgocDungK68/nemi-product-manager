@@ -16,4 +16,8 @@ public interface PosRepository extends JpaRepository<PosEntity, String> {
     @Query(value = "SELECT * FROM pos p WHERE CAST(p.config AS JSONB) ->> 'app-id' = :appId",
             nativeQuery = true)
     Optional<PosEntity> findByAppId(@Param("appId") String appId);
+
+    @Query("SELECT p FROM PosEntity p WHERE p.config LIKE %:keyword%")
+    Optional<PosEntity> findByConfigContaining(@Param("keyword") String config);
+
 }

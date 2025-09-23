@@ -7,6 +7,7 @@ import com.nemi.constant.enums.PosName;
 import com.nemi.constant.enums.PosStatus;
 import com.nemi.entity.PosEntity;
 import com.nemi.entity.TransactionTempEntity;
+import com.nemi.model.auth.request.AuthPosRequest;
 import com.nemi.model.config.NhanhvnConfig;
 import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.request.nhanhvn.NhanhvnAccessTokenRequest;
@@ -15,6 +16,7 @@ import com.nemi.model.response.nhanhvn.NhanhvnAccessTokenResponse;
 import com.nemi.repository.PosRepository;
 import com.nemi.repository.TransactionTempRepository;
 import com.nemi.service.WebhookService;
+import com.nemi.util.JsonUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transaction;
 import lombok.RequiredArgsConstructor;
@@ -56,18 +58,76 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
         return false;
     }
 
-    @Override
-    public void authWebhook(String appId ) throws Exception {
+    // lay accessToken, set status trong pos thanh active
+    public void authPos(AuthPosRequest authPosRequest) {
+        try {
 
-        Optional<PosEntity> posEntityOpt = posRepository.findByAppId(appId);
+            Optional<TransactionTempEntity> transactionTempEntityOpt = transactionTempRepository.findTopByOrderByUpdatedAtDesc();
+            if (transactionTempEntityOpt.isEmpty()) {
+                throw new RuntimeException("Transcation is not exist");
+            }
+            TransactionTempEntity transactionTempEntity = transactionTempEntityOpt.get();
+            String appId = transactionTempEntity.getAppId();
 
-        if(!posEntityOpt.isPresent()){
-            log.info("Appid {} doese not exist",appId);
-            throw new RuntimeException("App id not exist"); // udpate enum exception later
+            Optional<PosEntity> posOPt = posRepository.findByAppId(appId);
+            if (posOPt.isEmpty()) {
+                throw new RuntimeException("pos connection is not exist");
+            }
+            PosEntity pos = posOPt.get();
+
+            String configJson = pos.getConfig();
+            Map<String, Object> configMap = objectMapper.readValue(configJson, new TypeReference<HashMap<String, Object>>() {
+            });
+
+            String secretKey = (String) configMap.get("secret-key");
+            String businessId = (String) configMap.get("business-id");
+            log.info("secretkey : {}" , secretKey);
+            log.info("businessId : {}" , businessId);
+
+
+
+            String url = nhanhvnConfig.getUrlAccessToken() + nhanhvnConfig.getApiVersion()
+                    + "/app/getaccesstoken"
+                    + "?appId=" + nhanhvnConfig.getAppId()
+                    + "&businessId=" + businessId;
+
+            NhanhvnAccessTokenRequest requestBody =
+                    new NhanhvnAccessTokenRequest(authPosRequest.getAccessCode(),secretKey);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            HttpEntity<NhanhvnAccessTokenRequest> entity = new HttpEntity<>(requestBody, headers);
+
+            log.info("[NhanhvnAuthService.exchangeAccessToken] Request URL: {}", url);
+
+            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+
+            if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
+                log.error("Nhanhvn exchange token failed, status: {}", resp.getStatusCode());
+
+            }
+
+            NhanhvnAccessTokenResponse tokenResponse =
+                    JsonUtils.fromJson(resp.getBody(), NhanhvnAccessTokenResponse.class);
+
+            if (tokenResponse.getData() == null || tokenResponse.getData().getAccessToken() == null) {
+                log.error("Nhanhvn response does not contain accessToken: {}", resp.getBody());
+
+            }
+
+            log.info("Nhanhvn AccessToken received: {}", tokenResponse.getData().getAccessToken());
+
+            pos.setAccessToken(tokenResponse.getData().getAccessToken());
+            pos.setStatus(PosStatus.ACTIVE.name());
+            posRepository.save(pos);
+            log.info("lay duoc accessToken: {} cua appid: {}  ",pos.getAccessToken(),appId);
+
+
+        } catch (Exception e) {
+            log.error("Exchange token failed: {}", e.getMessage(), e);
+
         }
-        PosEntity pos = posEntityOpt.get();
-
-        getAccessCode(appId,pos.getUserId(),pos.getId());
     }
 
     public Optional<NhanhvnAccessTokenResponse> exchangeAccessToken(String accessCode,String appId,String businessId,String secretKey) {
@@ -110,27 +170,46 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
             return Optional.empty();
         }
     }
-        private void getAccessCode(String appId,String userId,String posId) {
-            try {
-                String url = nhanhvnConfig.getUrlAccessCode() + "?"
-                        + "version" + nhanhvnConfig.getApiVersion()
-                        + "&appId=" + appId
-                        + "&returnLink=" + "https://nemi-dev-02.ecombase.net/nemi-product-manager/public-api/nhanhvn/auth";
 
-                restTemplate.getForEntity(url, String.class);
 
-                TransactionTempEntity transactionTempEntity = TransactionTempEntity.builder()
-                        .id(posId)
-                        .status(PosStatus.PENDING.name())
-                        .appId(appId)
-                        .createdBy(userId)
-                        .build();
-
-                transactionTempRepository.save(transactionTempEntity);
-
-            } catch (Exception e) {
-                log.error("Exchange token failed: {}", e.getMessage(), e);
-            }
-
-        }
+//    @Override
+//    public void authWebhook(String appId ) throws Exception {
+//
+//        Optional<PosEntity> posEntityOpt = posRepository.findByAppId(appId);
+//
+//        if(!posEntityOpt.isPresent()){
+//            log.info("Appid {} doese not exist",appId);
+//            throw new RuntimeException("App id not exist"); // udpate enum exception later
+//        }
+//        PosEntity pos = posEntityOpt.get();
+//
+//        getAccessCode(appId,pos.getUserId(),pos.getId());
+//    }
+//
+//        private void getAccessCode(String appId,String userId,String posId) {
+//            try {
+//                String url = nhanhvnConfig.getUrlAccessCode() + "?"
+//                        + "version" + nhanhvnConfig.getApiVersion()
+//                        + "&appId=" + appId
+//                        + "&returnLink=" + "https://nemi-dev-02.ecombase.net/nemi-product-manager/public-api/nhanhvn/auth";
+//
+//                restTemplate.getForEntity(url, String.class);
+//
+//                TransactionTempEntity transactionTempEntity = TransactionTempEntity.builder()
+//                        .id(posId)
+//                        .status(PosStatus.PENDING.name())
+//                        .appId(appId)
+//                        .createdBy(userId)
+//                        .build();
+//
+//                transactionTempRepository.save(transactionTempEntity);
+//
+//            } catch (Exception e) {
+//                log.error("Exchange token failed: {}", e.getMessage(), e);
+//            }
+//
+//        }
 }
+
+
+

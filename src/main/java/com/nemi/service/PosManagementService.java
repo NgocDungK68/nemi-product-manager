@@ -31,5 +31,5 @@ public interface PosManagementService {
      * get accessCode + exchange accesstoken + sync + save db
      * @return
      */
-    PosConnectionResponse connectPos(String accessCode);
+    PosConnectionResponse connectPos(PosConnectionRequest posConnectionRequest);
 }
