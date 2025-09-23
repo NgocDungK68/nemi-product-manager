@@ -1,4 +1,4 @@
-package com.nemi.service.impl.sapo;
+package com.nemi.service_impl.sapo;
 
 import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.response.PosConnectionResponse;
