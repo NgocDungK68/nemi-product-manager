@@ -66,6 +66,9 @@ public class WebhookController {
     public PosConnectionResponse authWebhook(@PathVariable String posName,
                                              @RequestParam String accessCode,
                                              @RequestParam String code) {
+        WebhookService webhookService = webhookFactory.getWebhookService(posName);
+
+
         return null;
     }
 }

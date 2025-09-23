@@ -1,8 +1,10 @@
 package com.nemi.model.response;
 
+import lombok.Builder;
 import lombok.Data;
 
 @Data
+@Builder
 public class PosConnectionResponse {
     private String id;
     private String posName;

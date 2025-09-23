@@ -1,5 +1,6 @@
 package com.nemi.service;
 
+import com.nemi.model.response.PosConnectionResponse;
 import jakarta.servlet.http.HttpServletRequest;
 
 public interface WebhookService {
@@ -18,4 +19,12 @@ public interface WebhookService {
      * Kiểm tra xem có hỗ trợ loại webhook này không
      */
     boolean supports(String webhookType);
+
+
+    PosConnectionResponse authorizeUser();
+
+
+
+
+
 }

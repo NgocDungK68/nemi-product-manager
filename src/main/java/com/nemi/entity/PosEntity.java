@@ -27,9 +27,11 @@ public class PosEntity extends BaseEntity {
     @Column(name = "user_id", nullable = false)
     private String userId;  // FK sang bảng user (nếu có quan hệ thì dùng @ManyToOne)
 
+    @Column(name = "company_id", nullable = false)
     private String companyId;
 
     @Column(name = "pos_name", nullable = false, length = 100)
+    // ten doi tac
     private String posName;
 
     //    @Lob uncoment when json is a long text

@@ -33,7 +33,9 @@ nhanhvn:
   app-id: 76215
   business-id: 215016
   access-token: CuTFlgwHuTqYqP9gUeln1oZG1218iN9z4qnlJ74dCFbvs9KS8llOTAaJ6PaDXDOLUXKkK8tORAuFiDnXwloRWngdoG5LHqkDXLpcWnJFfL0T2YzsE2F9mzaKhkbKbbLdbyDO0rHmm9hrNnpOPYacHcfObrEAmhQJ
-  url: https://pos.open.nhanh.vn/
+  url:
+    get-access-code:  https://nhanh.vn/oauth
+    get-access-token: https://pos.open.nhanh.vn/
   api-version: v3.0
   verify-token: nemiWebhook123!@#
   secret-key: NHdyJR8NKO2v8Md7Nwb06o1n0nOAW5YcLBeQs4DdyoLmoXJK8jz6Hf3nQcadBx2m5Ys9kGydcKs0g3Kn94rVgXyU1nhmDtQSZipWJjiHo5A6ffCamfsL81DXUSm9n3AT
