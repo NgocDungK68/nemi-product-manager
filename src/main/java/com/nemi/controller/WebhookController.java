@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -69,10 +70,10 @@ public class WebhookController {
 
     @GetMapping("/{posName}/auth")
     public ResponseEntity<String> authWebhook(@PathVariable String posName,
-                                              @RequestBody PosConnectionRequest posConnectionRequest)
+                                              @RequestParam String appId)
             throws Exception {
         WebhookService webhookService = webhookFactory.getWebhookService(posName);
-        webhookService.authWebhook(posConnectionRequest);
+        webhookService.authWebhook(appId);
 
         logger.info("callling api to get access code");
         return ResponseEntity.ok("Call AccessCode");

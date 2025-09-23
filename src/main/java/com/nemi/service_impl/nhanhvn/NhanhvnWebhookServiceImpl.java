@@ -57,9 +57,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
     }
 
     @Override
-    public void authWebhook(PosConnectionRequest posConnectionRequest) throws Exception {
-
-        String appId = posConnectionRequest.getAppId();
+    public void authWebhook(String appId ) throws Exception {
 
         Optional<PosEntity> posEntityOpt = posRepository.findByAppId(appId);
 

@@ -22,7 +22,7 @@ public interface WebhookService {
     boolean supports(String webhookType);
 
 
-    void authWebhook(PosConnectionRequest posConnectionRequest) throws Exception;
+     void authWebhook(String appId ) throws Exception;
 
 
 

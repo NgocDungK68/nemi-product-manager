@@ -36,14 +36,15 @@ public class NhanhRedirectController {
     @GetMapping
 
     public ResponseEntity<?> getAccessToken(@RequestParam String accessCode) throws JsonProcessingException {
+
         Optional<TransactionTempEntity> transactionTempEntityOpt = transactionTempRepository.findTopByOrderByUpdatedAtDesc();
         if (transactionTempEntityOpt.isEmpty()) {
             throw new RuntimeException("Transcation is not exist");
         }
         TransactionTempEntity transactionTempEntity = transactionTempEntityOpt.get();
         String appId = transactionTempEntity.getAppId();
-        Optional<PosEntity> posOPt = posRepository.findByAppId(appId);
 
+        Optional<PosEntity> posOPt = posRepository.findByAppId(appId);
         if (posOPt.isEmpty()) {
             throw new RuntimeException("pos connection is not exist");
         }
@@ -55,6 +56,9 @@ public class NhanhRedirectController {
 
         String secretKey = (String) configMap.get("secret-key");
         String businessId = (String) configMap.get("business-id");
+        log.info("secretkey : {}" , secretKey);
+        log.info("businessId : {}" , businessId);
+
 
 
         Optional<NhanhvnAccessTokenResponse> nhanhvnAccessTokenResponseOpt = nhanhvnWebhookService.exchangeAccessToken(accessCode, appId, businessId, secretKey);
@@ -66,6 +70,8 @@ public class NhanhRedirectController {
         pos.setAccessToken(nhanhvnAccessTokenResponse.getData().getAccessToken());
         pos.setStatus(PosStatus.ACTIVE.name());
         posRepository.save(pos);
+        log.info("lay duoc accessToken: {} cua appid: {}  ",pos.getAccessToken(),appId);
+
 
         return ResponseEntity.ok("accessToken updated");
     }
