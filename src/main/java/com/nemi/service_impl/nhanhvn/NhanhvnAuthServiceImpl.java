@@ -24,7 +24,7 @@ public class NhanhvnAuthServiceImpl implements NhanhvnAuthService {
     @Override
     public Optional<NhanhvnAccessTokenResponse> exchangeAccessToken(String accessCode) {
         try {
-            String url = nhanhvnConfig.getUrl() + nhanhvnConfig.getApiVersion()
+            String url = nhanhvnConfig.getUrlAccessToken() + nhanhvnConfig.getApiVersion()
                     + "/app/getaccesstoken"
                     + "?appId=" + nhanhvnConfig.getAppId()
                     + "&businessId=" + nhanhvnConfig.getBusinessId();
