@@ -20,9 +20,8 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "pos")
+@Table(schema = "product_manager", name = "pos")
 @EqualsAndHashCode(callSuper = true)
-
 public class PosEntity extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

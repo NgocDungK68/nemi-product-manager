@@ -4,6 +4,7 @@ import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.response.PosConnectionResponse;
 import com.nemi.service.PosManagementService;
 import com.nemi.service.factory.PosManagementFactory;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -14,9 +15,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/public-api/v1")
+@RequestMapping("/client-api/v1")
+@RequiredArgsConstructor
 public class PosManagementController  {
-    private PosManagementFactory posManagementFactory;
+    private final PosManagementFactory posManagementFactory;
 
     @PostMapping("/{posName}/pos1")
     public ResponseEntity<PosConnectionResponse> connectPos(@PathVariable String posName,

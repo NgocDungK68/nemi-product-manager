@@ -44,7 +44,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
     @Override
     public String getPosName() {
-        return PosName.NHANHVN.name();
+        return PosName.NHANHVN.getValue();
     }
 
     /**
@@ -118,8 +118,9 @@ public class NhanhvnServiceImpl implements PosManagementService {
                     .posName(PosName.NHANHVN.name())
                     .userId(userId)
                     .status(PosStatus.ACTIVE.name())
-                    .config(configMap.toString())
+                    .config(JsonUtils.toJson(configMap))
                     .expiredTime(expiredTime)
+                    .companyId(String.valueOf(claimUtil.getCompanyId()))
                     .build();
 
             posRepository.save(posEntityBuilder);
@@ -131,7 +132,6 @@ public class NhanhvnServiceImpl implements PosManagementService {
                     .updatedAt(LocalDateTime.now())
                      .expiredTime(expiredTime)
                     .build();
-
 
         } catch (Exception e) {
             log.error("Exchange token failed: {}", e.getMessage(), e);
