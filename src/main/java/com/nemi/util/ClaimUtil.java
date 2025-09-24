@@ -15,7 +15,8 @@ public class ClaimUtil {
 
     public String getUserId() {
         try {
-            return SecurityContextHolder.getContext().getAuthentication().getPrincipal().toString();
+            return "123";
+//            return SecurityContextHolder.getContext().getAuthentication().getPrincipal().toString();
         } catch (Exception e) {
             log.error("Exception occurred while getting username", e);
             return null;

@@ -16,7 +16,7 @@ public class PosConnectionResponse {
     private String posName;
     private String config;
     private String status;
-    private String expiredTime;
+    private LocalDateTime expiredTime;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

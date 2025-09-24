@@ -4,19 +4,33 @@ import com.nemi.constant.enums.PosName;
 import com.nemi.constant.enums.PosStatus;
 import com.nemi.entity.PosEntity;
 import com.nemi.entity.TransactionTempEntity;
+import com.nemi.exception.TechnicalAlertCode;
+import com.nemi.exception.TechnicalException;
+import com.nemi.exception.pojo.AlertMessages;
 import com.nemi.model.config.NhanhvnConfig;
 import com.nemi.model.request.PosConnectionRequest;
+import com.nemi.model.request.nhanhvn.NhanhvnAccessTokenRequest;
 import com.nemi.model.response.PosConnectionResponse;
+import com.nemi.model.response.nhanhvn.NhanhvnAccessTokenResponse;
 import com.nemi.repository.PosRepository;
 import com.nemi.repository.TransactionTempRepository;
 import com.nemi.service.PosManagementService;
 import com.nemi.util.ClaimUtil;
+import com.nemi.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -25,8 +39,9 @@ import java.util.Optional;
 public class NhanhvnServiceImpl implements PosManagementService {
     private final PosRepository posRepository;
     private final NhanhvnConfig nhanhvnConfig;
-    private final TransactionTempRepository transactionTempRepository;
     private final ClaimUtil claimUtil;
+    private final RestTemplate restTemplate;
+
     @Override
     public String getPosName() {
         return PosName.NHANHVN.name();
@@ -62,42 +77,59 @@ public class NhanhvnServiceImpl implements PosManagementService {
     @Override
     public PosConnectionResponse connectPos(PosConnectionRequest posConnectionRequest) {
         PosConnectionResponse posConnectionResponse = new PosConnectionResponse();
-
         try {
              String userId = claimUtil.getUserId();
 
+            Map<String, String> configMap = new HashMap<>();
+            configMap.put("secretId", posConnectionRequest.getAppSecret());
+            configMap.put("appId", posConnectionRequest.getAppSecret());
+            configMap.put("businessId", posConnectionRequest.getBusinessId());
 
-            String config = String.format(
-                    "{\"secretId\":\"%s\", \"appId\":\"%s\", \"businessId\":\"%s\"}",
-                    posConnectionRequest.getAppSecret(), posConnectionRequest.getAppId(), posConnectionRequest.getBusinessId()
-            );
+            String url = nhanhvnConfig.getUrlAccessToken() + nhanhvnConfig.getApiVersion()
+                    + "/app/getaccesstoken"
+                    + "?appId=" + posConnectionRequest.getAppId()
+                    + "&businessId=" + posConnectionRequest.getBusinessId();
+
+            NhanhvnAccessTokenRequest requestBody = NhanhvnAccessTokenRequest.builder()
+                    .accessCode(posConnectionRequest.getAccessCode())
+                    .secretKey(posConnectionRequest.getAppSecret()).build();
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<NhanhvnAccessTokenRequest> entity = new HttpEntity<>(requestBody, headers);
+
+            log.info("[NhanhvnAuthService.exchangeAccessToken] Request URL: {}", url);
+            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+
+            if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
+                log.error("Nhanhvn exchange token failed, status: {}", resp.getStatusCode());
+
+            }
+            NhanhvnAccessTokenResponse tokenResponse =
+                    JsonUtils.fromJson(resp.getBody(), NhanhvnAccessTokenResponse.class);
+
+            if (tokenResponse.getData() == null || tokenResponse.getData().getAccessToken() == null) {
+                log.error("Nhanhvn response does not contain accessToken: {}", resp.getBody());
+            }
+
+            LocalDateTime expiredTime = LocalDateTime.now().plusYears(1);
 
             PosEntity posEntityBuilder = PosEntity.builder()
                     .posName(PosName.NHANHVN.name())
                     .userId(userId)
-                    .status(PosStatus.PENDING.name())
-                    .config(config)
-                    .expiredTime(LocalDateTime.now().plusYears(1))
+                    .status(PosStatus.ACTIVE.name())
+                    .config(configMap.toString())
+                    .expiredTime(expiredTime)
                     .build();
 
             posRepository.save(posEntityBuilder);
-            PosEntity posEntity = posRepository.findByConfigContaining(config).orElseThrow(() -> new RuntimeException("error while finding entity"));
-
-
-            TransactionTempEntity transactionTempEntity = TransactionTempEntity.builder()
-                    .id(posEntity.getId())
-                    .status(PosStatus.PENDING.name())
-                    .appId(posConnectionRequest.getAppId())
-                    .createdBy(userId)
-                    .build();
-            transactionTempRepository.save(transactionTempEntity);
 
              posConnectionResponse = PosConnectionResponse.builder()
                     .posName(PosName.NHANHVN.name())
-                    .status(PosStatus.PENDING.name())
-                    .config(config)
+                    .status(PosStatus.ACTIVE.name())
                     .createdAt(LocalDateTime.now())
                     .updatedAt(LocalDateTime.now())
+                     .expiredTime(expiredTime)
                     .build();
 
 
