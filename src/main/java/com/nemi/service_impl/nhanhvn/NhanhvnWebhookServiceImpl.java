@@ -62,12 +62,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
     public void authPos(AuthPosRequest authPosRequest) {
         try {
 
-            Optional<TransactionTempEntity> transactionTempEntityOpt = transactionTempRepository.findTopByOrderByUpdatedAtDesc();
-            if (transactionTempEntityOpt.isEmpty()) {
-                throw new RuntimeException("Transcation is not exist");
-            }
-            TransactionTempEntity transactionTempEntity = transactionTempEntityOpt.get();
-            String appId = transactionTempEntity.getAppId();
+            String appId = authPosRequest.getAppId();
 
             Optional<PosEntity> posOPt = posRepository.findByAppId(appId);
             if (posOPt.isEmpty()) {
@@ -88,7 +83,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
 
             String url = nhanhvnConfig.getUrlAccessToken() + nhanhvnConfig.getApiVersion()
                     + "/app/getaccesstoken"
-                    + "?appId=" + nhanhvnConfig.getAppId()
+                    + "?appId=" + appId
                     + "&businessId=" + businessId;
 
             NhanhvnAccessTokenRequest requestBody =

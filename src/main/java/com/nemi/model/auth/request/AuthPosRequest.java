@@ -14,6 +14,7 @@ import lombok.NoArgsConstructor;
 public class AuthPosRequest {
     private String accessCode;
     private String secretkey;
-    private String businessId;
+    private String businessId; // kha nang k can truong nay, pancake hay sapo k can thi xoa di nhe
+    private String appId;
     // bo sung cac truong tu pos khac sau
 }

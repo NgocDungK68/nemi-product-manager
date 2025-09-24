@@ -17,7 +17,12 @@ public interface PosRepository extends JpaRepository<PosEntity, String> {
             nativeQuery = true)
     Optional<PosEntity> findByAppId(@Param("appId") String appId);
 
-    @Query("SELECT p FROM PosEntity p WHERE p.config LIKE %:keyword%")
-    Optional<PosEntity> findByConfigContaining(@Param("keyword") String config);
+//    @Query("SELECT p FROM PosEntity p WHERE p.config LIKE %:keyword%")
+//    Optional<PosEntity> findByConfigContaining(@Param("keyword") String config);
+
+    Optional<PosEntity> findByConfigContaining(String config);
+
+
+
 
 }
