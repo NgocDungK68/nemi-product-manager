@@ -5,6 +5,8 @@ import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.response.PosConnectionResponse;
 import com.nemi.model.response.StatusResponse;
 import com.nemi.service.factory.PosManagementFactory;
+import com.nemi.service.factory.PosSyncDataFactory;
+import com.nemi.service.sync_data.PosSyncDataService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,14 +24,17 @@ import java.util.List;
 @RequestMapping("/client-api/v1")
 @RequiredArgsConstructor
 public class PosManagementController {
-
     private final PosManagementFactory posManagementFactory;
+    private final PosSyncDataFactory posSyncDataFactory;
 
     @PostMapping("/{posName}/pos")
     public ResponseEntity<PosConnectionResponse> connectPos(@PathVariable String posName,
                                                             @RequestBody PosConnectionRequest posConnectionRequest) {
         PosManagementService posManagementService = posManagementFactory.getPosName(posName);
         PosConnectionResponse posConnectionResponse = posManagementService.connectPos(posConnectionRequest);
+
+        PosSyncDataService posSyncDataService = posSyncDataFactory.getPosName(posName);
+        posSyncDataService.trigger(posConnectionResponse.getId());
         return ResponseEntity.ok(posConnectionResponse);
     }
 

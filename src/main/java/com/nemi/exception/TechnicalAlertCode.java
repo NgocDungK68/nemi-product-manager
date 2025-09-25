@@ -13,6 +13,7 @@ public enum TechnicalAlertCode implements IAlertCode {
     KEYCLOAK_ERROR("500003", "Lỗi tích hợp Keycloak", AlertType.ERROR),
     POS_CONNECTION_FAILED("500004", "Lỗi kết nối POS", AlertType.ERROR),
     STATUS_NOT_EXIST("500005","status không hợp lệ",AlertType.ERROR),
+    DATA_INVALID("500006", "Thong tin khong hop le", AlertType.ERROR)
     ;
 
     private final AlertCode alertCode;
