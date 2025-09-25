@@ -69,7 +69,7 @@ public class NhanhvnServiceImpl extends AbstractPosManagementService implements 
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<String> entity = new HttpEntity<>(JsonUtils.toJson(requestBody), headers);
+            HttpEntity<NhanhvnAccessTokenRequest> entity = new HttpEntity<>(requestBody, headers);
 
             log.info("[NhanhvnAuthService.exchangeAccessToken] Request URL: {}", url);
             ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
@@ -91,6 +91,7 @@ public class NhanhvnServiceImpl extends AbstractPosManagementService implements 
                     .posName(PosName.NHANHVN.name())
                     .userId(userId)
                     .status(PosStatus.ACTIVE.name())
+                    .accessToken(tokenResponse.getData().getAccessToken())
                     .config(JsonUtils.toJson(configMap))
                     .expiredTime(expiredTime)
                     .companyId(String.valueOf(claimUtil.getCompanyId()))
