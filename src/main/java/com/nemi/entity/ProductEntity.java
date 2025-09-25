@@ -15,13 +15,13 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @NoArgsConstructor
 @Entity
-@Table(name = "products")
+@Table(name = "products",schema = "product_manager")
 public class ProductEntity {
     @Id
     @Column(name = "product_id")
     private String productId;
 
-    @Column(name = "posId")
+    @Column(name = "pos_id")
     private String posId;
 
     @Column(name = "code")
