@@ -73,11 +73,6 @@ public abstract class AbstractPosManagementService {
     /**
      * register all POS connections for a user
      */
-    public PosConnectionResponse registerPos(PosConnectionRequest posConnectionRequest) {
-        PosEntity pos = JsonUtils.map(posConnectionRequest,PosEntity.class);
-        posRepository.save(pos);
-        return JsonUtils.map(pos,PosConnectionResponse.class);
-    }
 }
 
 

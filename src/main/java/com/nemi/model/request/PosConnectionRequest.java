@@ -13,5 +13,5 @@ public class PosConnectionRequest {
     private String businessId;
     private String appSecret;       // clientSecret (SAPO)
     private String shopId;
-    private String accessCode ;
+    private String accessCode;
 }

@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/client-api/v1")
+@RequestMapping("/public-api/v1") // client-api
 @RequiredArgsConstructor
 public class PosManagementController {
 
@@ -59,8 +59,8 @@ public class PosManagementController {
 
     }
 
-    @GetMapping("/{posName}/pos/register") // giong getlist chi cha ra status
-    public ResponseEntity<PosConnectionResponse> registerPos(@PathVariable String posName, @PathVariable(name = "pos-id") String posId,
+    @PostMapping("/{posName}/pos/register") // giong getlist chi cha ra status
+    public ResponseEntity<PosConnectionResponse> registerPos(@PathVariable String posName,
                                                              @RequestBody PosConnectionRequest posConnectionRequest) {
 
         PosManagementService posManagementService = posManagementFactory.getPosName(posName);

@@ -54,7 +54,7 @@ public class NhanhvnServiceImpl extends AbstractPosManagementService implements 
 
             Map<String, String> configMap = new HashMap<>();
             configMap.put("secretId", posConnectionRequest.getAppSecret());
-            configMap.put("appId", posConnectionRequest.getAppSecret());
+            configMap.put("appId", posConnectionRequest.getAppId());
             configMap.put("businessId", posConnectionRequest.getBusinessId());
 
             String url = nhanhvnConfig.getUrlAccessToken() + nhanhvnConfig.getApiVersion()
@@ -65,10 +65,11 @@ public class NhanhvnServiceImpl extends AbstractPosManagementService implements 
             NhanhvnAccessTokenRequest requestBody = NhanhvnAccessTokenRequest.builder()
                     .accessCode(posConnectionRequest.getAccessCode())
                     .secretKey(posConnectionRequest.getAppSecret()).build();
+            log.info("token respon: {}",JsonUtils.toJson(requestBody));
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<NhanhvnAccessTokenRequest> entity = new HttpEntity<>(requestBody, headers);
+            HttpEntity<String> entity = new HttpEntity<>(JsonUtils.toJson(requestBody), headers);
 
             log.info("[NhanhvnAuthService.exchangeAccessToken] Request URL: {}", url);
             ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
@@ -102,6 +103,27 @@ public class NhanhvnServiceImpl extends AbstractPosManagementService implements 
             log.error("Exchange token failed: {}", e.getMessage(), e);
         }
         return posConnectionResponse;
+    }
+
+    @Override
+    public PosConnectionResponse registerPos(PosConnectionRequest posConnectionRequest) {
+        String userId = claimUtil.getUserId();
+        Map<String, String> configMap = new HashMap<>();
+        configMap.put("secretId", posConnectionRequest.getAppSecret());
+        configMap.put("appId", posConnectionRequest.getAppId());
+        configMap.put("businessId", posConnectionRequest.getBusinessId());
+
+        PosEntity posEntityBuilder = PosEntity.builder()
+                .posName(PosName.NHANHVN.name())
+                .userId(userId)
+                .status(PosStatus.PENDING.name())
+                .config(JsonUtils.toJson(configMap))
+                .expiredTime(LocalDateTime.now().plusYears(1))
+                .companyId(String.valueOf(claimUtil.getCompanyId()))
+                .build();
+
+        posRepository.save(posEntityBuilder);
+        return PosConnectionResponse.toPosConnectionResponse(posEntityBuilder);
     }
 
 }
