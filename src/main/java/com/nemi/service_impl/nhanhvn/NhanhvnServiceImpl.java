@@ -1,27 +1,24 @@
-package com.nemi.client.impl;
+package com.nemi.service_impl.nhanhvn;
 
+import com.nemi.client.impl.NhanhvnClientImpl;
 import com.nemi.constant.enums.PosName;
 import com.nemi.constant.enums.PosStatus;
 import com.nemi.entity.PosEntity;
+import com.nemi.exception.TechnicalAlertCode;
+import com.nemi.exception.TechnicalException;
+import com.nemi.exception.pojo.AlertMessages;
 import com.nemi.model.config.NhanhvnConfig;
 import com.nemi.model.request.PosConnectionRequest;
-import com.nemi.model.request.nhanhvn.NhanhvnAccessTokenRequest;
 import com.nemi.model.response.PosConnectionResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnAccessTokenResponse;
 import com.nemi.repository.PosRepository;
-import com.nemi.client.PosManagementService;
-import com.nemi.client.AbstractPosManagementService;
+import com.nemi.service.AbstractPosManagementService;
+import com.nemi.service.PosManagementService;
 import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -31,15 +28,13 @@ import java.util.Map;
 @Slf4j
 
 public class NhanhvnServiceImpl extends AbstractPosManagementService implements PosManagementService {
-    private final NhanhvnConfig nhanhvnConfig;
     private final ClaimUtil claimUtil;
-    private final RestTemplate restTemplate;
+    private final NhanhvnClientImpl nhanhvnClient;
 
-    public NhanhvnServiceImpl(PosRepository posRepository, NhanhvnConfig nhanhvnConfig, ClaimUtil claimUtil, RestTemplate restTemplate) {
+    public NhanhvnServiceImpl(PosRepository posRepository, ClaimUtil claimUtil, NhanhvnClientImpl nhanhvnClient) {
         super(posRepository);
-        this.nhanhvnConfig = nhanhvnConfig;
         this.claimUtil = claimUtil;
-        this.restTemplate = restTemplate;
+        this.nhanhvnClient = nhanhvnClient;
     }
 
     @Override
@@ -50,7 +45,7 @@ public class NhanhvnServiceImpl extends AbstractPosManagementService implements 
     @Override
     public PosConnectionResponse connectPos(PosConnectionRequest posConnectionRequest) {
         PosConnectionResponse posConnectionResponse = new PosConnectionResponse();
-        try {
+
             String userId = claimUtil.getUserId();
 
             Map<String, String> configMap = new HashMap<>();
@@ -58,42 +53,14 @@ public class NhanhvnServiceImpl extends AbstractPosManagementService implements 
             configMap.put("appId", posConnectionRequest.getAppId());
             configMap.put("businessId", posConnectionRequest.getBusinessId());
 
+
+            NhanhvnAccessTokenResponse tokenResponse = nhanhvnClient.getAccessToken(posConnectionRequest);
+
             // 1. Xây dựng URL với query parameters
-            String url = "https://pos.open.nhanh.vn/v3.0/app/getaccesstoken";
-
-            String urlWithParams = UriComponentsBuilder.fromHttpUrl(url)
-                    .queryParam("appId", posConnectionRequest.getAppId())
-                    .queryParam("businessId", posConnectionRequest.getBusinessId())
-                    .toUriString();
-
-            // 2. Request body chỉ chứa accessCode và secretKey
-            NhanhvnAccessTokenRequest requestBody = NhanhvnAccessTokenRequest.builder()
-                    .accessCode(posConnectionRequest.getAccessCode())
-                    .secretKey(posConnectionRequest.getAppSecret())
-                    .build();
-
-            log.info("Request body: {}", JsonUtils.toJson(requestBody));
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<NhanhvnAccessTokenRequest> entity = new HttpEntity<>(requestBody, headers);
-
-            log.info("[NhanhvnAuthService.exchangeAccessToken] Request URL with params: {}", urlWithParams);
-
-            // 3. Gọi API với URL đã có query parameters
-            ResponseEntity<String> resp = restTemplate.exchange(urlWithParams, HttpMethod.POST, entity, String.class);
-            log.info("[NhanhvnAuthService.exchangeAccessToken] Request URL: {}", url);
-
-
-            if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
-                log.error("Nhanhvn exchange token failed, status: {}", resp.getStatusCode());
-
-            }
-            NhanhvnAccessTokenResponse tokenResponse =
-                    JsonUtils.fromJson(resp.getBody(), NhanhvnAccessTokenResponse.class);
-
             if (tokenResponse.getData() == null || tokenResponse.getData().getAccessToken() == null) {
-                log.error("Nhanhvn response does not contain accessToken: {}", resp.getBody());
+                log.error("Nhanhvn response is null, stop persist to db");
+                throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
+
             }
 
             LocalDateTime expiredTime = LocalDateTime.now().plusYears(1);
@@ -109,11 +76,8 @@ public class NhanhvnServiceImpl extends AbstractPosManagementService implements 
                     .build();
 
             posRepository.save(posEntityBuilder);
+            posConnectionResponse = PosConnectionResponse.toPosConnectionResponse(posEntityBuilder);
 
-
-        } catch (Exception e) {
-            log.error("Exchange token failed: {}", e.getMessage(), e);
-        }
         return posConnectionResponse;
     }
 

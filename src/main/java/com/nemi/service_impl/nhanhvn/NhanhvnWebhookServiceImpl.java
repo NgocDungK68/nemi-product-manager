@@ -11,7 +11,7 @@ import com.nemi.model.request.nhanhvn.NhanhvnAccessTokenRequest;
 import com.nemi.model.response.nhanhvn.NhanhvnAccessTokenResponse;
 import com.nemi.repository.PosRepository;
 import com.nemi.repository.TransactionTempRepository;
-import com.nemi.client.WebhookService;
+import com.nemi.service.WebhookService;
 import com.nemi.util.JsonUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;

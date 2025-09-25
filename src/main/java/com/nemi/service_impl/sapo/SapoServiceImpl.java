@@ -2,8 +2,9 @@ package com.nemi.service_impl.sapo;
 
 import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.response.PosConnectionResponse;
-import com.nemi.client.PosManagementService;
+
 import com.nemi.model.response.StatusResponse;
+import com.nemi.service.PosManagementService;
 
 import java.util.List;
 

@@ -3,7 +3,7 @@ package com.nemi.service.factory;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
-import com.nemi.client.PosManagementService;
+import com.nemi.service.PosManagementService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

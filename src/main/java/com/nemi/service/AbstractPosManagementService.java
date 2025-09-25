@@ -1,15 +1,13 @@
-package com.nemi.client;
+package com.nemi.service;
 
 import com.nemi.constant.enums.PosStatus;
 import com.nemi.entity.PosEntity;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
-import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.response.PosConnectionResponse;
 import com.nemi.model.response.StatusResponse;
 import com.nemi.repository.PosRepository;
-import com.nemi.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 

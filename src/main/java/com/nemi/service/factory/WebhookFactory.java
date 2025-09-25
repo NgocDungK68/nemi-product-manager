@@ -1,6 +1,6 @@
 package com.nemi.service.factory;
 
-import com.nemi.client.WebhookService;
+import com.nemi.service.WebhookService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

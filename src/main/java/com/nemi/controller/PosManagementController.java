@@ -1,9 +1,9 @@
 package com.nemi.controller;
 
-import com.nemi.client.PosManagementService;
 import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.response.PosConnectionResponse;
 import com.nemi.model.response.StatusResponse;
+import com.nemi.service.PosManagementService;
 import com.nemi.service.factory.PosManagementFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
