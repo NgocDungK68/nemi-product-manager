@@ -56,7 +56,7 @@ sapo:
   client-id: 50f184d93c834ebaa764cc17c25e31fa
   client-secret: 50ce6b4d47a04ca18aa6f972b698779a
   access-token: 59d0c4eea0fc497e81733f693d3e4641
-  url: https://nemi.mysapo.net/
+  url: https://nemi-test.mysapo.net/
 
 secret:
   jwt-public-key: "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArh1qU7sGe0uiquAuZo9+T4RTLZoG5NdtHtPCxcFp04EaTJFF+EmN/hwC0v3BXjNbvHYOPfUkmZ98QGeGXE6Q8xp3RGJafrmg6IAOzcWVSaVS4X0hlZjUNs5gW197ojhCCPRuWUSdSmAJG1i+CLQPn+pCBK7Wy2sJ6JTVtnuvs6LaUeqL9B7yE4LaMgEJo9ubi/TCrkD6dI4mxrqsVQVDpaHxau+sZbBsbGD/V4rWfFv7XqAbqWbam3gF/Qr2q/321sLkYjoSEG5sLxaDLgrDPk2moZ1PyLtuDpeF1DWygcK7XRsZjD3j4LkV2K4Ubi+P2wQCI+oZfM1XVlslzKKnVQIDAQAB"
