@@ -1,24 +1,19 @@
 package com.nemi.service_impl.nhanhvn;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.constant.enums.PosName;
 import com.nemi.constant.enums.PosStatus;
 import com.nemi.entity.PosEntity;
-import com.nemi.entity.TransactionTempEntity;
 import com.nemi.model.auth.request.AuthPosRequest;
 import com.nemi.model.config.NhanhvnConfig;
-import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.request.nhanhvn.NhanhvnAccessTokenRequest;
-import com.nemi.model.response.PosConnectionResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnAccessTokenResponse;
 import com.nemi.repository.PosRepository;
 import com.nemi.repository.TransactionTempRepository;
-import com.nemi.service.WebhookService;
+import com.nemi.client.WebhookService;
 import com.nemi.util.JsonUtils;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.transaction.Transaction;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpEntity;
@@ -26,7 +21,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.parameters.P;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 

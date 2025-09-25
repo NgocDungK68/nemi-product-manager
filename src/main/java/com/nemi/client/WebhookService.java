@@ -1,4 +1,4 @@
-package com.nemi.service;
+package com.nemi.client;
 
 import com.nemi.model.auth.request.AuthPosRequest;
 import jakarta.servlet.http.HttpServletRequest;

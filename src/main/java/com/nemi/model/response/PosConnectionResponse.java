@@ -1,5 +1,6 @@
 package com.nemi.model.response;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.nemi.entity.PosEntity;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -12,6 +13,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class PosConnectionResponse {
     private String id;
     private String posName;

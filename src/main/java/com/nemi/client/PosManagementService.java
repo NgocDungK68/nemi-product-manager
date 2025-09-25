@@ -1,15 +1,17 @@
-package com.nemi.service;
+package com.nemi.client;
 
+import com.nemi.constant.enums.PosStatus;
 import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.response.PosConnectionResponse;
+import com.nemi.model.response.StatusResponse;
 
 import java.util.List;
 
 public interface PosManagementService {
     String getPosName();
-    String getPosStatus(String transactionId);
+    StatusResponse getPosStatus(String posId);
 
-    String setPosStatus(String id, String status);
+    PosConnectionResponse setPosStatus(String id, String status);
 
     List<PosConnectionResponse> listPosConnection(String userId);
 
@@ -32,4 +34,5 @@ public interface PosManagementService {
      * @return
      */
     PosConnectionResponse connectPos(PosConnectionRequest posConnectionRequest);
+
 }

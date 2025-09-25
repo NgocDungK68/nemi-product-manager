@@ -1,6 +1,9 @@
 package com.nemi.service.factory;
 
-import com.nemi.service.PosManagementService;
+import com.nemi.exception.TechnicalAlertCode;
+import com.nemi.exception.TechnicalException;
+import com.nemi.exception.pojo.AlertMessages;
+import com.nemi.client.PosManagementService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -16,6 +19,6 @@ public class PosManagementFactory {
         return Objects.requireNonNull(posManagementService.stream()
                 .filter(service -> service.getPosName().equals(posName))
                 .findFirst()
-                .orElseThrow(() ->  new RuntimeException("Pos type not supported " + posName)));  // update enum exception sau
+                .orElseThrow(() ->  new TechnicalException(AlertMessages.alert(TechnicalAlertCode.SYSTEM_ERROR))));  // update enum exception sau
     }
 }

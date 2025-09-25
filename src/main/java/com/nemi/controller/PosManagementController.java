@@ -1,45 +1,74 @@
 package com.nemi.controller;
 
+import com.nemi.client.PosManagementService;
+import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.response.PosConnectionResponse;
-import com.nemi.service.PosManagementService;
+import com.nemi.model.response.StatusResponse;
 import com.nemi.service.factory.PosManagementFactory;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/client-api/v1")
-public class PosManagementController  {
-    private PosManagementFactory posManagementFactory;
-    private PosManagementService posManagementService;
+@RequiredArgsConstructor
+public class PosManagementController {
 
-//    @PostMapping("/{posName}/pos") // save ban ghi vao db pos(status pending)
-//    public ResponseEntity<PosConnectionResponse> connectPos(@PathVariable String posName) {
-//        PosManagementService posManagementService = posManagementFactory.getPosName(posName);
-//
-//    }
-    // tuong tu
-//    @GetMapping("/pos") //get all pos theo db(k quan trong pos type)
-//    public ResponseEntity<PosConnectionResponse> listPos() {
-//        posManagementService.listPosConnection();
-//        return null;
-//    }
+    private final PosManagementFactory posManagementFactory;
+
+    @PostMapping("/{posName}/pos")
+    public ResponseEntity<PosConnectionResponse> connectPos(@PathVariable String posName,
+                                                            @RequestBody PosConnectionRequest posConnectionRequest) {
+        PosManagementService posManagementService = posManagementFactory.getPosName(posName);
+        PosConnectionResponse posConnectionResponse = posManagementService.connectPos(posConnectionRequest);
+        return ResponseEntity.ok(posConnectionResponse);
+    }
 
     @PatchMapping("/{posName}/pos/{pos-id}") // cap nhat trang thai pos trong db
-    public ResponseEntity<PosConnectionResponse> changeStatusPos(@PathVariable(name = "pos-id") String posId) {
-        return null;
+    public ResponseEntity<PosConnectionResponse> changeStatusPos(@PathVariable String posName, @PathVariable(name = "pos-id") String posId,
+                                                                 @RequestParam String status) {
+        PosManagementService posManagementService = posManagementFactory.getPosName(posName);
+        PosConnectionResponse posConnectionResponse =  posManagementService.setPosStatus(posId, status);
+        return ResponseEntity.ok(posConnectionResponse);
     }
 
-    @GetMapping("/{posName}/pos/{transactionId}/auth/status") // giong getlist chi cha ra status
-    public ResponseEntity<PosConnectionResponse> getStatusPos(@PathVariable String transactionId) {
-        return null;
+    @GetMapping("/{posName}/pos/{pos-id}/auth/status") // giong getlist chi cha ra status
+    public ResponseEntity<StatusResponse> getStatusPos(@PathVariable String posName, @PathVariable(name = "pos-id") String posId) {
+        PosManagementService posManagementService = posManagementFactory.getPosName(posName);
+        StatusResponse statusResponse =  posManagementService.getPosStatus(posId);
+
+        return ResponseEntity.ok(statusResponse);
+
     }
+
+    @GetMapping("/{posName}/pos/{userId}") // giong getlist chi cha ra status
+    public ResponseEntity<List<PosConnectionResponse>> listAllPos(@PathVariable String posName, @PathVariable String userId) {
+
+        PosManagementService posManagementService = posManagementFactory.getPosName(posName);
+        List<PosConnectionResponse> listPosConnection = posManagementService.listPosConnection(userId);
+        return ResponseEntity.ok(listPosConnection);
+
+    }
+
+    @GetMapping("/{posName}/pos/register") // giong getlist chi cha ra status
+    public ResponseEntity<PosConnectionResponse> registerPos(@PathVariable String posName, @PathVariable(name = "pos-id") String posId,
+                                                             @RequestBody PosConnectionRequest posConnectionRequest) {
+
+        PosManagementService posManagementService = posManagementFactory.getPosName(posName);
+        PosConnectionResponse pos = posManagementService.registerPos(posConnectionRequest);
+        return ResponseEntity.ok(pos);
+    }
+
 }
-
 
 
 // nhanhvn

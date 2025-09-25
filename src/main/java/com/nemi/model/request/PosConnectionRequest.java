@@ -9,9 +9,9 @@ import lombok.*;
 @AllArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class PosConnectionRequest {
-    private String userId;
     private String appId;           //  clientId    (SAPO)
     private String businessId;
     private String appSecret;       // clientSecret (SAPO)
     private String shopId;
+    private String accessCode ;
 }

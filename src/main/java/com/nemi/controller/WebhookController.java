@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.model.auth.request.AuthPosRequest;
 import com.nemi.repository.PosRepository;
 import com.nemi.repository.TransactionTempRepository;
-import com.nemi.service.WebhookService;
+import com.nemi.client.WebhookService;
 import com.nemi.service.factory.WebhookFactory;
 import com.nemi.service_impl.nhanhvn.NhanhvnWebhookServiceImpl;
 import jakarta.servlet.http.HttpServletRequest;

@@ -1,4 +1,4 @@
-package com.nemi.model.request.nhanhvn;
+package com.nemi.model.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -6,10 +6,9 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
-public class NhanhvnAccessTokenRequest {
-    private String accessCode;
-    private String secretKey;
+public class StatusResponse {
+    private String status;
 }
