@@ -79,6 +79,7 @@ public class SapoServiceImpl extends AbstractPosManagementService implements Pos
             PosEntity posEntityBuilder = PosEntity.builder()
                     .posName(PosName.SAPO.name())
                     .userId(userId)
+                    .accessToken(tokenResponse.getAccessToken())
                     .status(PosStatus.ACTIVE.name())
                     .config(JsonUtils.toJson(configMap))
                     .companyId(String.valueOf(claimUtil.getCompanyId()))
