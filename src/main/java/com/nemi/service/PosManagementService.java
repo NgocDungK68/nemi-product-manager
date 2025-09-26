@@ -22,4 +22,6 @@ public interface PosManagementService {
 
     List<PosConnectionResponse> getAllPos();
 
+    boolean syncData(String posId);
+
 }

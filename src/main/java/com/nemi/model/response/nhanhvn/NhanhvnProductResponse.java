@@ -3,6 +3,8 @@ package com.nemi.model.response.nhanhvn;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.nemi.configuration.BrandDeserializer;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -39,7 +41,9 @@ public class NhanhvnProductResponse {
         private Prices prices;
         private Images images;
         private List<Warranty> warranty;
-        private List<Brand> brand;
+
+        @JsonDeserialize(using = BrandDeserializer.class)
+        private Brand brand;
         private Integer type;
         private Shipping shipping;
         private String countryName;
