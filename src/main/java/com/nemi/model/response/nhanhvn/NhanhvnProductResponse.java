@@ -34,12 +34,12 @@ public class NhanhvnProductResponse {
         private String otherName;
         private Integer status;
         private Integer vat;
-        private Category category;
-        private Category internalCategory;
+        private List<Category> category;
+        private List<Category> internalCategory;
         private Prices prices;
         private Images images;
-        private Warranty warranty;
-        private Brand brand;
+        private List<Warranty> warranty;
+        private List<Brand> brand;
         private Integer type;
         private Shipping shipping;
         private String countryName;
