@@ -32,12 +32,12 @@ public class NhanhvnClientImpl implements PosClient {
         String url = nhanhvnConfig.getBaseUrl() + "/"
                 + nhanhvnConfig.getApiVersion() + "/"
                 + nhanhvnConfig.getUrlAccessToken();
-        log.debug("[NhanhvnAuthService.exchangeAccessToken] Request URL with params: {}", url);
 
         String urlWithParams = UriComponentsBuilder.fromHttpUrl(url)
                 .queryParam("appId", posConnectionRequest.getAppId())
                 .queryParam("businessId", posConnectionRequest.getBusinessId())
                 .toUriString();
+        log.debug("[NhanhvnAuthService.exchangeAccessToken] Request URL with params: {}", url);
 
         // 2. Request body chỉ chứa accessCode và secretKey
         NhanhvnAccessTokenRequest requestBody = NhanhvnAccessTokenRequest.builder()

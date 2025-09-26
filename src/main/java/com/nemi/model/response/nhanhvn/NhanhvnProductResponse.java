@@ -39,7 +39,7 @@ public class NhanhvnProductResponse {
         private Prices prices;
         private Images images;
         private List<Warranty> warranty;
-        private List<Brand> brand;
+        private Brand brand;
         private Integer type;
         private Shipping shipping;
         private String countryName;
