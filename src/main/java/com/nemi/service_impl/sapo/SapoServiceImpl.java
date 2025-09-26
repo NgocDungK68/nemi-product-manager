@@ -4,6 +4,9 @@ import com.nemi.client.SapoClient;
 import com.nemi.constant.enums.PosName;
 import com.nemi.constant.enums.PosStatus;
 import com.nemi.entity.PosEntity;
+import com.nemi.exception.TechnicalAlertCode;
+import com.nemi.exception.TechnicalException;
+import com.nemi.exception.pojo.AlertMessages;
 import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.response.PosConnectionResponse;
 import com.nemi.model.response.sapo.SapoAccessTokenResponse;
@@ -41,7 +44,6 @@ public class SapoServiceImpl extends AbstractPosManagementService implements Pos
 
     @Override
     public PosConnectionResponse connectPos(PosConnectionRequest posConnectionRequest) {
-        PosConnectionResponse posConnectionResponse = new PosConnectionResponse();
         try {
             String userId = claimUtil.getUserId();
 
@@ -66,10 +68,13 @@ public class SapoServiceImpl extends AbstractPosManagementService implements Pos
                     .build();
 
             posRepository.save(posEntityBuilder);
+            PosConnectionResponse posConnectionResponse = PosConnectionResponse.toPosConnectionResponse(posEntityBuilder);
+            log.info("Sapo response is {}", posConnectionResponse);
+            return posConnectionResponse;
         } catch (Exception e) {
             log.error("Exchange token failed: {}", e.getMessage(), e);
+            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
         }
-        return posConnectionResponse;
     }
 
     @Override

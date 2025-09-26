@@ -55,37 +55,42 @@ public class NhanhvnServiceImpl extends AbstractPosManagementService implements 
 
     @Override
     public PosConnectionResponse connectPos(PosConnectionRequest posConnectionRequest) {
-        String userId = claimUtil.getUserId();
+        try {
 
-        Map<String, String> configMap = new HashMap<>();
-        configMap.put("secretId", posConnectionRequest.getAppSecret());
-        configMap.put("appId", posConnectionRequest.getAppId());
-        configMap.put("businessId", posConnectionRequest.getBusinessId());
+            String userId = claimUtil.getUserId();
 
-        NhanhvnAccessTokenResponse tokenResponse = nhanhvnClient.getAccessToken(posConnectionRequest);
+            Map<String, String> configMap = new HashMap<>();
+            configMap.put("secretId", posConnectionRequest.getAppSecret());
+            configMap.put("appId", posConnectionRequest.getAppId());
+            configMap.put("businessId", posConnectionRequest.getBusinessId());
 
-        if (tokenResponse.getData() == null || tokenResponse.getData().getAccessToken() == null) {
-            log.error("Nhanhvn response is null, stop persist to db {}", tokenResponse);
+            NhanhvnAccessTokenResponse tokenResponse = nhanhvnClient.getAccessToken(posConnectionRequest);
+
+            if (tokenResponse.getData() == null || tokenResponse.getData().getAccessToken() == null) {
+                log.error("Nhanhvn response is null, stop persist to db {}", tokenResponse);
+                throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
+            }
+
+            LocalDateTime expiredTime = LocalDateTime.now().plusYears(1);
+            PosEntity posEntityBuilder = PosEntity.builder()
+                    .posName(PosName.NHANHVN.name())
+                    .userId(userId)
+                    .status(PosStatus.ACTIVE.name())
+                    .accessToken(tokenResponse.getData().getAccessToken())
+                    .config(JsonUtils.toJson(configMap))
+                    .expiredTime(expiredTime)
+                    .companyId(String.valueOf(claimUtil.getCompanyId()))
+                    .createdBy(claimUtil.getUserName())
+                    .build();
+
+            posRepository.save(posEntityBuilder);
+            PosConnectionResponse posConnectionResponse = PosConnectionResponse.toPosConnectionResponse(posEntityBuilder);
+            log.info("Nhanhvn response is {}", posConnectionResponse);
+            return posConnectionResponse;
+        } catch (Exception e) {
+            log.error("Exchange token failed: {}", e.getMessage(), e);
             throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
         }
-
-        LocalDateTime expiredTime = LocalDateTime.now().plusYears(1);
-        PosEntity posEntityBuilder = PosEntity.builder()
-                .posName(PosName.NHANHVN.name())
-                .userId(userId)
-                .status(PosStatus.ACTIVE.name())
-                .accessToken(tokenResponse.getData().getAccessToken())
-                .config(JsonUtils.toJson(configMap))
-                .expiredTime(expiredTime)
-                .companyId(String.valueOf(claimUtil.getCompanyId()))
-                .createdBy(claimUtil.getUserName())
-                .build();
-
-        posRepository.save(posEntityBuilder);
-        PosConnectionResponse posConnectionResponse = PosConnectionResponse.toPosConnectionResponse(posEntityBuilder);
-        log.info("Nhanhvn response is {}", posConnectionResponse);
-
-        return posConnectionResponse;
     }
 
     @Override
@@ -97,7 +102,8 @@ public class NhanhvnServiceImpl extends AbstractPosManagementService implements 
             // B2: parse config
             Map<String, String> configMap = objectMapper.readValue(
                     posEntity.getConfig(),
-                    new TypeReference<>() {}
+                    new TypeReference<>() {
+                    }
             );
 
             String appId = configMap.get("appId");
