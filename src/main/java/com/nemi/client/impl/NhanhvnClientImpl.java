@@ -29,7 +29,7 @@ public class NhanhvnClientImpl implements PosClient {
 
     @Override
     public NhanhvnAccessTokenResponse getAccessToken(PosConnectionRequest posConnectionRequest) {
-        String url = nhanhvnConfig.getUrlAccessToken() + nhanhvnConfig.getApiVersion();
+        String url = nhanhvnConfig.getUrlAccessToken() + nhanhvnConfig.getApiVersion() + "/app/getaccesstoken";
         log.debug("[NhanhvnAuthService.exchangeAccessToken] Request URL with params: {}", url);
 
         String urlWithParams = UriComponentsBuilder.fromHttpUrl(url)

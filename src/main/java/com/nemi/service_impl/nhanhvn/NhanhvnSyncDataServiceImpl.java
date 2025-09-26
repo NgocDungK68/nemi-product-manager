@@ -84,7 +84,7 @@ public class NhanhvnSyncDataServiceImpl implements PosSyncDataService {
                     break;
                 }
 
-                List<ProductEntity> pageProducts = convertToProductEntities(response.getData());
+                List<ProductEntity> pageProducts = convertToProductEntities(posId, response.getData());
                 allProducts.addAll(pageProducts);
 
                 log.info("Fetched {} products, total so far: {}", pageProducts.size(), allProducts.size());
@@ -147,15 +147,16 @@ public class NhanhvnSyncDataServiceImpl implements PosSyncDataService {
                 });
     }
 
-    private List<ProductEntity> convertToProductEntities(List<NhanhvnProductResponse.ProductData> apiProducts) {
+    private List<ProductEntity> convertToProductEntities(String posId, List<NhanhvnProductResponse.ProductData> apiProducts) {
         return apiProducts.stream()
-                .map(this::convertToProductEntity)
+                .map(apiProduct -> convertToProductEntity(posId, apiProduct))
                 .collect(Collectors.toList());
     }
 
-    private ProductEntity convertToProductEntity(NhanhvnProductResponse.ProductData apiProducts) {
+    private ProductEntity convertToProductEntity(String posId, NhanhvnProductResponse.ProductData apiProducts) {
         ProductEntity product = new ProductEntity();
 
+        product.setPosId(posId);
         product.setProductId(String.valueOf(apiProducts.getId()));
         product.setCode(apiProducts.getCode());
         product.setName(apiProducts.getName());
