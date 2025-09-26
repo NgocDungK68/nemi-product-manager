@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/public-api/v1")
+@RequestMapping("/client-api/v1")
 @RequiredArgsConstructor
 public class PosManagementController {
 
