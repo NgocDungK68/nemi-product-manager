@@ -1,6 +1,5 @@
-package com.nemi.client.impl;
+package com.nemi.client;
 
-import com.nemi.client.PosClient;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
@@ -29,11 +28,10 @@ import java.util.Optional;
 @RequiredArgsConstructor
 @Slf4j
 @Service
-public class NhanhvnClient implements PosClient {
+public class NhanhvnClient {
     private final RestTemplate restTemplate;
     private final NhanhvnConfig nhanhvnConfig;
 
-    @Override
     public NhanhvnAccessTokenResponse getAccessToken(PosConnectionRequest posConnectionRequest) {
         String url = nhanhvnConfig.getBaseUrl() + "/"
                 + nhanhvnConfig.getApiVersion() + "/"
@@ -68,7 +66,6 @@ public class NhanhvnClient implements PosClient {
         return JsonUtils.fromJson(resp.getBody(), NhanhvnAccessTokenResponse.class);
     }
 
-    @Override
     public Optional<NhanhvnProductResponse> getProducts(NhanhvnRequest request) {
         log.debug("[NhanhvnClient.getProducts] paginator: {}", request.getPaginator());
 
