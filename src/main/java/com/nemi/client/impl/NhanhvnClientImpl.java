@@ -1,6 +1,10 @@
 package com.nemi.client.impl;
 
 import com.nemi.client.PosClient;
+import com.nemi.exception.TechnicalAlertCode;
+import com.nemi.exception.TechnicalException;
+import com.nemi.exception.pojo.AlertMessages;
+import com.nemi.model.config.NhanhvnConfig;
 import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.request.nhanhvn.NhanhvnAccessTokenRequest;
 import com.nemi.model.response.nhanhvn.NhanhvnAccessTokenResponse;
@@ -21,10 +25,12 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Service
 public class NhanhvnClientImpl implements PosClient {
     private final RestTemplate restTemplate;
+    private final NhanhvnConfig nhanhvnConfig;
 
     @Override
     public NhanhvnAccessTokenResponse getAccessToken(PosConnectionRequest posConnectionRequest) {
-        String url = "https://pos.open.nhanh.vn/v3.0/app/getaccesstoken";
+        String url = nhanhvnConfig.getUrlAccessToken() + nhanhvnConfig.getApiVersion();
+        log.debug("[NhanhvnAuthService.exchangeAccessToken] Request URL with params: {}", url);
 
         String urlWithParams = UriComponentsBuilder.fromHttpUrl(url)
                 .queryParam("appId", posConnectionRequest.getAppId())
@@ -36,22 +42,20 @@ public class NhanhvnClientImpl implements PosClient {
                 .accessCode(posConnectionRequest.getAccessCode())
                 .secretKey(posConnectionRequest.getAppSecret())
                 .build();
-
-        log.info("Request body: {}", JsonUtils.toJson(requestBody));
+        log.debug("[NhanhvnAuthService.exchangeAccessToken] Request body: {}", JsonUtils.toJson(requestBody));
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<NhanhvnAccessTokenRequest> entity = new HttpEntity<>(requestBody, headers);
-
-        log.info("[NhanhvnAuthService.exchangeAccessToken] Request URL with params: {}", urlWithParams);
+        log.info("[NhanhvnAuthService.exchangeAccessToken] Request Entity: {}", headers);
 
         // 3. Gọi API với URL đã có query parameters
         ResponseEntity<String> resp = restTemplate.exchange(urlWithParams, HttpMethod.POST, entity, String.class);
-        log.info("[NhanhvnAuthService.exchangeAccessToken] Request URL: {}", url);
-
+        log.info("[NhanhvnAuthService.exchangeAccessToken] response: {}", resp);
 
         if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
-            log.error("Nhanhvn exchange token failed, status: {}", resp.getStatusCode());
+            log.error("[NhanhvnAuthService.exchangeAccessToken] failed, status: {}", resp.getStatusCode());
+            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
         }
         return JsonUtils.fromJson(resp.getBody(), NhanhvnAccessTokenResponse.class);
     }

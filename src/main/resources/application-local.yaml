@@ -65,6 +65,8 @@ secret:
 logging:
   level:
     root: info
+    com:
+      nemi: debug
     org.apache: off
   file:
     name: /tmp/log/nemi.log
