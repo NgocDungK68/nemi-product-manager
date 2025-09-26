@@ -29,7 +29,7 @@ public abstract class AbstractPosManagementService {
      */
     public StatusResponse getPosStatus(String posId) {
 
-        PosEntity pos = posRepository.findById(posId)
+        PosEntity pos = posRepository.findByIdAndUserId(posId, claimUtil.getUserId())
                 .orElseThrow(() -> {
                     log.warn("POS with id={} not found, cannot get status", posId);
                     return new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_STATUS_NOTFOUND));
@@ -41,7 +41,7 @@ public abstract class AbstractPosManagementService {
      * Update POS status by ID
      */
     public PosConnectionResponse setPosStatus(ChangeStatusRequest changeStatusRequest) {
-        PosEntity pos = posRepository.findById(changeStatusRequest.getPosId())
+        PosEntity pos = posRepository.findByIdAndUserId(changeStatusRequest.getPosId(), claimUtil.getUserId())
                 .orElseThrow(() -> {
                     log.warn("POS with id={} not found, cannot update status", changeStatusRequest.getPosId());
                     return new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
