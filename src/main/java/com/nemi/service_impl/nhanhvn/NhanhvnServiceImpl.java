@@ -2,7 +2,7 @@ package com.nemi.service_impl.nhanhvn;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nemi.client.impl.NhanhvnClient;
+import com.nemi.client.NhanhvnClient;
 import com.nemi.constant.enums.PosName;
 import com.nemi.constant.enums.PosStatus;
 import com.nemi.entity.PosEntity;
@@ -34,7 +34,6 @@ import java.util.stream.Collectors;
 
 @Service
 @Slf4j
-
 public class NhanhvnServiceImpl extends AbstractPosManagementService implements PosManagementService {
     private final ClaimUtil claimUtil;
     private final NhanhvnClient nhanhvnClient;
