@@ -1,0 +1,19 @@
+package com.nemi.model.request.nhanhvn;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.util.Map;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class NhanhvnRequest {
+    private String appId;
+    private String businessId;
+    private String accessToken;
+    private Map<String, Object> paginator;
+}
