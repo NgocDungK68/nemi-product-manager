@@ -12,7 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -29,7 +28,8 @@ public class NhanhvnProductServiceImpl implements NhanhvnProductService {
         log.info("[NhanhvnServiceImpl.getProducts] paginator: {}", request.getPaginator());
 
         try {
-            String url = nhanhvnConfig.getUrlAccessToken() + nhanhvnConfig.getApiVersion()
+            String url = nhanhvnConfig.getBaseUrl() + "/"
+                    + nhanhvnConfig.getApiVersion()
                     + "/product/list"
                     + "?appId=" + request.getAppId()
                     + "&businessId=" + request.getBusinessId();
