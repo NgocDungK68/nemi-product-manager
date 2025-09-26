@@ -10,12 +10,9 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties("nhanhvn")
 public class NhanhvnConfig {
 
+    private String baseUrl;
     private String urlAccessCode;
     private String urlAccessToken;
-
-    private Integer appId;
-    private Integer businessId;
-    private String accessToken;
     private String apiVersion;
     private String secretKey;
 }

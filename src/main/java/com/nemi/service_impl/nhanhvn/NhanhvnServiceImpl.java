@@ -65,6 +65,7 @@ public class NhanhvnServiceImpl extends AbstractPosManagementService implements 
                 .config(JsonUtils.toJson(configMap))
                 .expiredTime(expiredTime)
                 .companyId(String.valueOf(claimUtil.getCompanyId()))
+                .createdBy(claimUtil.getUserName())
                 .build();
 
         posRepository.save(posEntityBuilder);
