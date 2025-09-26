@@ -9,16 +9,19 @@ import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
 
 import java.time.LocalDateTime;
 
 @Entity
-@Builder
+@SuperBuilder
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "pos")
+@Table(schema = "product_manager", name = "pos")
+@EqualsAndHashCode(callSuper = true)
 public class PosEntity extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -27,9 +30,11 @@ public class PosEntity extends BaseEntity {
     @Column(name = "user_id", nullable = false)
     private String userId;  // FK sang bảng user (nếu có quan hệ thì dùng @ManyToOne)
 
+    @Column(name = "company_id", nullable = false)
     private String companyId;
 
     @Column(name = "pos_name", nullable = false, length = 100)
+    // ten doi tac
     private String posName;
 
     //    @Lob uncoment when json is a long text
