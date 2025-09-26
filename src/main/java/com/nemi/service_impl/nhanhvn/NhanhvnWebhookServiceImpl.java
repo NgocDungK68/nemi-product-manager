@@ -10,7 +10,6 @@ import com.nemi.model.config.NhanhvnConfig;
 import com.nemi.model.request.nhanhvn.NhanhvnAccessTokenRequest;
 import com.nemi.model.response.nhanhvn.NhanhvnAccessTokenResponse;
 import com.nemi.repository.PosRepository;
-import com.nemi.repository.TransactionTempRepository;
 import com.nemi.service.WebhookService;
 import com.nemi.util.JsonUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -36,7 +35,6 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
     private final PosRepository posRepository;
-    private final TransactionTempRepository transactionTempRepository;
     @Override
     public String getWebhookType() {
         return PosName.NHANHVN.name().toLowerCase();

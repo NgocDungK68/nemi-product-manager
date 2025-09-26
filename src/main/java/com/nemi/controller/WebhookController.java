@@ -3,7 +3,6 @@ package com.nemi.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.model.auth.request.AuthPosRequest;
 import com.nemi.repository.PosRepository;
-import com.nemi.repository.TransactionTempRepository;
 import com.nemi.service.WebhookService;
 import com.nemi.service.factory.WebhookFactory;
 import com.nemi.service_impl.nhanhvn.NhanhvnWebhookServiceImpl;
@@ -28,7 +27,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class WebhookController {
 
     private final NhanhvnWebhookServiceImpl nhanhvnWebhookService;
-    private final TransactionTempRepository transactionTempRepository;
     private final PosRepository posRepository;
     private final ObjectMapper objectMapper;
 
