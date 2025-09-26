@@ -13,6 +13,7 @@ public class NhanhvnConfig {
     private String baseUrl;
     private String urlAccessCode;
     private String urlAccessToken;
+    private String urlProducts;
     private String apiVersion;
     private String secretKey;
 }
