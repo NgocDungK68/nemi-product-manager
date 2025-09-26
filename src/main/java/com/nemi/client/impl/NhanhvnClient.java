@@ -43,26 +43,26 @@ public class NhanhvnClient implements PosClient {
                 .queryParam("appId", posConnectionRequest.getAppId())
                 .queryParam("businessId", posConnectionRequest.getBusinessId())
                 .toUriString();
-        log.debug("[NhanhvnAuthService.exchangeAccessToken] Request URL with params: {}", url);
+        log.debug("[NhanhvnClient.getAccessToken] Request URL with params: {}", url);
 
         // 2. Request body chỉ chứa accessCode và secretKey
         NhanhvnAccessTokenRequest requestBody = NhanhvnAccessTokenRequest.builder()
                 .accessCode(posConnectionRequest.getAccessCode())
                 .secretKey(posConnectionRequest.getAppSecret())
                 .build();
-        log.debug("[NhanhvnAuthService.exchangeAccessToken] Request body: {}", JsonUtils.toJson(requestBody));
+        log.debug("[NhanhvnClient.getAccessToken] Request body: {}", JsonUtils.toJson(requestBody));
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<NhanhvnAccessTokenRequest> entity = new HttpEntity<>(requestBody, headers);
-        log.info("[NhanhvnAuthService.exchangeAccessToken] Request Entity: {}", headers);
+        log.info("[NhanhvnClient.getAccessToken] Request Entity: {}", headers);
 
         // 3. Gọi API với URL đã có query parameters
         ResponseEntity<String> resp = restTemplate.exchange(urlWithParams, HttpMethod.POST, entity, String.class);
-        log.info("[NhanhvnAuthService.exchangeAccessToken] response: {}", resp);
+        log.info("[NhanhvnClient.getAccessToken] response: {}", resp);
 
         if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
-            log.error("[NhanhvnAuthService.exchangeAccessToken] failed, status: {}", resp.getStatusCode());
+            log.error("[NhanhvnClient.getAccessToken] failed, status: {}", resp.getStatusCode());
             throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
         }
         return JsonUtils.fromJson(resp.getBody(), NhanhvnAccessTokenResponse.class);
@@ -70,14 +70,15 @@ public class NhanhvnClient implements PosClient {
 
     @Override
     public Optional<NhanhvnProductResponse> getProducts(NhanhvnRequest request) {
-        log.info("[NhanhvnServiceImpl.getProducts] paginator: {}", request.getPaginator());
+        log.debug("[NhanhvnClient.getProducts] paginator: {}", request.getPaginator());
 
         try {
             String url = nhanhvnConfig.getBaseUrl() + "/"
-                    + nhanhvnConfig.getApiVersion()
-                    + "/product/list"
+                    + nhanhvnConfig.getApiVersion() + "/"
+                    + nhanhvnConfig.getUrlProducts()
                     + "?appId=" + request.getAppId()
                     + "&businessId=" + request.getBusinessId();
+            log.debug("[NhanhvnClient.getProducts] Calling URL: {}", url);
 
             // build request body
             Map<String, Object> requestBody = new HashMap<>();
@@ -90,30 +91,28 @@ public class NhanhvnClient implements PosClient {
             headers.set("Authorization", request.getAccessToken());
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-
-            log.info("[NhanhvnServiceImpl.getProducts] Calling URL: {}", url);
-
+            log.debug("[NhanhvnClient.getProducts] Calling URL: {}", url);
             ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
             String jsonResp = resp.getBody();
+            log.debug("[NhanhvnClient.getProducts] resp {}", resp);
 
             if (jsonResp == null || jsonResp.isBlank()) {
-                log.warn("[NhanhvnServiceImpl.getProducts] Empty response body (status: {})", resp.getStatusCode());
+                log.warn("[NhanhvnClient.getProducts] Empty response body (status: {})", resp.getStatusCode());
                 return Optional.empty();
             }
 
             NhanhvnProductResponse productsResponse =
                     JsonUtils.fromJson(jsonResp, NhanhvnProductResponse.class);
 
-            log.info("[NhanhvnServiceImpl.getProducts] Got {} products",
+            log.info("[NhanhvnClient.getProducts] Got {} products",
                     productsResponse.getData() != null ? productsResponse.getData().size() : 0);
 
             return Optional.of(productsResponse);
 
         } catch (Exception e) {
-            log.error("[NhanhvnServiceImpl.getProducts] Failed: {}", e.getMessage(), e);
+            log.error("[NhanhvnClient.getProducts] Failed: {}", e.getMessage(), e);
             return Optional.empty();
         }
     }
-
 }
 
