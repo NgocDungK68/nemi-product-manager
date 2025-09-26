@@ -7,7 +7,9 @@ import com.nemi.exception.pojo.AlertMessages;
 import com.nemi.model.config.NhanhvnConfig;
 import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.request.nhanhvn.NhanhvnAccessTokenRequest;
+import com.nemi.model.request.nhanhvn.NhanhvnRequest;
 import com.nemi.model.response.nhanhvn.NhanhvnAccessTokenResponse;
+import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
 import com.nemi.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,10 +22,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+
 @RequiredArgsConstructor
 @Slf4j
 @Service
-public class NhanhvnClientImpl implements PosClient {
+public class NhanhvnClient implements PosClient {
     private final RestTemplate restTemplate;
     private final NhanhvnConfig nhanhvnConfig;
 
@@ -60,6 +66,53 @@ public class NhanhvnClientImpl implements PosClient {
             throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
         }
         return JsonUtils.fromJson(resp.getBody(), NhanhvnAccessTokenResponse.class);
+    }
+
+    @Override
+    public Optional<NhanhvnProductResponse> getProducts(NhanhvnRequest request) {
+        log.info("[NhanhvnServiceImpl.getProducts] paginator: {}", request.getPaginator());
+
+        try {
+            String url = nhanhvnConfig.getBaseUrl() + "/"
+                    + nhanhvnConfig.getApiVersion()
+                    + "/product/list"
+                    + "?appId=" + request.getAppId()
+                    + "&businessId=" + request.getBusinessId();
+
+            // build request body
+            Map<String, Object> requestBody = new HashMap<>();
+            if (request.getPaginator() != null && !request.getPaginator().isEmpty()) {
+                requestBody.put("paginator", request.getPaginator());
+            }
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("Authorization", request.getAccessToken());
+
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+
+            log.info("[NhanhvnServiceImpl.getProducts] Calling URL: {}", url);
+
+            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+            String jsonResp = resp.getBody();
+
+            if (jsonResp == null || jsonResp.isBlank()) {
+                log.warn("[NhanhvnServiceImpl.getProducts] Empty response body (status: {})", resp.getStatusCode());
+                return Optional.empty();
+            }
+
+            NhanhvnProductResponse productsResponse =
+                    JsonUtils.fromJson(jsonResp, NhanhvnProductResponse.class);
+
+            log.info("[NhanhvnServiceImpl.getProducts] Got {} products",
+                    productsResponse.getData() != null ? productsResponse.getData().size() : 0);
+
+            return Optional.of(productsResponse);
+
+        } catch (Exception e) {
+            log.error("[NhanhvnServiceImpl.getProducts] Failed: {}", e.getMessage(), e);
+            return Optional.empty();
+        }
     }
 
 }
