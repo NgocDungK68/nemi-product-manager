@@ -4,5 +4,7 @@ public enum PosStatus {
     ACTIVE,
     PENDING,
     EXPIRED,
-    INACTIVE
+    INACTIVE,
+    SUCCESS,
+    FAIL
 }

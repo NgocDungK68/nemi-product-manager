@@ -5,8 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.client.NhanhvnClient;
 import com.nemi.constant.enums.PosName;
 import com.nemi.constant.enums.PosStatus;
+import com.nemi.constant.enums.SyncErrorMessage;
 import com.nemi.entity.PosEntity;
 import com.nemi.entity.ProductEntity;
+import com.nemi.entity.SyncHistoryEntity;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
@@ -17,6 +19,7 @@ import com.nemi.model.response.nhanhvn.NhanhvnAccessTokenResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
 import com.nemi.repository.PosRepository;
 import com.nemi.repository.ProductRepository;
+import com.nemi.repository.SyncHistoryRepository;
 import com.nemi.service.AbstractPosManagementService;
 import com.nemi.service.PosManagementService;
 import com.nemi.util.ClaimUtil;
@@ -39,13 +42,18 @@ public class NhanhvnServiceImpl extends AbstractPosManagementService implements 
     private final NhanhvnClient nhanhvnClient;
     private final ObjectMapper objectMapper;
     private final ProductRepository productRepository;
+    private final SyncHistoryRepository syncHistoryRepository;
 
-    public NhanhvnServiceImpl(PosRepository posRepository, ClaimUtil claimUtil, NhanhvnClient nhanhvnClient, ObjectMapper objectMapper, ProductRepository productRepository) {
+    public NhanhvnServiceImpl(PosRepository posRepository, ClaimUtil claimUtil,
+                              NhanhvnClient nhanhvnClient, ObjectMapper objectMapper,
+                              ProductRepository productRepository, SyncHistoryRepository syncHistoryRepository) {
         super(posRepository, claimUtil);
         this.claimUtil = claimUtil;
         this.nhanhvnClient = nhanhvnClient;
         this.objectMapper = objectMapper;
         this.productRepository = productRepository;
+        this.syncHistoryRepository = syncHistoryRepository;
+
     }
 
     @Override
@@ -95,6 +103,11 @@ public class NhanhvnServiceImpl extends AbstractPosManagementService implements 
 
     @Override
     public boolean syncData(String posId) {
+        SyncHistoryEntity history = SyncHistoryEntity.builder()
+                .posId(posId)
+                .startTime(LocalDateTime.now())
+                .syncStatus(PosStatus.FAIL.name())
+                .build();
         try {
             // B1: lấy PosEntity và validate posName
             PosEntity posEntity = getPos(posId);
@@ -111,7 +124,8 @@ public class NhanhvnServiceImpl extends AbstractPosManagementService implements 
             String accessToken = posEntity.getAccessToken();
 
             if (appId == null || businessId == null || accessToken == null) {
-                log.error("Missing required config for posId={}", posId);
+                syncHistoryRepository.save(toSyncHistory(history, (SyncErrorMessage.MISSING_CONFIG), false));
+                log.error("Missing required config for posId={}", posId); // throw techial
                 return false;
             }
 
@@ -132,6 +146,8 @@ public class NhanhvnServiceImpl extends AbstractPosManagementService implements 
                 Optional<NhanhvnProductResponse> responseOpt = nhanhvnClient.getProducts(request);
 
                 if (responseOpt.isEmpty()) {
+                    syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
+                    log.error("Missing required config for posId={}", posId);
                     log.error("Failed to fetch products with paginator: {}", paginator);
                     return false;
                 }
@@ -139,8 +155,9 @@ public class NhanhvnServiceImpl extends AbstractPosManagementService implements 
                 NhanhvnProductResponse response = responseOpt.get();
 
                 if (response.getData() == null || response.getData().isEmpty()) {
+                    syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.CONNECTION_FAILED, false));
                     log.info("No products found with paginator: {}", paginator);
-                    break;
+                    return false;
                 }
 
                 List<ProductEntity> pageProducts = convertToProductEntities(posId, response.getData());
@@ -156,7 +173,7 @@ public class NhanhvnServiceImpl extends AbstractPosManagementService implements 
                     break; // hết data
                 }
             }
-
+            syncHistoryRepository.save(toSyncHistory(history, null, true));
             saveAllProductsSync(allProducts);
 
             log.info("Successfully synced {} products from Nhanh.vn", allProducts.size());
@@ -164,6 +181,7 @@ public class NhanhvnServiceImpl extends AbstractPosManagementService implements 
 
         } catch (Exception e) {
             log.error("Failed to sync Nhanh.vn data - {}", e.getMessage(), e);
+            syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
             return false;
         }
     }
@@ -189,7 +207,7 @@ public class NhanhvnServiceImpl extends AbstractPosManagementService implements 
             log.info("Successfully saved all {} Nhanh.vn products", products.size());
         } catch (Exception e) {
             log.error("Failed to save Nhanh.vn products synchronously: {}", e.getMessage(), e);
-            throw e;
+            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
         }
     }
 
@@ -221,5 +239,18 @@ public class NhanhvnServiceImpl extends AbstractPosManagementService implements 
 
         return product;
     }
+
+    private SyncHistoryEntity toSyncHistory(SyncHistoryEntity syncHistoryEntity, SyncErrorMessage syncErrorMessage, Boolean isSyncSuccess) {
+        if (isSyncSuccess == false) {
+            syncHistoryEntity.setSyncStatus(PosStatus.FAIL.name());
+            syncHistoryEntity.setEndTime(LocalDateTime.now());
+            syncHistoryEntity.setErrorMessage(syncErrorMessage.getMessage());
+            return syncHistoryEntity;
+        }
+        syncHistoryEntity.setSyncStatus(PosStatus.SUCCESS.name());
+        syncHistoryEntity.setEndTime(LocalDateTime.now());
+        return syncHistoryEntity;
+    }
+
 }
 
