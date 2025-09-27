@@ -12,10 +12,10 @@ import com.nemi.model.response.PosConnectionResponse;
 import com.nemi.model.response.sapo.SapoAccessTokenResponse;
 import com.nemi.repository.PosRepository;
 import com.nemi.repository.ProductRepository;
-import com.nemi.service.AbstractPosManagementService;
 import com.nemi.service.PosManagementService;
 import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -24,18 +24,14 @@ import java.util.Map;
 
 @Service
 @Slf4j
-public class SapoServiceImpl extends AbstractPosManagementService implements PosManagementService {
+@RequiredArgsConstructor
+public class SapoServiceImpl implements PosManagementService {
 
     private final ClaimUtil claimUtil;
     private final SapoClient sapoClient;
     private final ProductRepository productRepository;
+    private final PosRepository posRepository;
 
-    public SapoServiceImpl(PosRepository posRepository, ClaimUtil claimUtil, ClaimUtil claimUtil1, SapoClient sapoClient, ProductRepository productRepository) {
-        super(posRepository, claimUtil);
-        this.claimUtil = claimUtil1;
-        this.sapoClient = sapoClient;
-        this.productRepository = productRepository;
-    }
 
     @Override
     public String getPosName() {
@@ -58,7 +54,7 @@ public class SapoServiceImpl extends AbstractPosManagementService implements Pos
             }
 
             PosEntity posEntityBuilder = PosEntity.builder()
-                    .posName(PosName.SAPO.name())
+                    .posName(PosName.SAPO.getValue())
                     .userId(userId)
                     .accessToken(tokenResponse.getAccessToken())
                     .status(PosStatus.ACTIVE.name())

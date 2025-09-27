@@ -17,10 +17,10 @@ import com.nemi.model.response.nhanhvn.NhanhvnAccessTokenResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
 import com.nemi.repository.PosRepository;
 import com.nemi.repository.ProductRepository;
-import com.nemi.service.AbstractPosManagementService;
 import com.nemi.service.PosManagementService;
 import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -34,19 +34,13 @@ import java.util.stream.Collectors;
 
 @Service
 @Slf4j
-public class NhanhvnServiceImpl extends AbstractPosManagementService implements PosManagementService {
+@RequiredArgsConstructor
+public class NhanhvnServiceImpl implements PosManagementService {
     private final ClaimUtil claimUtil;
     private final NhanhvnClient nhanhvnClient;
     private final ObjectMapper objectMapper;
     private final ProductRepository productRepository;
-
-    public NhanhvnServiceImpl(PosRepository posRepository, ClaimUtil claimUtil, NhanhvnClient nhanhvnClient, ObjectMapper objectMapper, ProductRepository productRepository) {
-        super(posRepository, claimUtil);
-        this.claimUtil = claimUtil;
-        this.nhanhvnClient = nhanhvnClient;
-        this.objectMapper = objectMapper;
-        this.productRepository = productRepository;
-    }
+    private final PosRepository posRepository;
 
     @Override
     public String getPosName() {
@@ -73,7 +67,7 @@ public class NhanhvnServiceImpl extends AbstractPosManagementService implements 
 
             LocalDateTime expiredTime = LocalDateTime.now().plusYears(1);
             PosEntity posEntityBuilder = PosEntity.builder()
-                    .posName(PosName.NHANHVN.name())
+                    .posName(PosName.NHANHVN.getValue())
                     .userId(userId)
                     .status(PosStatus.ACTIVE.name())
                     .accessToken(tokenResponse.getData().getAccessToken())
