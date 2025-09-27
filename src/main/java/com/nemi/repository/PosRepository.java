@@ -13,6 +13,8 @@ import java.util.Optional;
 public interface PosRepository extends JpaRepository<PosEntity, String> {
     List<PosEntity> findByUserId(String userId);
 
+    Optional<PosEntity> findByIdAndUserId(String id,String userId);
+
     @Query(value = "SELECT * FROM pos p WHERE CAST(p.config AS JSONB) ->> 'app-id' = :appId",
             nativeQuery = true)
     Optional<PosEntity> findByAppId(@Param("appId") String appId);

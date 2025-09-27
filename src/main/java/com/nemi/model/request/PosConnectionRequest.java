@@ -13,7 +13,7 @@ public class PosConnectionRequest {
     private String businessId;
     private String appSecret;
     private String shopId;
-    private String accessCode ;
+    private String accessCode;
 
     private String clientId;        // SAPO
     private String clientSecret;

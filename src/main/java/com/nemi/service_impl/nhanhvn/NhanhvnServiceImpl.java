@@ -2,33 +2,45 @@ package com.nemi.service_impl.nhanhvn;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nemi.client.NhanhvnClient;
 import com.nemi.constant.enums.PosName;
+import com.nemi.constant.enums.PosStatus;
 import com.nemi.entity.PosEntity;
 import com.nemi.entity.ProductEntity;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
+import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.request.nhanhvn.NhanhvnRequest;
+import com.nemi.model.response.PosConnectionResponse;
+import com.nemi.model.response.nhanhvn.NhanhvnAccessTokenResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
 import com.nemi.repository.PosRepository;
 import com.nemi.repository.ProductRepository;
-import com.nemi.service.nhanhvn.NhanhvnProductService;
-import com.nemi.service.sync_data.PosSyncDataService;
+import com.nemi.service.PosManagementService;
+import com.nemi.util.ClaimUtil;
+import com.nemi.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
-public class NhanhvnSyncDataServiceImpl implements PosSyncDataService {
+public class NhanhvnServiceImpl implements PosManagementService {
+    private final ClaimUtil claimUtil;
+    private final NhanhvnClient nhanhvnClient;
+    private final ObjectMapper objectMapper;
     private final ProductRepository productRepository;
     private final PosRepository posRepository;
-    private final NhanhvnProductService nhanhvnProductService;
-    private final ObjectMapper objectMapper;
 
     @Override
     public String getPosName() {
@@ -36,7 +48,47 @@ public class NhanhvnSyncDataServiceImpl implements PosSyncDataService {
     }
 
     @Override
-    public boolean trigger(String posId) {
+    public PosConnectionResponse connectPos(PosConnectionRequest posConnectionRequest) {
+        try {
+
+            String userId = claimUtil.getUserId();
+
+            Map<String, String> configMap = new HashMap<>();
+            configMap.put("secretId", posConnectionRequest.getAppSecret());
+            configMap.put("appId", posConnectionRequest.getAppId());
+            configMap.put("businessId", posConnectionRequest.getBusinessId());
+
+            NhanhvnAccessTokenResponse tokenResponse = nhanhvnClient.getAccessToken(posConnectionRequest);
+
+            if (tokenResponse.getData() == null || tokenResponse.getData().getAccessToken() == null) {
+                log.error("Nhanhvn response is null, stop persist to db {}", tokenResponse);
+                throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
+            }
+
+            LocalDateTime expiredTime = LocalDateTime.now().plusYears(1);
+            PosEntity posEntityBuilder = PosEntity.builder()
+                    .posName(PosName.NHANHVN.getValue())
+                    .userId(userId)
+                    .status(PosStatus.ACTIVE.name())
+                    .accessToken(tokenResponse.getData().getAccessToken())
+                    .config(JsonUtils.toJson(configMap))
+                    .expiredTime(expiredTime)
+                    .companyId(String.valueOf(claimUtil.getCompanyId()))
+                    .createdBy(claimUtil.getUserName())
+                    .build();
+
+            posRepository.save(posEntityBuilder);
+            PosConnectionResponse posConnectionResponse = PosConnectionResponse.toPosConnectionResponse(posEntityBuilder);
+            log.info("Nhanhvn response is {}", posConnectionResponse);
+            return posConnectionResponse;
+        } catch (Exception e) {
+            log.error("Exchange token failed: {}", e.getMessage(), e);
+            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
+        }
+    }
+
+    @Override
+    public boolean syncData(String posId) {
         try {
             // B1: lấy PosEntity và validate posName
             PosEntity posEntity = getPos(posId);
@@ -44,7 +96,8 @@ public class NhanhvnSyncDataServiceImpl implements PosSyncDataService {
             // B2: parse config
             Map<String, String> configMap = objectMapper.readValue(
                     posEntity.getConfig(),
-                    new TypeReference<>() {}
+                    new TypeReference<>() {
+                    }
             );
 
             String appId = configMap.get("appId");
@@ -70,7 +123,7 @@ public class NhanhvnSyncDataServiceImpl implements PosSyncDataService {
                     .build();
 
             while (true) {
-                Optional<NhanhvnProductResponse> responseOpt = nhanhvnProductService.getProducts(request);
+                Optional<NhanhvnProductResponse> responseOpt = nhanhvnClient.getProducts(request);
 
                 if (responseOpt.isEmpty()) {
                     log.error("Failed to fetch products with paginator: {}", paginator);
@@ -84,7 +137,7 @@ public class NhanhvnSyncDataServiceImpl implements PosSyncDataService {
                     break;
                 }
 
-                List<ProductEntity> pageProducts = convertToProductEntities(response.getData());
+                List<ProductEntity> pageProducts = convertToProductEntities(posId, response.getData());
                 allProducts.addAll(pageProducts);
 
                 log.info("Fetched {} products, total so far: {}", pageProducts.size(), allProducts.size());
@@ -109,7 +162,6 @@ public class NhanhvnSyncDataServiceImpl implements PosSyncDataService {
         }
     }
 
-    @Override
     public void saveAllProductsSync(List<ProductEntity> products) {
         log.info("Saving {} Nhanh.vn products synchronously", products.size());
 
@@ -135,7 +187,6 @@ public class NhanhvnSyncDataServiceImpl implements PosSyncDataService {
         }
     }
 
-    @Override
     public PosEntity getPos(String posId) {
         log.debug("[NhanhvnSyncDataImpl.getPos] posId: {}", posId);
 
@@ -147,15 +198,16 @@ public class NhanhvnSyncDataServiceImpl implements PosSyncDataService {
                 });
     }
 
-    private List<ProductEntity> convertToProductEntities(List<NhanhvnProductResponse.ProductData> apiProducts) {
+    private List<ProductEntity> convertToProductEntities(String posId, List<NhanhvnProductResponse.ProductData> apiProducts) {
         return apiProducts.stream()
-                .map(this::convertToProductEntity)
+                .map(apiProduct -> convertToProductEntity(posId, apiProduct))
                 .collect(Collectors.toList());
     }
 
-    private ProductEntity convertToProductEntity(NhanhvnProductResponse.ProductData apiProducts) {
+    private ProductEntity convertToProductEntity(String posId, NhanhvnProductResponse.ProductData apiProducts) {
         ProductEntity product = new ProductEntity();
 
+        product.setPosId(posId);
         product.setProductId(String.valueOf(apiProducts.getId()));
         product.setCode(apiProducts.getCode());
         product.setName(apiProducts.getName());
@@ -164,3 +216,4 @@ public class NhanhvnSyncDataServiceImpl implements PosSyncDataService {
         return product;
     }
 }
+

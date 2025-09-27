@@ -11,7 +11,7 @@ public class TestController {
         return "Test successful";
     }
 
-    @GetMapping("/public-api/test2")
+    @GetMapping("/public-api/test")
     public String test2() {
         return "Test successful";
     }

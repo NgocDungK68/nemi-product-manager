@@ -7,15 +7,14 @@
 
 ## I. NhanhVN
 ### 1. Tạo và đăng nhập tài khoản
-- Tài khoản: `0904858995`  
-- Mật khẩu: `Dung@2005`
+- Tài khoản: `0327405788`  
+- Mật khẩu: `Cuong?432000`
 
 ### 2. Tạo App
-- AppID: `76158`  
-- BusinessID: `214415`  
+- AppID: `76283`  
+- BusinessID: `215487`  
 - SecretKey: (xem trong app) [NhanhVN App Detail](https://open.nhanh.vn/app/detail?id=76158)  
 - Redirect URL: `https://nemi-dev.ecombase.net/redirect_url_1`
-![alt text](/docs/images/image.png)
 
 > ⚠️ **Lưu ý**: Tài khoản Nhanh.vn sẽ hết hạn sau 7 ngày, nếu không gia hạn hệ thống sẽ tự động tính phí duy trì
 
@@ -23,13 +22,13 @@
 Truy cập link sau:
 
 ```bash
-https://nhanh.vn/oauth?version=3.0&appId=76158&returnLink=https://nemi-dev.ecombase.net/redirect_url_1
+https://nhanh.vn/oauth?version=3.0&appId=76283&returnLink=https://nemi-dev-02.ecombase.net/nemi-product-manager/nhanhvn/auth
 ```
 
 Kết quả trả về (ví dụ):
 
 ```
-https://nemi-dev.ecombase.net/redirect_url_1?accessCode=0DECuIHCpplrYkvpRoGa441HDsZa0lCUhRA5Gvb128gNcoFT9M7ZUIm9x8gLKvXY
+https://nemi-dev-02.ecombase.net/nemi-product-manager/nhanhvn/auth?accessCode=Tka0TVtfKlsQurgom3w0JAsRc77gR4gNJMaDcZ41ZuWVWmTXnAo7TdGVZXN94RBc
 ```
 
 > ⚠️ **Lưu ý**: Access code chỉ có hiệu lực **10 phút** và sẽ hết hạn ngay khi đổi sang Access Token.
