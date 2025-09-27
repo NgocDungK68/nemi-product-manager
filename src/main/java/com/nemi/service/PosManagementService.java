@@ -16,12 +16,6 @@ public interface PosManagementService {
      */
     PosConnectionResponse connectPos(PosConnectionRequest posConnectionRequest);
 
-    StatusResponse getPosStatus(String posId);
-
-    PosConnectionResponse setPosStatus(ChangeStatusRequest changeStatusRequest);
-
-    List<PosConnectionResponse> getAllPos();
-
     boolean syncData(String posId);
 
 }
