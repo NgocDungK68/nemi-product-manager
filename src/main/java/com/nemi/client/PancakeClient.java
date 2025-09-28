@@ -1,28 +1,16 @@
 package com.nemi.client;
 
-import com.nemi.model.config.NhanhvnConfig;
-import com.nemi.model.config.PancakeConfig;
-import com.nemi.model.request.PosConnectionRequest;
-import com.nemi.model.request.nhanhvn.NhanhvnRequest;
+import com.nemi.configuration.PancakeConfig;
 import com.nemi.model.request.pancake.PancakeRequest;
-import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
 import com.nemi.model.response.pancake.PancakeProductResponse;
-import com.nemi.model.response.pancake.PancakeResponse;
-import com.nemi.model.response.sapo.SapoAccessTokenResponse;
 import com.nemi.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Repository;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
