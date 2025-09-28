@@ -1,107 +1,99 @@
 package com.nemi.service_impl.nhanhvn;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.JsonNode;
+import com.nemi.constant.enums.NhanhvnEvent;
 import com.nemi.constant.enums.PosName;
-import com.nemi.constant.enums.PosStatus;
-import com.nemi.entity.PosEntity;
-import com.nemi.model.auth.request.AuthPosRequest;
 import com.nemi.model.config.NhanhvnConfig;
-import com.nemi.model.request.nhanhvn.NhanhvnAccessTokenRequest;
-import com.nemi.model.response.nhanhvn.NhanhvnAccessTokenResponse;
-import com.nemi.repository.PosRepository;
+import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
+import com.nemi.model.response.nhanhvn.NhanhvnWebhookResponse;
+import com.nemi.repository.ProductRepository;
 import com.nemi.service.WebhookService;
 import com.nemi.util.JsonUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.util.*;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class NhanhvnWebhookServiceImpl implements WebhookService {
-
     private final NhanhvnConfig nhanhvnConfig;
-    private final RestTemplate restTemplate;
-    private final ObjectMapper objectMapper;
-    private final PosRepository posRepository;
-
-    @Value("${nhanhvn.verify-token}")
-    private String verifyToken;
+    private final ProductRepository productRepository;
 
     @Override
-    public String getWebhookType() {
-        return PosName.NHANHVN.name().toLowerCase();
+    public String getPosName() {
+        return PosName.NHANHVN.getValue();
     }
 
     @Override
-    public void processWebhook(HttpServletRequest request) {
-        log.info("[NhanhvnWebhook] Received request: method={}, uri={}", request.getMethod(), request.getRequestURI());
-
-        //log headers
-        Map<String, String> headers = extractHeaders(request);
-        log.info("====== Weehook headers: =======");
-        headers.forEach((k, v) -> log.info("Header: {} = {}", k, v));
-
-        // read body
-        String body = readBody(request);
-        log.info("Raw body : {}", body);
-
-        // parse body to json node
-        JsonNode root = null;
+    public boolean processWebhook(HttpServletRequest request) {
         try {
-            root = objectMapper.readTree(body);
-            log.info("parsed body successfully");
-        } catch (IOException e) {
-            log.error("Failed to parse body to JSON", e);
-            throw new RuntimeException("Invalid JSON body");
-        }
-
-        if (root != null) {
-            //log possible fields
-            String eventType = root.has("event") ? root.get("event").asText() : "unknown";
-            log.info("Processing event type: {}", eventType);
-
-            if (root.has("businessId")) {
-                log.info("Field businessId: {}", root.get("businessId").asText());
+            String verifyToken = request.getHeader(HttpHeaders.AUTHORIZATION);
+            if (verifyToken == null || verifyToken.isEmpty() || !verifyToken.equals(nhanhvnConfig.getVerifyToken())) {
+                log.error("Invalid verify token: {}", verifyToken);
+                return false;
             }
-            if (root.has("webhooksVerifyToken")) {
-                String token = root.get("webhooksVerifyToken").asText();
-                log.info("Field webhooksVerifyToken: {}", token);
-                if (!verifyToken.equals(token)) {
-                    log.warn("Invalid webhook token. Expected: {}, Received: {}",
-                            verifyToken, token);
-                    throw new RuntimeException("Invalid token");
-                }
+
+            String body = readBody(request);
+            log.info("Body: {}", body);
+
+            NhanhvnWebhookResponse webhookResponse = JsonUtils.fromJson(body, NhanhvnWebhookResponse.class);
+            if (webhookResponse == null || webhookResponse.getEvent() == null) {
+                log.error("Invalid webhook payload: {}", body);
+                return false;
             }
+
+            return handleEvent(webhookResponse);
+        } catch (Exception e) {
+            log.error("Process webhook failed: {}", e.getMessage(), e);
+            return false;
         }
     }
 
-    private Map<String, String> extractHeaders(HttpServletRequest request) {
-        Map<String, String> map = new HashMap<>();
-        Enumeration<String> names = request.getHeaderNames();
-        if (names == null) {
-            return Collections.emptyMap();
+    private boolean handleEvent(NhanhvnWebhookResponse webhookResponse) {
+        NhanhvnEvent event = NhanhvnEvent.fromValue(webhookResponse.getEvent());
+        String data = webhookResponse.getData();
+
+        if (event == null) {
+            log.warn("Unhandled webhook event: {}", webhookResponse.getEvent());
+            return false;
         }
-        while (names.hasMoreElements()) {
-            String name = names.nextElement();
-            String value = request.getHeader(name);
-            map.put(name, value);
+
+        switch (event) {
+            case PRODUCT_ADD:
+                return handleProductAdd(data);
+            case PRODUCT_UPDATE:
+                return handleProductUpdate(data);
+
+            default:
+                log.warn("Unhandled event: {}", event);
+                return false;
         }
-        return map;
+    }
+
+    private boolean handleProductAdd(String data) {
+        NhanhvnProductResponse.ProductData productData = JsonUtils.fromJson(data, NhanhvnProductResponse.ProductData.class);
+        if (productData == null) {
+            log.error("Failed to parse product data: {}", data);
+            return false;
+        }
+
+        // logic ...
+        return true;
+    }
+
+    private boolean handleProductUpdate(String data) {
+        NhanhvnProductResponse.ProductData productData = JsonUtils.fromJson(data, NhanhvnProductResponse.ProductData.class);
+        if (productData == null) {
+            log.error("Failed to parse product data: {}", data);
+            return false;
+        }
+
+        return true;
     }
 
     private String readBody(HttpServletRequest request) {
@@ -115,82 +107,6 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
             log.error("Error reading request body", e);
         }
         return sb.toString();
-    }
-
-
-    @Override
-    public boolean supports(String webhookType) {
-        if (webhookType == null) {
-            return false;
-        }
-        String type = webhookType.toLowerCase();
-        return "nhanh".equals(type) || "nhanhvn".equals(type);
-    }
-
-    // lay accessToken, set status trong pos thanh active
-    public void authPos(AuthPosRequest authPosRequest) {
-        try {
-
-            String appId = authPosRequest.getAppId();
-
-            Optional<PosEntity> posOPt = posRepository.findByAppId(appId);
-            if (posOPt.isEmpty()) {
-                throw new RuntimeException("pos connection is not exist");
-            }
-            PosEntity pos = posOPt.get();
-
-            String configJson = pos.getConfig();
-            Map<String, Object> configMap = objectMapper.readValue(configJson, new TypeReference<HashMap<String, Object>>() {
-            });
-
-            String secretKey = (String) configMap.get("secret-key");
-            String businessId = (String) configMap.get("business-id");
-            log.info("secretkey : {}", secretKey);
-            log.info("businessId : {}", businessId);
-
-
-            String url = nhanhvnConfig.getUrlAccessToken() + nhanhvnConfig.getApiVersion()
-                    + "/app/getaccesstoken"
-                    + "?appId=" + appId
-                    + "&businessId=" + businessId;
-
-            NhanhvnAccessTokenRequest requestBody =
-                    new NhanhvnAccessTokenRequest(authPosRequest.getAccessCode(), secretKey);
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-
-            HttpEntity<NhanhvnAccessTokenRequest> entity = new HttpEntity<>(requestBody, headers);
-
-            log.info("[NhanhvnAuthService.exchangeAccessToken] Request URL: {}", url);
-
-            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
-
-            if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
-                log.error("Nhanhvn exchange token failed, status: {}", resp.getStatusCode());
-
-            }
-
-            NhanhvnAccessTokenResponse tokenResponse =
-                    JsonUtils.fromJson(resp.getBody(), NhanhvnAccessTokenResponse.class);
-
-            if (tokenResponse.getData() == null || tokenResponse.getData().getAccessToken() == null) {
-                log.error("Nhanhvn response does not contain accessToken: {}", resp.getBody());
-
-            }
-
-            log.info("Nhanhvn AccessToken received: {}", tokenResponse.getData().getAccessToken());
-
-            pos.setAccessToken(tokenResponse.getData().getAccessToken());
-            pos.setStatus(PosStatus.ACTIVE.name());
-            posRepository.save(pos);
-            log.info("lay duoc accessToken: {} cua appid: {}  ", pos.getAccessToken(), appId);
-
-
-        } catch (Exception e) {
-            log.error("Exchange token failed: {}", e.getMessage(), e);
-
-        }
     }
 }
 
