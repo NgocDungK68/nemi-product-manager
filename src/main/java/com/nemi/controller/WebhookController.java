@@ -26,15 +26,14 @@ public class WebhookController {
      * - POST /webhook/pancake -> webhookType = "pancake"
      * - POST /webhook/sapo -> webhookType = "sapo"
      */
-    @PostMapping("/{webhookType}")
+    @PostMapping("/{webhookType}/{posId}")
     public ResponseEntity<String> receiveWebhook(
             @PathVariable String webhookType,
+            @PathVariable String posId,
             HttpServletRequest request) {
 
         log.info("=== UNIFIED WEBHOOK RECEIVED ===");
-        log.info("Webhook type: {}", webhookType);
-        log.info("Request URI: {}", request.getRequestURI());
-        log.info("Request method: {}", request.getMethod());
+        log.info("Webhook type: {}, PosId: {}, Request URI: {}, Request method: {}", webhookType, posId, request.getRequestURI(), request.getMethod());
 
         // Get appropriate webhook service using factory
         WebhookService webhookService = webhookFactory.getWebhookService(webhookType);
