@@ -4,5 +4,5 @@ import jakarta.servlet.http.HttpServletRequest;
 
 public interface WebhookService {
     String getPosName();
-    boolean processWebhook(HttpServletRequest request);
+    boolean processWebhook(String posId, HttpServletRequest request);
 }

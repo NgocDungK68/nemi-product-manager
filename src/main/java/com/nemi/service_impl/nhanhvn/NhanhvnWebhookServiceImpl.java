@@ -2,7 +2,7 @@ package com.nemi.service_impl.nhanhvn;
 
 import com.nemi.constant.enums.NhanhvnEvent;
 import com.nemi.constant.enums.PosName;
-import com.nemi.model.config.NhanhvnConfig;
+upimport com.nemi.configuration.NhanhvnConfig;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnWebhookResponse;
 import com.nemi.repository.ProductRepository;
@@ -30,7 +30,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
     }
 
     @Override
-    public boolean processWebhook(HttpServletRequest request) {
+    public boolean processWebhook(String posId, HttpServletRequest request) {
         try {
             String verifyToken = request.getHeader(HttpHeaders.AUTHORIZATION);
             if (verifyToken == null || verifyToken.isEmpty() || !verifyToken.equals(nhanhvnConfig.getVerifyToken())) {
@@ -47,14 +47,14 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
                 return false;
             }
 
-            return handleEvent(webhookResponse);
+            return handleEvent(posId, webhookResponse);
         } catch (Exception e) {
             log.error("Process webhook failed: {}", e.getMessage(), e);
             return false;
         }
     }
 
-    private boolean handleEvent(NhanhvnWebhookResponse webhookResponse) {
+    private boolean handleEvent(String posId, NhanhvnWebhookResponse webhookResponse) {
         NhanhvnEvent event = NhanhvnEvent.fromValue(webhookResponse.getEvent());
         String data = webhookResponse.getData();
 
@@ -65,17 +65,16 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
 
         switch (event) {
             case PRODUCT_ADD:
-                return handleProductAdd(data);
+                return handleProductAdd(posId, data);
             case PRODUCT_UPDATE:
                 return handleProductUpdate(data);
-
             default:
                 log.warn("Unhandled event: {}", event);
                 return false;
         }
     }
 
-    private boolean handleProductAdd(String data) {
+    private boolean handleProductAdd(String posId, String data) {
         NhanhvnProductResponse.ProductData productData = JsonUtils.fromJson(data, NhanhvnProductResponse.ProductData.class);
         if (productData == null) {
             log.error("Failed to parse product data: {}", data);
@@ -93,6 +92,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
             return false;
         }
 
+        // logic ...
         return true;
     }
 

@@ -115,7 +115,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
             // set size mỗi page
             Map<String, Object> paginator = new HashMap<>();
-            paginator.put("size", 3);
+            paginator.put("size", 50);
 
             NhanhvnRequest request = NhanhvnRequest.builder()
                     .appId(appId)
@@ -179,7 +179,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
         }
 
         try {
-            int batchSize = 3;
+            int batchSize = 50;
             for (int i = 0; i < products.size(); i += batchSize) {
                 int endIndex = Math.min(i + batchSize, products.size());
                 List<ProductEntity> batch = products.subList(i, endIndex);

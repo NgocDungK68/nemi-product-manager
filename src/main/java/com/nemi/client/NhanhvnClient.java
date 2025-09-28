@@ -3,7 +3,7 @@ package com.nemi.client;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
-import com.nemi.model.config.NhanhvnConfig;
+import com.nemi.configuration.NhanhvnConfig;
 import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.request.nhanhvn.NhanhvnAccessTokenRequest;
 import com.nemi.model.request.nhanhvn.NhanhvnRequest;
