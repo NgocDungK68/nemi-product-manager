@@ -101,7 +101,7 @@ public class NhanhvnClient {
             NhanhvnProductResponse productsResponse =
                     JsonUtils.fromJson(jsonResp, NhanhvnProductResponse.class);
 
-            log.info("[NhanhvnClient.getProducts] Got {} products",
+            log.info("[NhanhvnClient.getProducts] Got total {} products",
                     productsResponse.getData() != null ? productsResponse.getData().size() : 0);
 
             return Optional.of(productsResponse);
