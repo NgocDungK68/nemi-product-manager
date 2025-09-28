@@ -5,6 +5,7 @@ import com.nemi.constant.enums.PosName;
 import com.nemi.constant.enums.PosStatus;
 import com.nemi.entity.PosEntity;
 import com.nemi.entity.ProductEntity;
+import com.nemi.entity.ProductVariantEntity;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
@@ -15,10 +16,11 @@ import com.nemi.model.response.sapo.SapoAccessTokenResponse;
 import com.nemi.model.response.sapo.SapoProductResponse;
 import com.nemi.repository.PosRepository;
 import com.nemi.repository.ProductRepository;
-import com.nemi.service.AbstractPosManagementService;
+import com.nemi.repository.ProductVariantRepository;
 import com.nemi.service.PosManagementService;
 import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -29,20 +31,15 @@ import java.util.stream.Collectors;
 
 @Service
 @Slf4j
-public class SapoServiceImpl extends AbstractPosManagementService implements PosManagementService {
+@RequiredArgsConstructor
+public class SapoServiceImpl implements PosManagementService {
 
     private final ClaimUtil claimUtil;
     private final SapoClient sapoClient;
     private final ProductRepository productRepository;
+    private final PosRepository posRepository;
     private final ProductVariantRepository productVariantRepository;
 
-    public SapoServiceImpl(PosRepository posRepository, ClaimUtil claimUtil, ClaimUtil claimUtil1, SapoClient sapoClient, ProductRepository productRepository, ProductVariantRepository productVariantRepository) {
-        super(posRepository, claimUtil);
-        this.claimUtil = claimUtil1;
-        this.sapoClient = sapoClient;
-        this.productRepository = productRepository;
-        this.productVariantRepository = productVariantRepository;
-    }
 
     @Override
     public String getPosName() {
@@ -65,7 +62,7 @@ public class SapoServiceImpl extends AbstractPosManagementService implements Pos
             }
 
             PosEntity posEntityBuilder = PosEntity.builder()
-                    .posName(PosName.SAPO.name())
+                    .posName(PosName.SAPO.getValue())
                     .userId(userId)
                     .accessToken(tokenResponse.getAccessToken())
                     .status(PosStatus.ACTIVE.name())
@@ -133,7 +130,7 @@ public class SapoServiceImpl extends AbstractPosManagementService implements Pos
             for (SapoProductResponse.Product sapoProduct : response.getProducts()) {
                 ProductEntity productEntity = convertToProductEntity(posId, sapoProduct);
                 allProducts.add(productEntity);
-                
+
                 // Convert variants
                 if (sapoProduct.getVariants() != null && !sapoProduct.getVariants().isEmpty()) {
                     List<ProductVariantEntity> variants = convertToVariantEntities(productEntity.getProductId(), sapoProduct.getVariants());
@@ -214,11 +211,11 @@ public class SapoServiceImpl extends AbstractPosManagementService implements Pos
         // Handle nullable fields with defaults
         variant.setSku(apiVariant.getSku() != null ? apiVariant.getSku() : "");
         variant.setBarcode(apiVariant.getBarcode() != null ? apiVariant.getBarcode() : "");
-        
+
         // Parse price
-        if (apiVariant.getPrice() != null && !apiVariant.getPrice().isEmpty()) {
+        if (apiVariant.getPrice() != null) {
             try {
-                variant.setPrice(new BigDecimal(apiVariant.getPrice()));
+                variant.setPrice(BigDecimal.valueOf(apiVariant.getPrice()));
             } catch (NumberFormatException e) {
                 log.warn("Failed to parse price: {}", apiVariant.getPrice());
                 variant.setPrice(BigDecimal.ZERO);
@@ -226,7 +223,7 @@ public class SapoServiceImpl extends AbstractPosManagementService implements Pos
         } else {
             variant.setPrice(BigDecimal.ZERO);
         }
-        
+
         variant.setCcy("VND"); // Default currency
         variant.setInventoryQuantity(apiVariant.getInventoryQuantity() != null ? apiVariant.getInventoryQuantity() : 0);
 
@@ -320,21 +317,21 @@ public class SapoServiceImpl extends AbstractPosManagementService implements Pos
         try {
             // Handle Sapo date format: "2025-09-27T09:17:31Z"
             String cleanDate = dateTimeString.trim();
-            
+
             // Remove timezone info
             if (cleanDate.endsWith("Z")) {
                 cleanDate = cleanDate.substring(0, cleanDate.length() - 1);
             }
-            
+
             // Parse ISO 8601 format
             if (cleanDate.length() >= 19) {
                 cleanDate = cleanDate.substring(0, 19);
                 return LocalDateTime.parse(cleanDate);
             }
-            
+
             log.warn("[SapoServiceImpl] Unrecognized date format: {}", dateTimeString);
             return null;
-            
+
         } catch (Exception e) {
             log.warn("[SapoServiceImpl] Failed to parse date time: {}", dateTimeString, e);
             return null;

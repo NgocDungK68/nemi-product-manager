@@ -4,6 +4,7 @@ import com.nemi.model.request.ChangeStatusRequest;
 import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.response.PosConnectionResponse;
 import com.nemi.model.response.StatusResponse;
+import com.nemi.service.GeneralPosService;
 import com.nemi.service.PosManagementService;
 import com.nemi.service.factory.PosManagementFactory;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +24,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class PosManagementController {
     private final PosManagementFactory posManagementFactory;
+    private final GeneralPosService generalPosService;
 
+    // POS-specific endpoints (require posName)
     @PostMapping("/{posName}/pos")
     public ResponseEntity<PosConnectionResponse> connectPos(@PathVariable String posName,
                                                             @RequestBody PosConnectionRequest posConnectionRequest) {
@@ -33,28 +36,23 @@ public class PosManagementController {
         return ResponseEntity.ok(posConnectionResponse);
     }
 
-    @PutMapping("/{posName}/pos")
-    public ResponseEntity<PosConnectionResponse> changeStatusPos(@PathVariable String posName,
-                                                                 @RequestBody ChangeStatusRequest changeStatusRequest) {
-        PosManagementService posManagementService = posManagementFactory.getPosName(posName);
-        PosConnectionResponse posConnectionResponse =  posManagementService.setPosStatus(changeStatusRequest);
-        return ResponseEntity.ok(posConnectionResponse);
+    // Common endpoints (no posName needed - cleaner API)
+    @GetMapping("/pos")
+    public ResponseEntity<List<PosConnectionResponse>> listAllPos() {
+        List<PosConnectionResponse> listPosConnection = generalPosService.getAllPos();
+        return ResponseEntity.ok(listPosConnection);
     }
 
-    @GetMapping("/{posName}/pos/{posId}/status")
-    public ResponseEntity<StatusResponse> getStatusPos(
-            @PathVariable String posName,
-            @PathVariable String posId) {
-        PosManagementService posManagementService = posManagementFactory.getPosName(posName);
-        StatusResponse statusResponse =  posManagementService.getPosStatus(posId);
+    @GetMapping("/pos/{posId}/status")
+    public ResponseEntity<StatusResponse> getStatusPos(@PathVariable String posId) {
+        StatusResponse statusResponse = generalPosService.getPosStatus(posId);
         return ResponseEntity.ok(statusResponse);
     }
 
-    @GetMapping("/{posName}/pos")
-    public ResponseEntity<List<PosConnectionResponse>> listAllPos(  @PathVariable String posName) {
-        PosManagementService posManagementService = posManagementFactory.getPosName(posName);
-        List<PosConnectionResponse> listPosConnection = posManagementService.getAllPos();
-        return ResponseEntity.ok(listPosConnection);
+    @PutMapping("/pos")
+    public ResponseEntity<PosConnectionResponse> changeStatusPos(@RequestBody ChangeStatusRequest changeStatusRequest) {
+        PosConnectionResponse posConnectionResponse = generalPosService.setPosStatus(changeStatusRequest);
+        return ResponseEntity.ok(posConnectionResponse);
     }
 
 }

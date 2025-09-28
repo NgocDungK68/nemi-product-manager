@@ -53,7 +53,7 @@ public class SapoProductResponse {
         private Long id;
         private Long productId;
         private String title;
-        private String price;
+        private Double price;
         private String sku;
         private Integer position;
         private String inventoryPolicy;
