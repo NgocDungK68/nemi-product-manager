@@ -1,33 +1,28 @@
 package com.nemi.service_impl.nhanhvn;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nemi.configuration.NhanhvnConfig;
+import com.nemi.constant.enums.NhanhvnEvent;
 import com.nemi.constant.enums.PosName;
-import com.nemi.model.config.NhanhvnConfig;
-import com.nemi.repository.PosRepository;
+import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
+import com.nemi.model.response.nhanhvn.NhanhvnWebhookResponse;
+import com.nemi.repository.ProductRepository;
 import com.nemi.service.WebhookService;
+import com.nemi.util.JsonUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class NhanhvnWebhookServiceImpl implements WebhookService {
-
     private final NhanhvnConfig nhanhvnConfig;
-    private final RestTemplate restTemplate;
-    private final ObjectMapper objectMapper;
-    private final PosRepository posRepository;
+    private final ProductRepository productRepository;
 
     @Override
     public String getPosName() {
@@ -35,60 +30,70 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
     }
 
     @Override
-    public void processWebhook(HttpServletRequest request) {
-        log.info("[NhanhvnWebhook] Received request: method={}, uri={}", request.getMethod(), request.getRequestURI());
-
-        //log headers
-        Map<String, String> headers = extractHeaders(request);
-        log.info("====== Weehook headers: =======");
-        headers.forEach((k, v) -> log.info("Header: {} = {}", k, v));
-
-        // read body
-        String body = readBody(request);
-        log.info("Raw body : {}", body);
-
-        // parse body to json node
-        JsonNode root = null;
+    public boolean processWebhook(String posId, HttpServletRequest request) {
         try {
-            root = objectMapper.readTree(body);
-            log.info("parsed body successfully");
-        } catch (IOException e) {
-            log.error("Failed to parse body to JSON", e);
-            throw new RuntimeException("Invalid JSON body");
-        }
-
-        if (root != null) {
-            //log possible fields
-            String eventType = root.has("event") ? root.get("event").asText() : "unknown";
-            log.info("Processing event type: {}", eventType);
-
-            if (root.has("businessId")) {
-                log.info("Field businessId: {}", root.get("businessId").asText());
+            String verifyToken = request.getHeader(HttpHeaders.AUTHORIZATION);
+            if (verifyToken == null || verifyToken.isEmpty() || !verifyToken.equals(nhanhvnConfig.getVerifyToken())) {
+                log.error("Invalid verify token: {}", verifyToken);
+                return false;
             }
-            if (root.has("webhooksVerifyToken")) {
-                String token = root.get("webhooksVerifyToken").asText();
-                log.info("Field webhooksVerifyToken: {}", token);
-                if (!nhanhvnConfig.getVerifyToken().equals(token)) {
-                    log.warn("Invalid webhook token. Expected: {}, Received: {}",
-                            nhanhvnConfig.getVerifyToken(), token);
-                    throw new RuntimeException("Invalid token");
-                }
+
+            String body = readBody(request);
+            log.info("Body: {}", body);
+
+            NhanhvnWebhookResponse webhookResponse = JsonUtils.fromJson(body, NhanhvnWebhookResponse.class);
+            if (webhookResponse == null || webhookResponse.getEvent() == null) {
+                log.error("Invalid webhook payload: {}", body);
+                return false;
             }
+
+            return handleEvent(posId, webhookResponse);
+        } catch (Exception e) {
+            log.error("Process webhook failed: {}", e.getMessage(), e);
+            return false;
         }
     }
 
-    private Map<String, String> extractHeaders(HttpServletRequest request) {
-        Map<String, String> map = new HashMap<>();
-        Enumeration<String> names = request.getHeaderNames();
-        if (names == null) {
-            return Collections.emptyMap();
+    private boolean handleEvent(String posId, NhanhvnWebhookResponse webhookResponse) {
+        NhanhvnEvent event = NhanhvnEvent.fromValue(webhookResponse.getEvent());
+        String data = webhookResponse.getData();
+
+        if (event == null) {
+            log.warn("Unhandled webhook event: {}", webhookResponse.getEvent());
+            return false;
         }
-        while (names.hasMoreElements()) {
-            String name = names.nextElement();
-            String value = request.getHeader(name);
-            map.put(name, value);
+
+        switch (event) {
+            case PRODUCT_ADD:
+                return handleProductAdd(posId, data);
+            case PRODUCT_UPDATE:
+                return handleProductUpdate(data);
+            default:
+                log.warn("Unhandled event: {}", event);
+                return false;
         }
-        return map;
+    }
+
+    private boolean handleProductAdd(String posId, String data) {
+        NhanhvnProductResponse.ProductData productData = JsonUtils.fromJson(data, NhanhvnProductResponse.ProductData.class);
+        if (productData == null) {
+            log.error("Failed to parse product data: {}", data);
+            return false;
+        }
+
+        // logic ...
+        return true;
+    }
+
+    private boolean handleProductUpdate(String data) {
+        NhanhvnProductResponse.ProductData productData = JsonUtils.fromJson(data, NhanhvnProductResponse.ProductData.class);
+        if (productData == null) {
+            log.error("Failed to parse product data: {}", data);
+            return false;
+        }
+
+        // logic ...
+        return true;
     }
 
     private String readBody(HttpServletRequest request) {

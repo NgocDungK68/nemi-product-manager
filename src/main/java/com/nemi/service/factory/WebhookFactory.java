@@ -15,9 +15,9 @@ import java.util.Set;
 public class WebhookFactory {
     private final Set<WebhookService> webhookServices;
 
-    public WebhookService getWebhookService(String webhookType) {
+    public WebhookService getWebhookService(String posName) {
         return Objects.requireNonNull(this.webhookServices.stream()
-                .filter(service -> service.getPosName().equals(webhookType))
+                .filter(service -> service.getPosName().equals(posName))
                 .findFirst()
                 .orElseThrow(() -> new TechnicalException(AlertMessages.alert(TechnicalAlertCode.SYSTEM_ERROR))));
     }

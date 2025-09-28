@@ -1,4 +1,4 @@
-package com.nemi.model.config;
+package com.nemi.configuration;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
