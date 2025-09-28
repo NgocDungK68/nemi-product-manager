@@ -30,8 +30,8 @@ public class NhanhvnProductResponse {
     public static class ProductData {
         private Integer id;
         private Integer parentId;
-        private String code;
-        private String barcode;
+            private String code;
+            private String barcode;
         private String name;
         private String otherName;
         private Integer status;

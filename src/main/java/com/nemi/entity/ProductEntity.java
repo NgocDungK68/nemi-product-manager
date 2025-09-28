@@ -34,7 +34,6 @@ public class ProductEntity {
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
-
     @Column(name = "brand")
     private String brand;
 
