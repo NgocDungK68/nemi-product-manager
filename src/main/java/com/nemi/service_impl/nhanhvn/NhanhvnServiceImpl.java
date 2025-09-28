@@ -27,6 +27,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -264,7 +265,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 .productId(String.valueOf(apiProduct.getParentId()))
                 .sku(apiProduct.getCode())
                 .barcode(apiProduct.getBarcode())
-                .price(apiProduct.getPrices().getRetail())
+                .price(BigDecimal.valueOf(apiProduct.getPrices().getRetail()))
                 .inventoryQuantity(apiProduct.getInventory().getRemain())
                 .fulfillableQuantity(apiProduct.getInventory().getAvailable())
                 .weight(apiProduct.getShipping().getWeight())
