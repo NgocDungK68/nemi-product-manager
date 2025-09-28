@@ -19,4 +19,6 @@ public class PosConnectionRequest {
     private String clientSecret;
     private String storeName;
     private String code;
+
+    private String apiKey;    //PANCAKE
 }
