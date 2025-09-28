@@ -1,28 +1,29 @@
-package com.nemi.service_impl.nhanhvn;
+package com.nemi.service_impl.pancake;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.client.NhanhvnClient;
+import com.nemi.client.PancakeClient;
 import com.nemi.constant.enums.PosName;
 import com.nemi.constant.enums.PosStatus;
-import com.nemi.constant.enums.WeightUnit;
 import com.nemi.constant.enums.SyncErrorMessage;
 import com.nemi.entity.PosEntity;
 import com.nemi.entity.ProductEntity;
-import com.nemi.entity.ProductVariantEntity;
 import com.nemi.entity.SyncHistoryEntity;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
 import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.request.nhanhvn.NhanhvnRequest;
+import com.nemi.model.request.pancake.PancakeRequest;
 import com.nemi.model.response.PosConnectionResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnAccessTokenResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
+import com.nemi.model.response.pancake.PancakeProductResponse;
 import com.nemi.repository.PosRepository;
 import com.nemi.repository.ProductRepository;
-import com.nemi.repository.ProductVariantRepository;
 import com.nemi.repository.SyncHistoryRepository;
+import com.nemi.service.AbstractPosManagementService;
 import com.nemi.service.PosManagementService;
 import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
@@ -30,25 +31,28 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
-public class NhanhvnServiceImpl implements PosManagementService {
+public class PancakeServiceImpl  implements PosManagementService {
     private final ClaimUtil claimUtil;
-    private final NhanhvnClient nhanhvnClient;
+    private final PancakeClient pancakeClient;
     private final ObjectMapper objectMapper;
-    private final ProductRepository productRepository;
     private final PosRepository posRepository;
-    private final ProductVariantRepository productVariantRepository;
+    private final ProductRepository productRepository;
     private final SyncHistoryRepository syncHistoryRepository;
+
     @Override
     public String getPosName() {
-        return PosName.NHANHVN.getValue();
+        return PosName.PANCAKE.getValue();
     }
 
     @Override
@@ -58,23 +62,14 @@ public class NhanhvnServiceImpl implements PosManagementService {
             String userId = claimUtil.getUserId();
 
             Map<String, String> configMap = new HashMap<>();
-            configMap.put("secretId", posConnectionRequest.getAppSecret());
-            configMap.put("appId", posConnectionRequest.getAppId());
-            configMap.put("businessId", posConnectionRequest.getBusinessId());
-
-            NhanhvnAccessTokenResponse tokenResponse = nhanhvnClient.getAccessToken(posConnectionRequest);
-
-            if (tokenResponse.getData() == null || tokenResponse.getData().getAccessToken() == null) {
-                log.error("Nhanhvn response is null, stop persist to db {}", tokenResponse);
-                throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
-            }
+            configMap.put("shopId", posConnectionRequest.getShopId());
 
             LocalDateTime expiredTime = LocalDateTime.now().plusYears(1);
             PosEntity posEntityBuilder = PosEntity.builder()
-                    .posName(PosName.NHANHVN.getValue())
+                    .posName(PosName.PANCAKE.name())
                     .userId(userId)
                     .status(PosStatus.ACTIVE.name())
-                    .accessToken(tokenResponse.getData().getAccessToken())
+                    .accessToken(posConnectionRequest.getApiKey())
                     .config(JsonUtils.toJson(configMap))
                     .expiredTime(expiredTime)
                     .companyId(String.valueOf(claimUtil.getCompanyId()))
@@ -109,75 +104,64 @@ public class NhanhvnServiceImpl implements PosManagementService {
                     }
             );
 
-            String appId = configMap.get("appId");
-            String businessId = configMap.get("businessId");
+            String shopId = configMap.get("shopId");
             String accessToken = posEntity.getAccessToken();
 
-            if (appId == null || businessId == null || accessToken == null) {
+            if (shopId == null || accessToken == null) {
                 syncHistoryRepository.save(toSyncHistory(history, (SyncErrorMessage.MISSING_CONFIG), false));
                 log.error("Missing required config for posId={}", posId); // throw techial
                 return false;
             }
 
             List<ProductEntity> allProducts = new ArrayList<>();
-            List<ProductVariantEntity> allVariants = new ArrayList<>();
-
-            // set size mỗi page
-            Map<String, Object> paginator = new HashMap<>();
-            paginator.put("size", 50);
-
-            NhanhvnRequest request = NhanhvnRequest.builder()
-                    .appId(appId)
-                    .businessId(businessId)
-                    .accessToken(accessToken)
-                    .paginator(paginator)
+//--------------------------------------------------------------------------------------
+            // chỉ set size cho lần đầu
+            int pageSize = 150;
+            int pageNumber = 1;
+            PancakeRequest request = PancakeRequest.builder()
+                    .apiKey(posEntity.getAccessToken())
+                    .pageNumber(pageNumber)
+                    .pageSize(pageSize)
+                    .shopId(shopId)
                     .build();
 
             while (true) {
-                Optional<NhanhvnProductResponse> responseOpt = nhanhvnClient.getProducts(request);
+                Optional<PancakeProductResponse> responseOpt = pancakeClient.getProducts(request);
 
                 if (responseOpt.isEmpty()) {
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
                     log.error("Missing required config for posId={}", posId);
-                    log.error("Failed to fetch products with paginator: {}", paginator);
                     return false;
                 }
 
-                NhanhvnProductResponse response = responseOpt.get();
+                PancakeProductResponse response = responseOpt.get();
+
+                if (!response.isSuccess()) {
+                    syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
+                    log.error("Missing required config for posId={}", posId);
+                    return false;
+                }
 
                 if (response.getData() == null || response.getData().isEmpty()) {
-                    if(response.getCode() == 1){
-                        syncHistoryRepository.save(toSyncHistory(history,null, true));
-                        return true;
-                    }
-                    syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.CONNECTION_FAILED, false));
-                    log.info("No products found with paginator: {}", paginator);
-                    return false;
+
+                    log.info("No products found with page number: {}",pageNumber);
+                    break;
+                } else {
+                    request.setPageNumber(request.getPageNumber()+1);
                 }
 
-                // product
                 List<ProductEntity> pageProducts = convertToProductEntities(posId, response.getData());
                 allProducts.addAll(pageProducts);
+
                 log.info("Fetched {} products, total so far: {}", pageProducts.size(), allProducts.size());
 
-                // variant
-                List<ProductVariantEntity> pageVariants = convertToVariantEntities(posId, response.getData());
-                allVariants.addAll(pageVariants);
-                log.info("Fetched {} variants, total so far: {}", pageVariants.size(), allVariants.size());
-
-                // xử lý next
-                if (response.getPaginator() != null && response.getPaginator().getNext() != null) {
-                    paginator.put("next", response.getPaginator().getNext());
-                } else {
-                    break; // hết data
-                }
             }
+
+
             syncHistoryRepository.save(toSyncHistory(history, null, true));
             saveAllProductsSync(allProducts);
-            saveAllVariantsSync(allVariants);
 
             log.info("Successfully synced {} products from Nhanh.vn", allProducts.size());
-            log.info("Successfully synced {} variants from Nhanh.vn", allVariants.size());
             return true;
 
         } catch (Exception e) {
@@ -191,12 +175,11 @@ public class NhanhvnServiceImpl implements PosManagementService {
         log.info("Saving {} Nhanh.vn products synchronously", products.size());
 
         if (products.isEmpty()) {
-            log.info("No products to save.");
             return;
         }
 
         try {
-            int batchSize = 50;
+            int batchSize = 100;
             for (int i = 0; i < products.size(); i += batchSize) {
                 int endIndex = Math.min(i + batchSize, products.size());
                 List<ProductEntity> batch = products.subList(i, endIndex);
@@ -209,33 +192,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
             log.info("Successfully saved all {} Nhanh.vn products", products.size());
         } catch (Exception e) {
             log.error("Failed to save Nhanh.vn products synchronously: {}", e.getMessage(), e);
-            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_PERSISTENCE_ERROR));
-        }
-    }
-
-    public void saveAllVariantsSync(List<ProductVariantEntity> variants) {
-        log.info("Saving {} Nhanh.vn variants synchronously", variants.size());
-
-        if (variants.isEmpty()) {
-            log.info("No variants to save.");
-            return;
-        }
-
-        try {
-            int batchSize = 50;
-            for (int i = 0; i < variants.size(); i += batchSize) {
-                int endIndex = Math.min(i + batchSize, variants.size());
-                List<ProductVariantEntity> batch = variants.subList(i, endIndex);
-
-                productVariantRepository.saveAll(batch);
-                log.info("Saved batch {}-{} of {} variants",
-                        i + 1, endIndex, variants.size());
-            }
-
-            log.info("Successfully saved all {} Nhanh.vn variants", variants.size());
-        } catch (Exception e) {
-            log.error("Failed to save Nhanh.vn variants synchronously: {}", e.getMessage(), e);
-            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_PERSISTENCE_ERROR));
+            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
         }
     }
 
@@ -250,44 +207,26 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 });
     }
 
-    private List<ProductEntity> convertToProductEntities(String posId, List<NhanhvnProductResponse.ProductData> apiProducts) {
+    private List<ProductEntity> convertToProductEntities(String posId, List<PancakeProductResponse.ProductData> apiProducts) {
         return apiProducts.stream()
                 .map(apiProduct -> convertToProductEntity(posId, apiProduct))
-                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
-    private ProductEntity convertToProductEntity(String posId, NhanhvnProductResponse.ProductData apiProduct) {
-        if (apiProduct.getParentId() > 0) return null;
-        return ProductEntity.builder()
-                .posId(posId)
-                .productId(String.valueOf(apiProduct.getId()))
-                .code(apiProduct.getCode())
-                .name(apiProduct.getName())
-                .status(apiProduct.getStatus().toString())
-                .build();
-    }
+    private ProductEntity convertToProductEntity(String posId, PancakeProductResponse.ProductData apiProducts) {
+        ProductEntity product = new ProductEntity();
 
-    private List<ProductVariantEntity> convertToVariantEntities(String posId, List<NhanhvnProductResponse.ProductData> apiProducts) {
-        return apiProducts.stream()
-                .map(apiProduct -> convertToVariantEntity(posId, apiProduct))
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
-    }
+        product.setPosId(posId);
+        product.setProductId(String.valueOf(apiProducts.getId()));
+        product.setCode(apiProducts.getProductId());
+        product.setName(apiProducts.getProduct().getName());
+        if(apiProducts.getIsLocked()) {
+            product.setStatus(PosStatus.INACTIVE.name());
+        } else {
+            product.setStatus(PosStatus.ACTIVE.name());
+        }
 
-    private ProductVariantEntity convertToVariantEntity(String posId, NhanhvnProductResponse.ProductData apiProduct) {
-        if (apiProduct.getParentId() < 0) return null;
-        return ProductVariantEntity.builder()
-                .variantId(String.valueOf(apiProduct.getId()))
-                .productId(String.valueOf(apiProduct.getParentId()))
-                .sku(apiProduct.getCode())
-                .barcode(apiProduct.getBarcode())
-                .price(BigDecimal.valueOf(apiProduct.getPrices().getRetail()))
-                .inventoryQuantity(apiProduct.getInventory().getRemain())
-                .fulfillableQuantity(apiProduct.getInventory().getAvailable())
-                .weight(apiProduct.getShipping().getWeight())
-                .weightUnit(WeightUnit.GAM.getValue())
-                .build();
+        return product;
     }
 
     private SyncHistoryEntity toSyncHistory(SyncHistoryEntity syncHistoryEntity, SyncErrorMessage syncErrorMessage, Boolean isSyncSuccess) {

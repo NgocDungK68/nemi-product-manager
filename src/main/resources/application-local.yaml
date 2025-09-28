@@ -39,7 +39,7 @@ nhanhvn:
 
 pancake:
   secret: elqsF9ERiFWGacWQO9Gg5XC4kXojot
-  base-url: https://pos.pages.fm/api/v1/shops/
+  base-url: https://pos.pages.fm/api/v1
   api-key: 10b76cf31be245848c8361287cee2adf
   shop-id: 1720119150
   timeout: 30000

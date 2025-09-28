@@ -2,6 +2,7 @@ package com.nemi.service;
 
 import com.nemi.constant.enums.PosStatus;
 import com.nemi.entity.PosEntity;
+import com.nemi.entity.SyncHistoryEntity;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
@@ -9,6 +10,7 @@ import com.nemi.model.request.ChangeStatusRequest;
 import com.nemi.model.response.PosConnectionResponse;
 import com.nemi.model.response.StatusResponse;
 import com.nemi.repository.PosRepository;
+import com.nemi.repository.SyncHistoryRepository;
 import com.nemi.util.ClaimUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,18 +25,15 @@ public abstract class AbstractPosManagementService {
 
     protected final PosRepository posRepository;
     protected final ClaimUtil claimUtil;
+    protected final SyncHistoryRepository syncHistoryRepository;
 
     /**
      * Get POS status by ID
      */
     public StatusResponse getPosStatus(String posId) {
-
-        PosEntity pos = posRepository.findByIdAndUserId(posId, claimUtil.getUserId())
-                .orElseThrow(() -> {
-                    log.warn("POS with id={} not found, cannot get status", posId);
-                    return new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_STATUS_NOTFOUND));
-                });
-        return new StatusResponse(pos.getStatus());
+        SyncHistoryEntity syncHistoryEntity = syncHistoryRepository.findByPosId(posId)
+                .orElseThrow(() -> new TechnicalException(AlertMessages.alert(TechnicalAlertCode.SYNC_HISTORY_NOT_FOUND)));
+        return new StatusResponse(syncHistoryEntity.getSyncStatus());
     }
 
     /**
