@@ -14,5 +14,5 @@ import lombok.NoArgsConstructor;
 public class NhanhvnWebhookResponse {
     private String event;
     private String businessId;
-    private String data;
+    private Object data;
 }
