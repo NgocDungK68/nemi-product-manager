@@ -56,7 +56,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
 
     private boolean handleEvent(String posId, NhanhvnWebhookResponse webhookResponse) {
         NhanhvnEvent event = NhanhvnEvent.fromValue(webhookResponse.getEvent());
-        String data = webhookResponse.getData();
+        Object data = webhookResponse.getData();
 
         if (event == null) {
             log.warn("Unhandled webhook event: {}", webhookResponse.getEvent());
@@ -74,8 +74,9 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
         }
     }
 
-    private boolean handleProductAdd(String posId, String data) {
-        NhanhvnProductResponse.ProductData productData = JsonUtils.fromJson(data, NhanhvnProductResponse.ProductData.class);
+    private boolean handleProductAdd(String posId, Object data) {
+        NhanhvnProductResponse.ProductData productData = JsonUtils.map(data, NhanhvnProductResponse.ProductData.class);
+        log.info("ProductData: {}", productData);
         if (productData == null) {
             log.error("Failed to parse product data: {}", data);
             return false;
@@ -85,8 +86,8 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
         return true;
     }
 
-    private boolean handleProductUpdate(String data) {
-        NhanhvnProductResponse.ProductData productData = JsonUtils.fromJson(data, NhanhvnProductResponse.ProductData.class);
+    private boolean handleProductUpdate(Object data) {
+        NhanhvnProductResponse.ProductData productData = JsonUtils.map(data, NhanhvnProductResponse.ProductData.class);
         if (productData == null) {
             log.error("Failed to parse product data: {}", data);
             return false;
