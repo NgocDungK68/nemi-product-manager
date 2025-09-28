@@ -5,9 +5,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.client.NhanhvnClient;
 import com.nemi.constant.enums.PosName;
 import com.nemi.constant.enums.PosStatus;
+import com.nemi.constant.enums.WeightUnit;
 import com.nemi.constant.enums.SyncErrorMessage;
 import com.nemi.entity.PosEntity;
 import com.nemi.entity.ProductEntity;
+import com.nemi.entity.ProductVariantEntity;
 import com.nemi.entity.SyncHistoryEntity;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
@@ -19,43 +21,30 @@ import com.nemi.model.response.nhanhvn.NhanhvnAccessTokenResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
 import com.nemi.repository.PosRepository;
 import com.nemi.repository.ProductRepository;
+import com.nemi.repository.ProductVariantRepository;
 import com.nemi.repository.SyncHistoryRepository;
-import com.nemi.service.AbstractPosManagementService;
 import com.nemi.service.PosManagementService;
 import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
 @Slf4j
-public class NhanhvnServiceImpl extends AbstractPosManagementService implements PosManagementService {
+@RequiredArgsConstructor
+public class NhanhvnServiceImpl implements PosManagementService {
     private final ClaimUtil claimUtil;
     private final NhanhvnClient nhanhvnClient;
     private final ObjectMapper objectMapper;
     private final ProductRepository productRepository;
+    private final PosRepository posRepository;
+    private final ProductVariantRepository productVariantRepository;
     private final SyncHistoryRepository syncHistoryRepository;
-
-    public NhanhvnServiceImpl(PosRepository posRepository, ClaimUtil claimUtil,
-                              NhanhvnClient nhanhvnClient, ObjectMapper objectMapper,
-                              ProductRepository productRepository, SyncHistoryRepository syncHistoryRepository) {
-        super(posRepository, claimUtil);
-        this.claimUtil = claimUtil;
-        this.nhanhvnClient = nhanhvnClient;
-        this.objectMapper = objectMapper;
-        this.productRepository = productRepository;
-        this.syncHistoryRepository = syncHistoryRepository;
-
-    }
-
     @Override
     public String getPosName() {
         return PosName.NHANHVN.getValue();
@@ -81,7 +70,7 @@ public class NhanhvnServiceImpl extends AbstractPosManagementService implements 
 
             LocalDateTime expiredTime = LocalDateTime.now().plusYears(1);
             PosEntity posEntityBuilder = PosEntity.builder()
-                    .posName(PosName.NHANHVN.name())
+                    .posName(PosName.NHANHVN.getValue())
                     .userId(userId)
                     .status(PosStatus.ACTIVE.name())
                     .accessToken(tokenResponse.getData().getAccessToken())
@@ -130,10 +119,11 @@ public class NhanhvnServiceImpl extends AbstractPosManagementService implements 
             }
 
             List<ProductEntity> allProducts = new ArrayList<>();
+            List<ProductVariantEntity> allVariants = new ArrayList<>();
 
-            // chỉ set size cho lần đầu
+            // set size mỗi page
             Map<String, Object> paginator = new HashMap<>();
-            paginator.put("size", 50);
+            paginator.put("size", 3);
 
             NhanhvnRequest request = NhanhvnRequest.builder()
                     .appId(appId)
@@ -164,10 +154,15 @@ public class NhanhvnServiceImpl extends AbstractPosManagementService implements 
                     return false;
                 }
 
+                // product
                 List<ProductEntity> pageProducts = convertToProductEntities(posId, response.getData());
                 allProducts.addAll(pageProducts);
-
                 log.info("Fetched {} products, total so far: {}", pageProducts.size(), allProducts.size());
+
+                // variant
+                List<ProductVariantEntity> pageVariants = convertToVariantEntities(posId, response.getData());
+                allVariants.addAll(pageVariants);
+                log.info("Fetched {} variants, total so far: {}", pageVariants.size(), allVariants.size());
 
                 // xử lý next
                 if (response.getPaginator() != null && response.getPaginator().getNext() != null) {
@@ -178,8 +173,10 @@ public class NhanhvnServiceImpl extends AbstractPosManagementService implements 
             }
             syncHistoryRepository.save(toSyncHistory(history, null, true));
             saveAllProductsSync(allProducts);
+            saveAllVariantsSync(allVariants);
 
             log.info("Successfully synced {} products from Nhanh.vn", allProducts.size());
+            log.info("Successfully synced {} variants from Nhanh.vn", allVariants.size());
             return true;
 
         } catch (Exception e) {
@@ -193,11 +190,12 @@ public class NhanhvnServiceImpl extends AbstractPosManagementService implements 
         log.info("Saving {} Nhanh.vn products synchronously", products.size());
 
         if (products.isEmpty()) {
+            log.info("No products to save.");
             return;
         }
 
         try {
-            int batchSize = 100;
+            int batchSize = 3;
             for (int i = 0; i < products.size(); i += batchSize) {
                 int endIndex = Math.min(i + batchSize, products.size());
                 List<ProductEntity> batch = products.subList(i, endIndex);
@@ -210,7 +208,33 @@ public class NhanhvnServiceImpl extends AbstractPosManagementService implements 
             log.info("Successfully saved all {} Nhanh.vn products", products.size());
         } catch (Exception e) {
             log.error("Failed to save Nhanh.vn products synchronously: {}", e.getMessage(), e);
-            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
+            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_PERSISTENCE_ERROR));
+        }
+    }
+
+    public void saveAllVariantsSync(List<ProductVariantEntity> variants) {
+        log.info("Saving {} Nhanh.vn variants synchronously", variants.size());
+
+        if (variants.isEmpty()) {
+            log.info("No variants to save.");
+            return;
+        }
+
+        try {
+            int batchSize = 50;
+            for (int i = 0; i < variants.size(); i += batchSize) {
+                int endIndex = Math.min(i + batchSize, variants.size());
+                List<ProductVariantEntity> batch = variants.subList(i, endIndex);
+
+                productVariantRepository.saveAll(batch);
+                log.info("Saved batch {}-{} of {} variants",
+                        i + 1, endIndex, variants.size());
+            }
+
+            log.info("Successfully saved all {} Nhanh.vn variants", variants.size());
+        } catch (Exception e) {
+            log.error("Failed to save Nhanh.vn variants synchronously: {}", e.getMessage(), e);
+            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_PERSISTENCE_ERROR));
         }
     }
 
@@ -228,19 +252,41 @@ public class NhanhvnServiceImpl extends AbstractPosManagementService implements 
     private List<ProductEntity> convertToProductEntities(String posId, List<NhanhvnProductResponse.ProductData> apiProducts) {
         return apiProducts.stream()
                 .map(apiProduct -> convertToProductEntity(posId, apiProduct))
+                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
-    private ProductEntity convertToProductEntity(String posId, NhanhvnProductResponse.ProductData apiProducts) {
-        ProductEntity product = new ProductEntity();
+    private ProductEntity convertToProductEntity(String posId, NhanhvnProductResponse.ProductData apiProduct) {
+        if (apiProduct.getParentId() > 0) return null;
+        return ProductEntity.builder()
+                .posId(posId)
+                .productId(String.valueOf(apiProduct.getId()))
+                .code(apiProduct.getCode())
+                .name(apiProduct.getName())
+                .status(apiProduct.getStatus().toString())
+                .build();
+    }
 
-        product.setPosId(posId);
-        product.setProductId(String.valueOf(apiProducts.getId()));
-        product.setCode(apiProducts.getCode());
-        product.setName(apiProducts.getName());
-        product.setStatus(apiProducts.getStatus().toString());
+    private List<ProductVariantEntity> convertToVariantEntities(String posId, List<NhanhvnProductResponse.ProductData> apiProducts) {
+        return apiProducts.stream()
+                .map(apiProduct -> convertToVariantEntity(posId, apiProduct))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
 
-        return product;
+    private ProductVariantEntity convertToVariantEntity(String posId, NhanhvnProductResponse.ProductData apiProduct) {
+        if (apiProduct.getParentId() < 0) return null;
+        return ProductVariantEntity.builder()
+                .variantId(String.valueOf(apiProduct.getId()))
+                .productId(String.valueOf(apiProduct.getParentId()))
+                .sku(apiProduct.getCode())
+                .barcode(apiProduct.getBarcode())
+                .price(apiProduct.getPrices().getRetail())
+                .inventoryQuantity(apiProduct.getInventory().getRemain())
+                .fulfillableQuantity(apiProduct.getInventory().getAvailable())
+                .weight(apiProduct.getShipping().getWeight())
+                .weightUnit(WeightUnit.GAM.getValue())
+                .build();
     }
 
     private SyncHistoryEntity toSyncHistory(SyncHistoryEntity syncHistoryEntity, SyncErrorMessage syncErrorMessage, Boolean isSyncSuccess) {

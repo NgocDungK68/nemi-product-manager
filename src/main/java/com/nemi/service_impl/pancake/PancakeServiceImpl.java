@@ -27,6 +27,7 @@ import com.nemi.service.AbstractPosManagementService;
 import com.nemi.service.PosManagementService;
 import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -40,24 +41,14 @@ import java.util.stream.Collectors;
 
 @Service
 @Slf4j
-public class PancakeServiceImpl extends AbstractPosManagementService implements PosManagementService {
+@RequiredArgsConstructor
+public class PancakeServiceImpl  implements PosManagementService {
     private final ClaimUtil claimUtil;
     private final PancakeClient pancakeClient;
     private final ObjectMapper objectMapper;
+    private final PosRepository posRepository;
     private final ProductRepository productRepository;
     private final SyncHistoryRepository syncHistoryRepository;
-
-    public PancakeServiceImpl(PosRepository posRepository, ClaimUtil claimUtil,
-                              PancakeClient pancakeClient, ObjectMapper objectMapper,
-                              ProductRepository productRepository, SyncHistoryRepository syncHistoryRepository) {
-        super(posRepository, claimUtil);
-        this.claimUtil = claimUtil;
-        this.pancakeClient = pancakeClient;
-        this.objectMapper = objectMapper;
-        this.productRepository = productRepository;
-        this.syncHistoryRepository = syncHistoryRepository;
-
-    }
 
     @Override
     public String getPosName() {
