@@ -25,7 +25,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -171,19 +173,14 @@ public class SapoServiceImpl implements PosManagementService {
         product.setProductId(String.valueOf(apiProduct.getId()));
         // Set code from first variant's SKU
         product.setCode(null);
-        product.setName(apiProduct.getName() != null ? apiProduct.getName() : "Unnamed Product");
+        product.setName(apiProduct.getName());
         product.setDescription(apiProduct.getContent());
         product.setBrand(apiProduct.getVendor());
         product.setCategory(apiProduct.getProductType());
         product.setStatus(apiProduct.getStatus());
-
-        // Convert images to JSON string
-        if (apiProduct.getImages() != null && !apiProduct.getImages().isEmpty()) {
-            String imagesJson = JsonUtils.toJson(apiProduct.getImages().stream()
-                    .map(SapoProductResponse.Image::getSrc)
-                    .collect(Collectors.toList()));
-            product.setImages(imagesJson);
-        }
+        product.setImages(JsonUtils.toJson(apiProduct.getImages().stream()
+                .map(SapoProductResponse.Image::getSrc) // Dùng method reference
+                .collect(Collectors.toList())));
 
         // Set timestamps - parse from string format
         if (apiProduct.getCreatedOn() != null && !apiProduct.getCreatedOn().isEmpty()) {
@@ -315,25 +312,17 @@ public class SapoServiceImpl implements PosManagementService {
         }
 
         try {
-            // Handle Sapo date format: "2025-09-27T09:17:31Z"
-            String cleanDate = dateTimeString.trim();
+            // 1. Dùng Instant để xử lý chuỗi ISO 8601 có 'Z' (Zulu/UTC)
+            // Instant.parse() xử lý định dạng "yyyy-MM-ddTHH:mm:ssZ" hoặc có mili giây.
+            Instant instant = Instant.parse(dateTimeString.trim());
 
-            // Remove timezone info
-            if (cleanDate.endsWith("Z")) {
-                cleanDate = cleanDate.substring(0, cleanDate.length() - 1);
-            }
-
-            // Parse ISO 8601 format
-            if (cleanDate.length() >= 19) {
-                cleanDate = cleanDate.substring(0, 19);
-                return LocalDateTime.parse(cleanDate);
-            }
-
-            log.warn("[SapoServiceImpl] Unrecognized date format: {}", dateTimeString);
-            return null;
+            // 2. Chuyển Instant (UTC time) sang LocalDateTime (bỏ thông tin múi giờ)
+            // Sử dụng ZoneOffset.UTC để đảm bảo chuyển đổi chính xác từ UTC.
+            return LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
 
         } catch (Exception e) {
-            log.warn("[SapoServiceImpl] Failed to parse date time: {}", dateTimeString, e);
+            // Ghi log chi tiết hơn để dễ debug
+            log.warn("[SapoServiceImpl] Failed to parse date time '{}'. Error: {}", dateTimeString, e.getMessage());
             return null;
         }
     }

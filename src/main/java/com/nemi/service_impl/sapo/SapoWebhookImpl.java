@@ -1,10 +1,12 @@
 package com.nemi.service_impl.sapo;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.constant.enums.PosName;
+import com.nemi.util.JsonUtils;
 import com.nemi.entity.ProductEntity;
+import com.nemi.entity.ProductVariantEntity;
+import com.nemi.model.response.sapo.SapoProductResponse;
 import com.nemi.repository.ProductRepository;
+import com.nemi.repository.ProductVariantRepository;
 import com.nemi.service.WebhookService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -13,18 +15,21 @@ import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class SapoWebhookImpl implements WebhookService {
     private final ProductRepository productRepository;
-    private final ObjectMapper objectMapper;
+    private final ProductVariantRepository productVariantRepository;
     @Override
     public String getPosName() {
         return PosName.SAPO.getValue();
@@ -43,15 +48,16 @@ public class SapoWebhookImpl implements WebhookService {
             String body = readBody(request);
             log.info("Payload body: {}", body);
 
-            // 3. Parse JSON payload
+            // 3. Parse JSON payload using JsonUtils
             if (body != null && !body.trim().isEmpty()) {
-                JsonNode payload = objectMapper.readTree(body);
+                SapoProductResponse.Product payload = JsonUtils.fromJson(body, SapoProductResponse.Product.class);
+                if (payload == null) {
+                    log.error("Failed to parse webhook payload");
+                    return false;
+                }
                 
                 // 4. Process webhook data based on event type
-
-
                 String topic = request.getHeader("x-sapo-topic");
-
                 switch (topic.toLowerCase()) {
                     case "products/create":
                         return processProductWebhook(posId, payload);
@@ -103,81 +109,23 @@ public class SapoWebhookImpl implements WebhookService {
     /**
      * Process product create/update webhook
      */
-    private boolean processProductWebhook(String posId, JsonNode payload) {
+    private boolean processProductWebhook(String posId, SapoProductResponse.Product payload) {
         try {
-            // Sapo webhook sends data directly in the root, not in "data" field
-            JsonNode productData = payload;
-            
-            ProductEntity product = new ProductEntity();
-            
-            // Map Sapo product data to ProductEntity based on actual payload structure
-            product.setProductId(String.valueOf(productData.path("id").asLong()));
-            
-            // Get SKU from first variant if available, otherwise use product ID
-            JsonNode variants = productData.path("variants");
-            if (!variants.isMissingNode() && variants.isArray() && variants.size() > 0) {
-                String sku = variants.get(0).path("sku").asText();
-                if (!sku.isEmpty()) {
-                    product.setCode(sku);
-                } else {
-                    product.setCode("SAPO-" + productData.path("id").asLong());
-                }
-            } else {
-                product.setCode("SAPO-" + productData.path("id").asLong());
-            }
-            
-            product.setName(productData.path("name").asText());
-            product.setDescription(productData.path("alias").asText()); // Using alias as description
-            product.setStatus(productData.path("status").asText());
-            product.setPosId(posId);
-            
-            // Handle category
-            JsonNode category = productData.path("product_type");
-            if (!category.isMissingNode()) {
-                product.setCategory(category.asText());
-            }
-            
-            // Handle brand
-            JsonNode vendor = productData.path("vendor");
-            if (!vendor.isMissingNode()) {
-                product.setBrand(vendor.asText());
-            }
-            
-            // Handle tags as additional info
-            JsonNode tags = productData.path("tags");
-            if (!tags.isMissingNode()) {
-                String tagsStr = tags.asText();
-                if (!tagsStr.isEmpty()) {
-                    product.setDescription(product.getDescription() + " | Tags: " + tagsStr);
-                }
-            }
-            
-            // Set timestamps
-            String createdOn = productData.path("created_on").asText();
-            String modifiedOn = productData.path("modified_on").asText();
-            
-            try {
-                if (!createdOn.isEmpty()) {
-                    product.setCreatedDatetime(LocalDateTime.parse(createdOn.replace("Z", "")));
-                } else {
-                    product.setCreatedDatetime(LocalDateTime.now());
-                }
-                
-                if (!modifiedOn.isEmpty()) {
-                    product.setUpdatedDatetime(LocalDateTime.parse(modifiedOn.replace("Z", "")));
-                } else {
-                    product.setUpdatedDatetime(LocalDateTime.now());
-                }
-            } catch (Exception e) {
-                log.warn("Failed to parse timestamps, using current time: {}", e.getMessage());
-                product.setCreatedDatetime(LocalDateTime.now());
-                product.setUpdatedDatetime(LocalDateTime.now());
-            }
-
-            // Save to database
+            // Convert and save product
+            ProductEntity product = convertToProductEntity(posId, payload);
             productRepository.save(product);
             log.info("Successfully processed Sapo product webhook for product: {} (SKU: {})", 
                     product.getProductId(), product.getCode());
+            
+            // Process variants if any
+            if (payload.getVariants() != null && !payload.getVariants().isEmpty()) {
+                for (SapoProductResponse.Variant variant : payload.getVariants()) {
+                    ProductVariantEntity variantEntity = convertToVariantEntity(variant, payload.getId());
+                    productVariantRepository.save(variantEntity);
+                    log.info("Successfully saved variant: {} for product: {}", 
+                            variantEntity.getVariantId(), product.getProductId());
+                }
+            }
             
             return true;
             
@@ -190,17 +138,20 @@ public class SapoWebhookImpl implements WebhookService {
     /**
      * Process product delete webhook
      */
-    private boolean processProductDeleteWebhook(String posId, JsonNode payload) {
+    private boolean processProductDeleteWebhook(String posId, SapoProductResponse.Product payload) {
         try {
-            // Sapo delete webhook also sends data directly in the root
-            Long productId = payload.path("id").asLong();
+            Long productId = payload.getId();
             
-            if (productId == 0) {
+            if (productId == null || productId == 0) {
                 log.error("No product ID found in delete webhook payload");
                 return false;
             }
             
-            // Delete from database
+            // Delete variants first (foreign key constraint)
+            productVariantRepository.deleteByProductId(String.valueOf(productId));
+            log.info("Deleted variants for product: {}", productId);
+            
+            // Delete product
             productRepository.deleteById(String.valueOf(productId));
             log.info("Successfully processed Sapo product delete webhook for product: {}", productId);
             
@@ -215,13 +166,10 @@ public class SapoWebhookImpl implements WebhookService {
     /**
      * Process product update webhook - only update changed fields
      */
-    private boolean processProductUpdateWebhook(String posId, JsonNode payload) {
+    private boolean processProductUpdateWebhook(String posId, SapoProductResponse.Product payload) {
         try {
-            // Sapo webhook sends data directly in the root
-            JsonNode productData = payload;
-            
-            Long productId = productData.path("id").asLong();
-            if (productId == 0) {
+            Long productId = payload.getId();
+            if (productId == null || productId == 0) {
                 log.error("No product ID found in update webhook payload");
                 return false;
             }
@@ -237,108 +185,155 @@ public class SapoWebhookImpl implements WebhookService {
             boolean hasChanges = false;
 
             // Check and update name
-            String newName = productData.path("name").asText();
-            if (!newName.isEmpty() && !newName.equals(existingProduct.getName())) {
-                log.info("Updating product name: {} -> {}", existingProduct.getName(), newName);
-                existingProduct.setName(newName);
+            if (payload.getName() != null && !payload.getName().equals(existingProduct.getName())) {
+                log.info("Updating product name: {} -> {}", existingProduct.getName(), payload.getName());
+                existingProduct.setName(payload.getName());
                 hasChanges = true;
             }
 
-            // Check and update alias (description)
-            String newAlias = productData.path("alias").asText();
-            if (!newAlias.isEmpty() && !newAlias.equals(existingProduct.getDescription())) {
-                log.info("Updating product alias: {} -> {}", existingProduct.getDescription(), newAlias);
-                existingProduct.setDescription(newAlias);
+            // Check and update content (description)
+            if (payload.getContent() != null && !payload.getContent().equals(existingProduct.getDescription())) {
+                log.info("Updating product description: {} -> {}", existingProduct.getDescription(), payload.getContent());
+                existingProduct.setDescription(payload.getContent());
                 hasChanges = true;
             }
 
             // Check and update status
-            String newStatus = productData.path("status").asText();
-            if (!newStatus.isEmpty() && !newStatus.equals(existingProduct.getStatus())) {
-                log.info("Updating product status: {} -> {}", existingProduct.getStatus(), newStatus);
-                existingProduct.setStatus(newStatus);
+            if (payload.getStatus() != null && !payload.getStatus().equals(existingProduct.getStatus())) {
+                log.info("Updating product status: {} -> {}", existingProduct.getStatus(), payload.getStatus());
+                existingProduct.setStatus(payload.getStatus());
                 hasChanges = true;
             }
 
             // Check and update product_type (category)
-            String newProductType = productData.path("product_type").asText();
-            if (!newProductType.isEmpty() && !newProductType.equals(existingProduct.getCategory())) {
-                log.info("Updating product category: {} -> {}", existingProduct.getCategory(), newProductType);
-                existingProduct.setCategory(newProductType);
+            if (payload.getProductType() != null && !payload.getProductType().equals(existingProduct.getCategory())) {
+                log.info("Updating product category: {} -> {}", existingProduct.getCategory(), payload.getProductType());
+                existingProduct.setCategory(payload.getProductType());
                 hasChanges = true;
             }
 
             // Check and update vendor (brand)
-            String newVendor = productData.path("vendor").asText();
-            if (!newVendor.isEmpty() && !newVendor.equals(existingProduct.getBrand())) {
-                log.info("Updating product brand: {} -> {}", existingProduct.getBrand(), newVendor);
-                existingProduct.setBrand(newVendor);
+            if (payload.getVendor() != null && !payload.getVendor().equals(existingProduct.getBrand())) {
+                log.info("Updating product brand: {} -> {}", existingProduct.getBrand(), payload.getVendor());
+                existingProduct.setBrand(payload.getVendor());
                 hasChanges = true;
             }
 
-            // Check and update tags
-            String newTags = productData.path("tags").asText();
-            String currentDescription = existingProduct.getDescription();
-            String currentTags = "";
-            if (currentDescription != null && currentDescription.contains(" | Tags: ")) {
-                currentTags = currentDescription.substring(currentDescription.indexOf(" | Tags: ") + 9);
-            }
-            
-            if (!newTags.isEmpty() && !newTags.equals(currentTags)) {
-                log.info("Updating product tags: {} -> {}", currentTags, newTags);
-                // Update description with new tags
-                String baseDescription = currentDescription;
-                if (baseDescription != null && baseDescription.contains(" | Tags: ")) {
-                    baseDescription = baseDescription.substring(0, baseDescription.indexOf(" | Tags: "));
-                } else if (baseDescription == null) {
-                    baseDescription = "";
-                }
-                existingProduct.setDescription(baseDescription + " | Tags: " + newTags);
-                hasChanges = true;
-            }
-
-            // Check and update SKU from variants
-            JsonNode variants = productData.path("variants");
-            if (!variants.isMissingNode() && variants.isArray() && variants.size() > 0) {
-                String newSku = variants.get(0).path("sku").asText();
-                if (!newSku.isEmpty() && !newSku.equals(existingProduct.getCode())) {
-                    log.info("Updating product SKU: {} -> {}", existingProduct.getCode(), newSku);
-                    existingProduct.setCode(newSku);
+            // Check and update images
+            if (payload.getImages() != null && !payload.getImages().isEmpty()) {
+                String newImages = JsonUtils.toJson(payload.getImages().stream()
+                        .map(SapoProductResponse.Image::getSrc)
+                        .collect(Collectors.toList()));
+                if (!newImages.equals(existingProduct.getImages())) {
+                    log.info("Updating product images");
+                    existingProduct.setImages(newImages);
                     hasChanges = true;
                 }
             }
 
-            // Always update modified timestamp
-            String modifiedOn = productData.path("modified_on").asText();
-            if (!modifiedOn.isEmpty()) {
-                try {
-                    LocalDateTime newModifiedTime = LocalDateTime.parse(modifiedOn.replace("Z", ""));
-                    if (!newModifiedTime.equals(existingProduct.getUpdatedDatetime())) {
-                        log.info("Updating product modified time: {} -> {}", existingProduct.getUpdatedDatetime(), newModifiedTime);
-                        existingProduct.setUpdatedDatetime(newModifiedTime);
-                        hasChanges = true;
-                    }
-                } catch (Exception e) {
-                    log.warn("Failed to parse modified timestamp: {}", e.getMessage());
-                    existingProduct.setUpdatedDatetime(LocalDateTime.now());
-                    hasChanges = true;
-                }
+            // Check and update modified timestamp
+            LocalDateTime newModifiedTime = parseSapoDateTime(payload.getModifiedOn());
+            if (newModifiedTime != null && !newModifiedTime.equals(existingProduct.getUpdatedDatetime())) {
+                log.info("Updating product modified time: {} -> {}", existingProduct.getUpdatedDatetime(), newModifiedTime);
+                existingProduct.setUpdatedDatetime(newModifiedTime);
+                hasChanges = true;
             }
 
+            // Save updated product to database if there are changes
             if (hasChanges) {
-                // Save updated product to database
                 productRepository.save(existingProduct);
-                log.info("Successfully updated Sapo product: {} with {} changes", productId, 
-                        (hasChanges ? "some" : "no"));
+                log.info("Successfully updated Sapo product: {} with some changes", productId);
             } else {
                 log.info("No changes detected for Sapo product: {}", productId);
             }
-            
+
+            // Update variants if any
+            if (payload.getVariants() != null && !payload.getVariants().isEmpty()) {
+                // Delete existing variants first
+                productVariantRepository.deleteByProductId(String.valueOf(productId));
+
+                // Save new variants
+                for (SapoProductResponse.Variant variant : payload.getVariants()) {
+                    ProductVariantEntity variantEntity = convertToVariantEntity(variant, productId);
+                    productVariantRepository.save(variantEntity);
+                    log.info("Updated variant: {} for product: {}", variantEntity.getVariantId(), productId);
+                }
+            }
+
             return true;
-            
+
         } catch (Exception e) {
             log.error("Failed to process product update webhook: {}", e.getMessage(), e);
             return false;
+        }
+    }
+
+
+    /**
+     * Convert Sapo product to ProductEntity
+     */
+    private ProductEntity convertToProductEntity(String posId, SapoProductResponse.Product payload) {
+        ProductEntity product = new ProductEntity();
+        
+        // Map Sapo product data to ProductEntity
+        product.setProductId(String.valueOf(payload.getId()));
+        
+        // Get SKU from first variant if available, otherwise use product ID
+        product.setCode(null);
+        product.setName(payload.getName());
+        product.setDescription(payload.getContent()); // Using content as description
+        product.setStatus(payload.getStatus());
+        product.setPosId(posId);
+        product.setCategory(payload.getProductType());
+        product.setBrand(payload.getVendor());
+        product.setImages(JsonUtils.toJson(payload.getImages().stream()
+                .map(SapoProductResponse.Image::getSrc) // Dùng method reference
+                .collect(Collectors.toList())));
+
+        // Set timestamps - parse from string format
+        product.setCreatedDatetime(parseSapoDateTime(payload.getCreatedOn()));
+        product.setUpdatedDatetime(parseSapoDateTime(payload.getModifiedOn()));
+
+        return product;
+    }
+
+    /**
+     * Convert Sapo variant to ProductVariantEntity
+     */
+    private ProductVariantEntity convertToVariantEntity(SapoProductResponse.Variant variant, Long productId) {
+        return ProductVariantEntity.builder()
+                .variantId(String.valueOf(variant.getId()))
+                .productId(String.valueOf(productId))
+                .sku(variant.getSku())
+                .barcode(variant.getBarcode())
+                .price(variant.getPrice() != null ? java.math.BigDecimal.valueOf(variant.getPrice()) : null)
+                .ccy("VND") // Default currency
+                .inventoryQuantity(variant.getInventoryQuantity())
+                .fulfillableQuantity(variant.getInventoryQuantity()) // Assume same as inventory
+                .weight(variant.getWeight())
+                .weightUnit(variant.getWeightUnit())
+                .attributes(JsonUtils.toJson(variant)) // Store full variant data as JSON
+                .build();
+    }
+
+    private LocalDateTime parseSapoDateTime(String dateTimeString) {
+        if (dateTimeString == null || dateTimeString.trim().isEmpty()) {
+            return null;
+        }
+
+        try {
+            // 1. Dùng Instant để xử lý chuỗi ISO 8601 có 'Z' (Zulu/UTC)
+            // Instant.parse() xử lý định dạng "yyyy-MM-ddTHH:mm:ssZ" hoặc có mili giây.
+            Instant instant = Instant.parse(dateTimeString.trim());
+
+            // 2. Chuyển Instant (UTC time) sang LocalDateTime (bỏ thông tin múi giờ)
+            // Sử dụng ZoneOffset.UTC để đảm bảo chuyển đổi chính xác từ UTC.
+            return LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
+
+        } catch (Exception e) {
+            // Ghi log chi tiết hơn để dễ debug
+            log.warn("[SapoServiceImpl] Failed to parse date time '{}'. Error: {}", dateTimeString, e.getMessage());
+            return null;
         }
     }
 }
