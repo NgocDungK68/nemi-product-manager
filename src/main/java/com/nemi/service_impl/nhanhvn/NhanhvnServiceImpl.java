@@ -5,8 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.client.NhanhvnClient;
 import com.nemi.constant.enums.PosName;
 import com.nemi.constant.enums.PosStatus;
-import com.nemi.constant.enums.WeightUnit;
 import com.nemi.constant.enums.SyncErrorMessage;
+import com.nemi.constant.enums.WeightUnit;
 import com.nemi.entity.PosEntity;
 import com.nemi.entity.ProductEntity;
 import com.nemi.entity.ProductVariantEntity;
@@ -33,7 +33,6 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -46,6 +45,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
     private final PosRepository posRepository;
     private final ProductVariantRepository productVariantRepository;
     private final SyncHistoryRepository syncHistoryRepository;
+
     @Override
     public String getPosName() {
         return PosName.NHANHVN.getValue();
@@ -146,9 +146,9 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 NhanhvnProductResponse response = responseOpt.get();
 
                 if (response.getData() == null || response.getData().isEmpty()) {
-                    if(response.getCode() == 1){
-                        syncHistoryRepository.save(toSyncHistory(history,null, true));
-                        return true;
+                    if (response.getCode() == 1) {
+                        syncHistoryRepository.save(toSyncHistory(history, null, true));
+                        break;
                     }
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.CONNECTION_FAILED, false));
                     log.info("No products found with paginator: {}", paginator);
@@ -161,7 +161,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 log.info("Fetched {} products, total so far: {}", pageProducts.size(), allProducts.size());
 
                 // variant
-                List<ProductVariantEntity> pageVariants = convertToVariantEntities(posId, response.getData());
+                List<ProductVariantEntity> pageVariants = convertToVariantEntities(response.getData());
                 allVariants.addAll(pageVariants);
                 log.info("Fetched {} variants, total so far: {}", pageVariants.size(), allVariants.size());
 
@@ -254,11 +254,11 @@ public class NhanhvnServiceImpl implements PosManagementService {
         return apiProducts.stream()
                 .map(apiProduct -> convertToProductEntity(posId, apiProduct))
                 .filter(Objects::nonNull)
-                .collect(Collectors.toList());
+                .toList();
     }
 
-    private ProductEntity convertToProductEntity(String posId, NhanhvnProductResponse.ProductData apiProduct) {
-        if (apiProduct.getParentId() > 0) return null;
+    public ProductEntity convertToProductEntity(String posId, NhanhvnProductResponse.ProductData apiProduct) {
+        if (apiProduct.getParentId() != -2) return null;
         return ProductEntity.builder()
                 .posId(posId)
                 .productId(String.valueOf(apiProduct.getId()))
@@ -268,15 +268,15 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 .build();
     }
 
-    private List<ProductVariantEntity> convertToVariantEntities(String posId, List<NhanhvnProductResponse.ProductData> apiProducts) {
+    private List<ProductVariantEntity> convertToVariantEntities(List<NhanhvnProductResponse.ProductData> apiProducts) {
         return apiProducts.stream()
-                .map(apiProduct -> convertToVariantEntity(posId, apiProduct))
+                .map(this::convertToVariantEntity)
                 .filter(Objects::nonNull)
-                .collect(Collectors.toList());
+                .toList();
     }
 
-    private ProductVariantEntity convertToVariantEntity(String posId, NhanhvnProductResponse.ProductData apiProduct) {
-        if (apiProduct.getParentId() < 0) return null;
+    public ProductVariantEntity convertToVariantEntity(NhanhvnProductResponse.ProductData apiProduct) {
+        if (apiProduct.getParentId() == -2) return null;
         return ProductVariantEntity.builder()
                 .variantId(String.valueOf(apiProduct.getId()))
                 .productId(String.valueOf(apiProduct.getParentId()))
