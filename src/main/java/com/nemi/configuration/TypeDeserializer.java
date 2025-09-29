@@ -26,10 +26,15 @@ public class TypeDeserializer extends JsonDeserializer<NhanhvnProductResponse.Ty
                 }
             case START_OBJECT:
                 return parser.readValueAs(NhanhvnProductResponse.Type.class);
+            case VALUE_NUMBER_INT:
+                NhanhvnProductResponse.Type type = new NhanhvnProductResponse.Type();
+                type.setId(parser.getIntValue());
+                type.setName(null);
+                return type;
             case VALUE_NULL:
                 return null;
             default:
-                throw new IOException("Unexpected token for Brand field: " + token);
+                throw new IOException("Unexpected token for Type field: " + token);
         }
     }
 }

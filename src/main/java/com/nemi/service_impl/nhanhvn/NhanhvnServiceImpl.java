@@ -45,6 +45,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
     private final PosRepository posRepository;
     private final ProductVariantRepository productVariantRepository;
     private final SyncHistoryRepository syncHistoryRepository;
+
     @Override
     public String getPosName() {
         return PosName.NHANHVN.getValue();
@@ -145,9 +146,9 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 NhanhvnProductResponse response = responseOpt.get();
 
                 if (response.getData() == null || response.getData().isEmpty()) {
-                    if(response.getCode() == 1){
-                        syncHistoryRepository.save(toSyncHistory(history,null, true));
-                        return true;
+                    if (response.getCode() == 1) {
+                        syncHistoryRepository.save(toSyncHistory(history, null, true));
+                        break;
                     }
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.CONNECTION_FAILED, false));
                     log.info("No products found with paginator: {}", paginator);
