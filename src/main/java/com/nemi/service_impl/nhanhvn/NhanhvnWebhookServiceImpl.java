@@ -1,11 +1,15 @@
 package com.nemi.service_impl.nhanhvn;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.configuration.NhanhvnConfig;
 import com.nemi.constant.enums.NhanhvnEvent;
 import com.nemi.constant.enums.PosName;
+import com.nemi.entity.ProductEntity;
+import com.nemi.entity.ProductVariantEntity;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnWebhookResponse;
 import com.nemi.repository.ProductRepository;
+import com.nemi.repository.ProductVariantRepository;
 import com.nemi.service.WebhookService;
 import com.nemi.util.JsonUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,6 +27,9 @@ import java.io.IOException;
 public class NhanhvnWebhookServiceImpl implements WebhookService {
     private final NhanhvnConfig nhanhvnConfig;
     private final ProductRepository productRepository;
+    private final ProductVariantRepository variantRepository;
+    private final NhanhvnServiceImpl nhanhvnService;
+    private final ObjectMapper objectMapper;
 
     @Override
     public String getPosName() {
@@ -42,6 +49,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
             log.info("Body: {}", body);
 
             NhanhvnWebhookResponse webhookResponse = JsonUtils.fromJson(body, NhanhvnWebhookResponse.class);
+            log.info("Webhook response convert from Body: {}", webhookResponse);
             if (webhookResponse == null || webhookResponse.getEvent() == null) {
                 log.error("Invalid webhook payload: {}", body);
                 return false;
@@ -64,36 +72,42 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
         }
 
         switch (event) {
-            case PRODUCT_ADD:
-                return handleProductAdd(posId, data);
-            case PRODUCT_UPDATE:
-                return handleProductUpdate(data);
+            case WEBHOOKS_ENABLED:
+                return handleWebhooksEnabled(data);
+            case PRODUCT_ADD, PRODUCT_UPDATE:
+                return handleProductAddAndUpdate(posId, data);
             default:
                 log.warn("Unhandled event: {}", event);
                 return false;
         }
     }
 
-    private boolean handleProductAdd(String posId, Object data) {
-        NhanhvnProductResponse.ProductData productData = JsonUtils.map(data, NhanhvnProductResponse.ProductData.class);
-        log.info("ProductData: {}", productData);
-        if (productData == null) {
-            log.error("Failed to parse product data: {}", data);
-            return false;
-        }
-
-        // logic ...
+    private boolean handleWebhooksEnabled(Object data) {
+        // logic
         return true;
     }
 
-    private boolean handleProductUpdate(Object data) {
-        NhanhvnProductResponse.ProductData productData = JsonUtils.map(data, NhanhvnProductResponse.ProductData.class);
+    private boolean handleProductAddAndUpdate(String posId, Object data) {
+        NhanhvnProductResponse.ProductData productData = objectMapper.convertValue(
+                data, NhanhvnProductResponse.ProductData.class
+        );
+        log.info("ProductData: {}", productData);
+
         if (productData == null) {
             log.error("Failed to parse product data: {}", data);
             return false;
         }
 
-        // logic ...
+        if (productData.getParentId() == -2) {
+            ProductEntity productEntity = nhanhvnService.convertToProductEntity(posId, productData);
+            productRepository.save(productEntity);
+            log.info("Successfully add 1 product");
+        } else {
+            ProductVariantEntity variantEntity = nhanhvnService.convertToVariantEntity(productData);
+            variantRepository.save(variantEntity);
+            log.info("Successfully add 1 product variant");
+        }
+
         return true;
     }
 

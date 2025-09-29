@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.nemi.configuration.BrandDeserializer;
+import com.nemi.configuration.TypeDeserializer;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -30,8 +31,8 @@ public class NhanhvnProductResponse {
     public static class ProductData {
         private Integer id;
         private Integer parentId;
-            private String code;
-            private String barcode;
+        private String code;
+        private String barcode;
         private String name;
         private String otherName;
         private Integer status;
@@ -44,7 +45,9 @@ public class NhanhvnProductResponse {
 
         @JsonDeserialize(using = BrandDeserializer.class)
         private Brand brand;
-        private Integer type;
+
+        @JsonDeserialize(using = TypeDeserializer.class)
+        private Type type;
         private Shipping shipping;
         private String countryName;
         private Units units;
@@ -87,6 +90,12 @@ public class NhanhvnProductResponse {
 
     @Data
     public static class Brand {
+        private Integer id;
+        private String name;
+    }
+
+    @Data
+    public static class Type {
         private Integer id;
         private String name;
     }
