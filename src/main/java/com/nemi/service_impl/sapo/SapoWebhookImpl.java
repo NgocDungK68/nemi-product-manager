@@ -47,17 +47,18 @@ public class SapoWebhookImpl implements WebhookService {
                 JsonNode payload = objectMapper.readTree(body);
                 
                 // 4. Process webhook data based on event type
-                String eventType = payload.path("event").asText();
-                log.info("Webhook event type: {}", eventType);
-                
-                switch (eventType.toLowerCase()) {
+
+
+                String topic = request.getHeader("x-sapo-topic");
+
+                switch (topic.toLowerCase()) {
                     case "product/create":
                     case "product/update":
                         return processProductWebhook(posId, payload);
                     case "product/delete":
                         return processProductDeleteWebhook(posId, payload);
                     default:
-                        log.warn("Unhandled webhook event type: {}", eventType);
+                        log.warn("Unhandled webhook event type: {}", topic);
                         return true; // Return true for unhandled events to acknowledge receipt
                 }
             } else {
