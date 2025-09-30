@@ -1,11 +1,15 @@
 package com.nemi.service_impl.sapo;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.client.SapoClient;
 import com.nemi.constant.enums.PosName;
 import com.nemi.constant.enums.PosStatus;
+import com.nemi.constant.enums.SyncErrorMessage;
 import com.nemi.entity.PosEntity;
 import com.nemi.entity.ProductEntity;
 import com.nemi.entity.ProductVariantEntity;
+import com.nemi.entity.SyncHistoryEntity;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
@@ -17,6 +21,7 @@ import com.nemi.model.response.sapo.SapoProductResponse;
 import com.nemi.repository.PosRepository;
 import com.nemi.repository.ProductRepository;
 import com.nemi.repository.ProductVariantRepository;
+import com.nemi.repository.SyncHistoryRepository;
 import com.nemi.service.PosManagementService;
 import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
@@ -41,6 +46,8 @@ public class SapoServiceImpl implements PosManagementService {
     private final ProductRepository productRepository;
     private final PosRepository posRepository;
     private final ProductVariantRepository productVariantRepository;
+    private final SyncHistoryRepository syncHistoryRepository;
+    private final ObjectMapper objectMapper;
 
 
     @Override
@@ -85,73 +92,99 @@ public class SapoServiceImpl implements PosManagementService {
 
     @Override
     public boolean syncData(String posId) {
-        // sync product from Sapo
-
-        //B1 : Lay posentity va validate posName
-        PosEntity posEntity = getPos(posId);
-
-        //B2 : parse Config (khuyen khich dung JsonUtils)
-        @SuppressWarnings("unchecked")
-        Map<String, String> configMap = JsonUtils.fromJson(posEntity.getConfig(), Map.class);
-
-        String clientId = configMap.get("clientId");
-        String clientSecret = configMap.get("clientSecret");
-        String storeName = configMap.get("storeName");
-        String accessToken = posEntity.getAccessToken();
-
-        List<ProductEntity> allProducts = new ArrayList<>();
-        List<ProductVariantEntity> allVariants = new ArrayList<>();
-
-        //chi set size cho lan dau tien
-        Map<String, Object> paginator = new HashMap<>();
-        paginator.put("limit", 50);
-
-        SapoRequest request = SapoRequest.builder()
-                .clientId(clientId)
-                .clientSecret(clientSecret)
-                .storeName(storeName)
-                .accessToken(accessToken)
-                .paginator(paginator)
+        SyncHistoryEntity history = SyncHistoryEntity.builder()
+                .posId(posId)
+                .startTime(LocalDateTime.now())
+                .syncStatus(PosStatus.FAIL.name())
                 .build();
-        //B3 : goi SapoClient de lay du lieu
-        while (true) {
-            Optional<SapoProductResponse> responseOpt = sapoClient.getProducts(request);
+        try {
+            //B1 : Lay posentity va validate posName
+            PosEntity posEntity = getPos(posId);
 
-            if(responseOpt.isEmpty()) {
-                log.error("[SapoServiceImpl.syncData] response is empty");
+            // B2: parse config
+            Map<String, String> configMap = objectMapper.readValue(
+                    posEntity.getConfig(),
+                    new TypeReference<>() {
+                    }
+            );
+            String clientId = configMap.get("clientId");
+            String clientSecret = configMap.get("clientSecret");
+            String storeName = configMap.get("storeName");
+            String accessToken = posEntity.getAccessToken();
+
+            if (clientId == null || clientSecret == null || storeName == null || accessToken == null) {
+                syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.MISSING_CONFIG, false));
+                log.error("Missing required config for posId={}", posId);
                 return false;
             }
 
-            SapoProductResponse response = responseOpt.get();
-            if(response.getProducts() == null || response.getProducts().isEmpty()) {
-                log.info("[SapoServiceImpl.syncData] No more products to sync");
-                break;
-            }
+            List<ProductEntity> allProducts = new ArrayList<>();
+            List<ProductVariantEntity> allVariants = new ArrayList<>();
 
-            // Convert products and variants
-            for (SapoProductResponse.Product sapoProduct : response.getProducts()) {
-                ProductEntity productEntity = convertToProductEntity(posId, sapoProduct);
-                allProducts.add(productEntity);
+            //chi set size cho lan dau tien + page-based pagination (Sapo: limit tối đa 250)
+            Map<String, Object> paginator = new HashMap<>();
+            int limit = 250;
+            int page = 1;
+            paginator.put("limit", limit);
+            paginator.put("page", page);
 
-                // Convert variants
-                if (sapoProduct.getVariants() != null && !sapoProduct.getVariants().isEmpty()) {
-                    List<ProductVariantEntity> variants = convertToVariantEntities(productEntity.getProductId(), sapoProduct.getVariants());
-                    allVariants.addAll(variants);
+            SapoRequest request = SapoRequest.builder()
+                    .clientId(clientId)
+                    .clientSecret(clientSecret)
+                    .storeName(storeName)
+                    .accessToken(accessToken)
+                    .paginator(paginator)
+                    .build();
+            //B3 : goi SapoClient de lay du lieu
+            while (true) {
+                Optional<SapoProductResponse> responseOpt = sapoClient.getProducts(request);
+
+                if (responseOpt.isEmpty()) {
+                    log.error("[SapoServiceImpl.syncData] response is empty");
+                    syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
+                    return false;
+                }
+
+                SapoProductResponse response = responseOpt.get();
+                if (response.getProducts() == null || response.getProducts().isEmpty()) {
+                    log.info("[SapoServiceImpl.syncData] No more products to sync");
+                    break;
+                }
+
+                // Convert products and variants
+                for (SapoProductResponse.Product sapoProduct : response.getProducts()) {
+                    ProductEntity productEntity = convertToProductEntity(posId, sapoProduct);
+                    allProducts.add(productEntity);
+
+                    // Convert variants
+                    if (sapoProduct.getVariants() != null && !sapoProduct.getVariants().isEmpty()) {
+                        List<ProductVariantEntity> variants = convertToVariantEntities(productEntity.getProductId(), sapoProduct.getVariants());
+                        allVariants.addAll(variants);
+                    }
+                }
+                log.info("Fetched {} products and {} variants", response.getProducts().size(), allVariants.size());
+
+                // xử lý next theo page: tăng page nếu vẫn còn đủ limit (== 250), ngược lại dừng
+                if (response.getProducts().size() >= limit) {
+                    page++;
+                    paginator.put("page", page);
+                    continue;
+                } else {
+                    break; // hết data
                 }
             }
 
-            log.info("Fetched {} products and {} variants", response.getProducts().size(), allVariants.size());
+            saveAllProductsSync(allProducts);
+            saveAllVariantsSync(allVariants);
 
-            // Sapo API uses limit-based pagination, so we break after first call
-            // In real implementation, you might need to handle pagination differently
-            break;
+            syncHistoryRepository.save(toSyncHistory(history, null, true));
+            log.info("Successfully synced {} products and {} variants from Sapo", allProducts.size(), allVariants.size());
+            return true;
+        } catch (Exception e) {
+            log.error("Failed to sync Sapo data - {}", e.getMessage(), e);
+            syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
+            return false;
         }
-
-        saveAllProductsSync(allProducts);
-        saveAllVariantsSync(allVariants);
-
-        log.info("Successfully synced {} products and {} variants from Sapo", allProducts.size(), allVariants.size());
-        return true;
     }
 
     public PosEntity getPos(String posId) {
@@ -274,9 +307,7 @@ public class SapoServiceImpl implements PosManagementService {
             log.info("Successfully saved all {} Sapo products", products.size());
         } catch (Exception e) {
             log.error("Failed to save Sapo products synchronously: {}", e.getMessage(), e);
-            //throw exception
-            //
-            throw e;
+            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_PERSISTENCE_ERROR));
         }
     }
 
@@ -301,7 +332,7 @@ public class SapoServiceImpl implements PosManagementService {
             log.info("Successfully saved all {} Sapo variants", variants.size());
         } catch (Exception e) {
             log.error("Failed to save Sapo variants synchronously: {}", e.getMessage(), e);
-            throw e;
+            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_PERSISTENCE_ERROR));
         }
     }
 
@@ -325,5 +356,16 @@ public class SapoServiceImpl implements PosManagementService {
             log.warn("[SapoServiceImpl] Failed to parse date time '{}'. Error: {}", dateTimeString, e.getMessage());
             return null;
         }
+    }
+
+    private SyncHistoryEntity toSyncHistory(SyncHistoryEntity syncHistoryEntity, SyncErrorMessage syncErrorMessage, Boolean isSyncSuccess) {
+        if (Boolean.FALSE.equals(isSyncSuccess)) {
+            syncHistoryEntity.setEndTime(LocalDateTime.now());
+            syncHistoryEntity.setErrorMessage(syncErrorMessage != null ? syncErrorMessage.getMessage() : null);
+            return syncHistoryEntity;
+        }
+        syncHistoryEntity.setSyncStatus(PosStatus.SUCCESS.name());
+        syncHistoryEntity.setEndTime(LocalDateTime.now());
+        return syncHistoryEntity;
     }
 }
