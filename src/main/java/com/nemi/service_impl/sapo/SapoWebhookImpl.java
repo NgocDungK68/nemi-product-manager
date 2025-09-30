@@ -12,6 +12,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -109,6 +110,7 @@ public class SapoWebhookImpl implements WebhookService {
     /**
      * Process product create/update webhook
      */
+    @Transactional
     private boolean processProductWebhook(String posId, SapoProductResponse.Product payload) {
         try {
             // Convert and save product
@@ -138,6 +140,7 @@ public class SapoWebhookImpl implements WebhookService {
     /**
      * Process product delete webhook
      */
+    @Transactional
     private boolean processProductDeleteWebhook(String posId, SapoProductResponse.Product payload) {
         try {
             Long productId = payload.getId();
@@ -166,6 +169,7 @@ public class SapoWebhookImpl implements WebhookService {
     /**
      * Process product update webhook - only update changed fields
      */
+    @Transactional
     private boolean processProductUpdateWebhook(String posId, SapoProductResponse.Product payload) {
         try {
             Long productId = payload.getId();
