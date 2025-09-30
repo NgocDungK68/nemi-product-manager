@@ -121,6 +121,7 @@ public class NhanhvnOrderResponse {
         private String name;
         private String mobile;
         private String address;
+        private String email;
         private int cityId;
         private int districtId;
         private int wardId;

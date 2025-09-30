@@ -3,6 +3,7 @@ package com.nemi.service_impl.nhanhvn;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.client.NhanhvnClient;
+import com.nemi.configuration.NhanhvnConfig;
 import com.nemi.constant.enums.PosName;
 import com.nemi.constant.enums.PosStatus;
 import com.nemi.constant.enums.SyncErrorMessage;
@@ -52,6 +53,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
     private final SyncHistoryRepository syncHistoryRepository;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
+    private final NhanhvnConfig nhanhvnConfig;
 
     @Override
     public String getPosName() {
@@ -304,19 +306,24 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
     public OrderEntity convertToOrderEntity(String posId, NhanhvnOrderResponse.OrderData apiOrders) {
 
+        int statusCode = apiOrders.getInfo().getStatus();
+        Map<Integer, String> mapping = nhanhvnConfig.getOrder().getStatus().getMapping();
+        String status =  mapping.getOrDefault(statusCode, "unknown");
+
 
         return OrderEntity.builder()
                 .posId(posId)
+                .orderId(String.valueOf(apiOrders.getInfo().getId()))
                 .orderCode(apiOrders.getCarrier().getCarrierCode())
                 .customerName(apiOrders.getShippingAddress().getName())
-//                .customerEmail(apiOrders.getShippingAddress().getEmail())
+                .customerEmail(apiOrders.getShippingAddress().getEmail())
                 .customerPhone(apiOrders.getShippingAddress().getMobile())// khi user co du thi them custemer phone va email
                 .shippingAddress(apiOrders.getShippingAddress().getAddress())
                 .shippingMethod(apiOrders.getCarrier().getName())
                 .paymentMethod(apiOrders.getPayment().getBusinessPayment().toString())
                 .shippingFee(apiOrders.getCarrier().getShipFee())
                 .totalPrice(totalProductPrice(apiOrders))
-                .status(PosStatus.PENDING.name())
+                .status(status.toUpperCase())
                 .build();
     }
 
@@ -353,6 +360,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
         for(NhanhvnOrderResponse.Product product : apiOrder.getProducts()){
             BigDecimal quantity = BigDecimal.valueOf(product.getQuantity());
             orderItemEntities.add(OrderItemEntity.builder()
+                    .orderItemId(String.valueOf(product.getId()))
                     .orderId(apiOrder.getChannel().getAppOrderId())
                     .quantity(product.getQuantity())
                     .sku(product.getImeiId())
