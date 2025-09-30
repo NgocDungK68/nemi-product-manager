@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.client.NhanhvnClient;
 import com.nemi.client.PancakeClient;
+import com.nemi.constant.enums.OrderStatus;
 import com.nemi.constant.enums.PosName;
 import com.nemi.constant.enums.PosStatus;
 import com.nemi.constant.enums.SyncErrorMessage;
@@ -171,6 +172,11 @@ public class PancakeServiceImpl  implements PosManagementService {
         }
     }
 
+    @Override
+    public boolean syncOrder(String posId) {
+        return false;
+    }
+
     public void saveAllProductsSync(List<ProductEntity> products) {
         log.info("Saving {} Nhanh.vn products synchronously", products.size());
 
@@ -220,10 +226,11 @@ public class PancakeServiceImpl  implements PosManagementService {
         product.setProductId(String.valueOf(apiProducts.getId()));
         product.setCode(apiProducts.getProductId());
         product.setName(apiProducts.getProduct().getName());
+        product.setProductId(apiProducts.getId());
         if(apiProducts.getIsLocked()) {
-            product.setStatus(PosStatus.INACTIVE.name());
+            product.setStatus(OrderStatus.CANCELLED.getValue());
         } else {
-            product.setStatus(PosStatus.ACTIVE.name());
+            product.setStatus(OrderStatus.PROCESSING.getValue());
         }
 
         return product;

@@ -8,6 +8,7 @@ import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.request.nhanhvn.NhanhvnAccessTokenRequest;
 import com.nemi.model.request.nhanhvn.NhanhvnRequest;
 import com.nemi.model.response.nhanhvn.NhanhvnAccessTokenResponse;
+import com.nemi.model.response.nhanhvn.NhanhvnOrderResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
 import com.nemi.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
@@ -111,5 +112,54 @@ public class NhanhvnClient {
             return Optional.empty();
         }
     }
+    public Optional<NhanhvnOrderResponse> getOrders(NhanhvnRequest request) {
+        log.debug("[NhanhvnClient.getOrders] paginator: {}", request.getPaginator());
+
+        try {
+            String url = nhanhvnConfig.getBaseUrl() + "/"
+                    + nhanhvnConfig.getApiVersion() + "/"
+                    + nhanhvnConfig.getUrlOrders()
+                    + "?appId=" + request.getAppId()
+                    + "&businessId=" + request.getBusinessId();
+            log.debug("[NhanhvnClient.getOrders] Calling URL: {}", url);
+
+            // build request body
+            Map<String, Object> requestBody = new HashMap<>();
+            if (request.getPaginator() != null && !request.getPaginator().isEmpty()) {
+                requestBody.put("paginator", request.getPaginator());
+            }
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("Authorization", request.getAccessToken());
+
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+            log.debug("[NhanhvnClient.getOrders] Calling URL: {}", url);
+            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+            String jsonResp = resp.getBody();
+            log.debug("[NhanhvnClient.getOrders] resp {}", resp);
+
+            if (jsonResp == null || jsonResp.isBlank()) {
+                log.warn("[NhanhvnClient.getOrders] Empty response body (status: {})", resp.getStatusCode());
+                return Optional.empty();
+            }
+
+            NhanhvnOrderResponse orderResponse =
+                    JsonUtils.fromJson(jsonResp, NhanhvnOrderResponse.class);
+
+            log.info("[NhanhvnClient.getOrders] Got total {} orders",
+                    orderResponse.getData() != null ? orderResponse.getData().size() : 0);
+
+            return Optional.of(orderResponse);
+
+        } catch (Exception e) {
+            log.error("[NhanhvnClient.getOrders] Failed: {}", e.getMessage(), e);
+            return Optional.empty();
+        }
+    }
+
+
+
+
 }
 
