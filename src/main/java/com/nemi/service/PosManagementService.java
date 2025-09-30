@@ -14,4 +14,6 @@ public interface PosManagementService {
 
     boolean syncData(String posId);
 
+    boolean syncOrder(String posId);
+
 }

@@ -154,6 +154,11 @@ public class SapoServiceImpl implements PosManagementService {
         return true;
     }
 
+    @Override
+    public boolean syncOrder(String posId) {
+        return false;
+    }
+
     public PosEntity getPos(String posId) {
         log.debug("[SapoSyncDataImpl.getPos] posId: {}", posId);
 

@@ -171,6 +171,11 @@ public class PancakeServiceImpl  implements PosManagementService {
         }
     }
 
+    @Override
+    public boolean syncOrder(String posId) {
+        return false;
+    }
+
     public void saveAllProductsSync(List<ProductEntity> products) {
         log.info("Saving {} Nhanh.vn products synchronously", products.size());
 

@@ -7,6 +7,8 @@ import com.nemi.constant.enums.PosName;
 import com.nemi.constant.enums.PosStatus;
 import com.nemi.constant.enums.SyncErrorMessage;
 import com.nemi.constant.enums.WeightUnit;
+import com.nemi.entity.OrderEntity;
+import com.nemi.entity.OrderItemEntity;
 import com.nemi.entity.PosEntity;
 import com.nemi.entity.ProductEntity;
 import com.nemi.entity.ProductVariantEntity;
@@ -18,7 +20,10 @@ import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.request.nhanhvn.NhanhvnRequest;
 import com.nemi.model.response.PosConnectionResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnAccessTokenResponse;
+import com.nemi.model.response.nhanhvn.NhanhvnOrderResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
+import com.nemi.repository.OrderItemRepository;
+import com.nemi.repository.OrderRepository;
 import com.nemi.repository.PosRepository;
 import com.nemi.repository.ProductRepository;
 import com.nemi.repository.ProductVariantRepository;
@@ -45,6 +50,8 @@ public class NhanhvnServiceImpl implements PosManagementService {
     private final PosRepository posRepository;
     private final ProductVariantRepository productVariantRepository;
     private final SyncHistoryRepository syncHistoryRepository;
+    private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
 
     @Override
     public String getPosName() {
@@ -147,7 +154,6 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
                 if (response.getData() == null || response.getData().isEmpty()) {
                     if (response.getCode() == 1) {
-                        syncHistoryRepository.save(toSyncHistory(history, null, true));
                         break;
                     }
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.CONNECTION_FAILED, false));
@@ -186,7 +192,6 @@ public class NhanhvnServiceImpl implements PosManagementService {
             return false;
         }
     }
-
     public void saveAllProductsSync(List<ProductEntity> products) {
         log.info("Saving {} Nhanh.vn products synchronously", products.size());
 
@@ -289,6 +294,229 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 .weightUnit(WeightUnit.GAM.getValue())
                 .build();
     }
+//------------------------------------------------------------------------------------------
+    private List<OrderEntity> convertToOrderEntities(String posId, List<NhanhvnOrderResponse.OrderData> apiOrders) {
+        return apiOrders.stream()
+                .map(orders -> convertToOrderEntity(posId, orders))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    public OrderEntity convertToOrderEntity(String posId, NhanhvnOrderResponse.OrderData apiOrders) {
+
+
+        return OrderEntity.builder()
+                .posId(posId)
+                .orderCode(apiOrders.getCarrier().getCarrierCode())
+                .customerName(apiOrders.getShippingAddress().getName())
+//                .customerEmail(apiOrders.getShippingAddress().getEmail())
+                .customerPhone(apiOrders.getShippingAddress().getMobile())// khi user co du thi them custemer phone va email
+                .shippingAddress(apiOrders.getShippingAddress().getAddress())
+                .shippingMethod(apiOrders.getCarrier().getName())
+                .paymentMethod(apiOrders.getPayment().getBusinessPayment().toString())
+                .shippingFee(apiOrders.getCarrier().getShipFee())
+                .totalPrice(totalProductPrice(apiOrders))
+                .status(PosStatus.PENDING.name())
+                .build();
+    }
+
+    private BigDecimal totalProductPrice(NhanhvnOrderResponse.OrderData apiOrders){
+        BigDecimal totalPrice = BigDecimal.valueOf(0);
+        for(NhanhvnOrderResponse.Product product : apiOrders.getProducts()){
+            BigDecimal price = product.getPrice(); // BigDecimal
+            BigDecimal vat = product.getVat().divide(BigDecimal.valueOf(100)); // vat% -> decimal
+            BigDecimal quantity = BigDecimal.valueOf(product.getQuantity());
+            BigDecimal discount = product.getDiscount();
+
+
+            BigDecimal lineTotal = price
+                    .multiply(BigDecimal.ONE.add(vat))
+                    .multiply(quantity)
+                    .subtract(discount != null ? discount : BigDecimal.ZERO);
+
+            totalPrice = totalPrice.add(lineTotal);
+        }
+        return totalPrice.add(apiOrders.getCarrier().getShipFee());
+
+    }
+
+    private List<OrderItemEntity> convertToOrderItemEntities(List<NhanhvnOrderResponse.OrderData> apiOrders) {
+        List<OrderItemEntity> orderItemEntities = new ArrayList<>();
+        for(NhanhvnOrderResponse.OrderData orderData : apiOrders){
+            orderItemEntities.addAll(convertToOrderItemEntity(orderData));
+        }
+        return  orderItemEntities;
+    }
+
+    public List<OrderItemEntity> convertToOrderItemEntity(NhanhvnOrderResponse.OrderData apiOrder) {
+        List<OrderItemEntity> orderItemEntities = new ArrayList<>();
+        for(NhanhvnOrderResponse.Product product : apiOrder.getProducts()){
+            BigDecimal quantity = BigDecimal.valueOf(product.getQuantity());
+            orderItemEntities.add(OrderItemEntity.builder()
+                    .orderId(apiOrder.getChannel().getAppOrderId())
+                    .quantity(product.getQuantity())
+                    .sku(product.getImeiId())
+                    .price(product.getPrice())
+                    .totalPrice(product.getPrice().multiply(quantity))
+                    .productName(product.getName())
+                    .build());
+        }
+
+        return orderItemEntities;
+    }
+
+    public void saveAllOrdersSync(List<OrderEntity> orderEntities) {
+        log.info("Saving {} Nhanh.vn order synchronously", orderEntities.size());
+
+        if (orderEntities.isEmpty()) {
+            log.info("No products to save.");
+            return;
+        }
+
+        try {
+            int batchSize = 50;
+            for (int i = 0; i < orderEntities.size(); i += batchSize) {
+                int endIndex = Math.min(i + batchSize, orderEntities.size());
+                List<OrderEntity> batch = orderEntities.subList(i, endIndex);
+
+                orderRepository.saveAll(batch);
+                log.info("Saved batch {}-{} of {} products",
+                        i + 1, endIndex, orderEntities.size());
+            }
+
+            log.info("Successfully saved all {} Nhanh.vn products", orderEntities.size());
+        } catch (Exception e) {
+            log.error("Failed to save Nhanh.vn products synchronously: {}", e.getMessage(), e);
+            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_PERSISTENCE_ERROR));
+        }
+    }
+
+    public void saveAllOrderItemSync(List<OrderItemEntity> orderItemEntities) {
+        log.info("Saving {} Nhanh.vn order item synchronously", orderItemEntities.size());
+
+        if (orderItemEntities.isEmpty()) {
+            log.info("No products to save.");
+            return;
+        }
+
+        try {
+            int batchSize = 50;
+            for (int i = 0; i < orderItemEntities.size(); i += batchSize) {
+                int endIndex = Math.min(i + batchSize, orderItemEntities.size());
+                List<OrderItemEntity> batch = orderItemEntities.subList(i, endIndex);
+
+                orderItemRepository.saveAll(batch);
+                log.info("Saved batch {}-{} of {} products",
+                        i + 1, endIndex, orderItemEntities.size());
+            }
+
+            log.info("Successfully saved all {} Nhanh.vn order item", orderItemEntities.size());
+        } catch (Exception e) {
+            log.error("Failed to save Nhanh.vn products synchronously: {}", e.getMessage(), e);
+            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_PERSISTENCE_ERROR));
+        }
+    }
+
+    @Override
+    public boolean syncOrder(String posId) {
+        SyncHistoryEntity history = SyncHistoryEntity.builder()
+                .posId(posId)
+                .startTime(LocalDateTime.now())
+                .syncStatus(PosStatus.FAIL.name())
+                .build();
+        try {
+            // B1: lấy PosEntity và validate posName
+            PosEntity posEntity = getPos(posId);
+
+            // B2: parse config
+            Map<String, String> configMap = objectMapper.readValue(
+                    posEntity.getConfig(),
+                    new TypeReference<>() {
+                    }
+            );
+
+            String appId = configMap.get("appId");
+            String businessId = configMap.get("businessId");
+            String accessToken = posEntity.getAccessToken();
+
+            if (appId == null || businessId == null || accessToken == null) {
+                syncHistoryRepository.save(toSyncHistory(history, (SyncErrorMessage.MISSING_CONFIG), false));
+                log.error("Missing required config for posId={}", posId); // throw techial
+                return false;
+            }
+
+            List<OrderEntity> allOrders = new ArrayList<>();
+            List<OrderItemEntity> allOrderItems = new ArrayList<>();
+
+            // set size mỗi page
+            Map<String, Object> paginator = new HashMap<>();
+            paginator.put("size", 50);
+
+            NhanhvnRequest request = NhanhvnRequest.builder()
+                    .appId(appId)
+                    .businessId(businessId)
+                    .accessToken(accessToken)
+                    .paginator(paginator)
+                    .build();
+
+            while (true) {
+                Optional<NhanhvnOrderResponse> responseOpt = nhanhvnClient.getOrders(request);
+
+                if (responseOpt.isEmpty()) {
+                    syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
+                    log.error("Missing required config for posId={}", posId);
+                    log.error("Failed to fetch products with paginator: {}", paginator);
+                    return false;
+                }
+
+                NhanhvnOrderResponse response = responseOpt.get();
+
+                if (response.getData() == null || response.getData().isEmpty()) {
+                    if (response.getCode() == 1) {
+                        break;
+                    }
+                    syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.CONNECTION_FAILED, false));
+                    log.info("No products found with paginator: {}", paginator);
+                    return false;
+                }
+
+                // order
+                List<OrderEntity> pageOrders = convertToOrderEntities(posId, response.getData());
+                allOrders.addAll(pageOrders);
+                log.info("Fetched {} products, total so far: {}", pageOrders.size(), pageOrders.size());
+
+
+                List<OrderItemEntity> pageOrderItem = convertToOrderItemEntities(response.getData());
+                allOrderItems.addAll(pageOrderItem);
+                log.info("Fetched {} variants, total so far: {}", pageOrderItem.size(), pageOrderItem.size());
+
+                // xử lý next
+                if (response.getPaginator() != null && response.getPaginator().getNext() != null) {
+                    paginator.put("next", response.getPaginator().getNext());
+                } else {
+                    break; // hết data
+                }
+            }
+
+            saveAllOrdersSync(allOrders);
+            saveAllOrderItemSync(allOrderItems);
+            syncHistoryRepository.save(toSyncHistory(history, null, true));
+
+            log.info("Successfully synced {} products from Nhanh.vn", allOrders.size());
+            log.info("Successfully synced {} variants from Nhanh.vn", allOrderItems.size());
+            return true;
+
+        } catch (Exception e) {
+            log.error("Failed to sync Nhanh.vn data order - {}", e.getMessage(), e);
+            syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
+            return false;
+        }
+    }
+
+
+
+
+
 
     private SyncHistoryEntity toSyncHistory(SyncHistoryEntity syncHistoryEntity, SyncErrorMessage syncErrorMessage, Boolean isSyncSuccess) {
         if (isSyncSuccess == false) {
