@@ -37,6 +37,7 @@ public class SapoWebhookImpl implements WebhookService {
     }
 
     @Override
+    @Transactional
     public boolean processWebhook(String posId, HttpServletRequest request) {
         try {
             // 1. Read headers
@@ -59,7 +60,7 @@ public class SapoWebhookImpl implements WebhookService {
                 
                 // 4. Process webhook data based on event type
                 String topic = request.getHeader("x-sapo-topic");
-                switch (topic.toLowerCase()) {
+                switch (topic) {
                     case "products/create":
                         return processProductWebhook(posId, payload);
                     case "products/delete":
@@ -110,7 +111,7 @@ public class SapoWebhookImpl implements WebhookService {
     /**
      * Process product create/update webhook
      */
-    @Transactional
+
     private boolean processProductWebhook(String posId, SapoProductResponse.Product payload) {
         try {
             // Convert and save product
@@ -140,8 +141,8 @@ public class SapoWebhookImpl implements WebhookService {
     /**
      * Process product delete webhook
      */
-    @Transactional
-    private boolean processProductDeleteWebhook(String posId, SapoProductResponse.Product payload) {
+
+    public boolean processProductDeleteWebhook(String posId, SapoProductResponse.Product payload) {
         try {
             Long productId = payload.getId();
             
@@ -169,7 +170,7 @@ public class SapoWebhookImpl implements WebhookService {
     /**
      * Process product update webhook - only update changed fields
      */
-    @Transactional
+
     private boolean processProductUpdateWebhook(String posId, SapoProductResponse.Product payload) {
         try {
             Long productId = payload.getId();
