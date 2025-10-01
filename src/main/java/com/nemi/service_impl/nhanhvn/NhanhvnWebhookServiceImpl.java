@@ -2,13 +2,20 @@ package com.nemi.service_impl.nhanhvn;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nemi.client.NhanhvnClient;
 import com.nemi.configuration.NhanhvnConfig;
 import com.nemi.constant.enums.NhanhvnEvent;
 import com.nemi.constant.enums.PosName;
+import com.nemi.entity.PosEntity;
 import com.nemi.entity.ProductEntity;
 import com.nemi.entity.ProductVariantEntity;
+import com.nemi.exception.TechnicalAlertCode;
+import com.nemi.exception.TechnicalException;
+import com.nemi.exception.pojo.AlertMessages;
+import com.nemi.model.request.nhanhvn.NhanhvnRequest;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnWebhookResponse;
+import com.nemi.repository.PosRepository;
 import com.nemi.repository.ProductRepository;
 import com.nemi.repository.ProductVariantRepository;
 import com.nemi.service.WebhookService;
@@ -22,6 +29,7 @@ import org.springframework.stereotype.Service;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -33,6 +41,8 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
     private final ProductVariantRepository variantRepository;
     private final NhanhvnServiceImpl nhanhvnService;
     private final ObjectMapper objectMapper;
+    private final PosRepository posRepository;
+    private final NhanhvnClient nhanhvnClient;
 
     @Override
     public String getPosName() {
@@ -91,30 +101,47 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
         return true;
     }
 
+    /**
+     * Chỉ có thể thêm được sản phẩm độc lập hoặc sản phẩm con
+     */
     private boolean handleProductAdd(String posId, Object data) {
-        NhanhvnProductResponse.ProductData productData = objectMapper.convertValue(
+        NhanhvnProductResponse.ProductData newVariant = objectMapper.convertValue(
                 data, NhanhvnProductResponse.ProductData.class
         );
-        log.info("Add ProductData: {}", productData);
+        log.info("Add ProductData: {}", newVariant);
 
-        if (productData == null) {
+        if (newVariant == null) {
             log.error("Failed to add product data: {}", data);
             return false;
         }
 
-        if (productData.getParentId() == -2) {
-            ProductEntity productEntity = nhanhvnService.convertToProductEntity(posId, productData);
-            productRepository.save(productEntity);
-            log.info("Successfully add 1 product with id={}", productEntity.getProductId());
-        } else {
-            ProductVariantEntity variantEntity = nhanhvnService.convertToVariantEntity(productData);
-            variantRepository.save(variantEntity);
-            log.info("Successfully add 1 product variant with id={}", variantEntity.getVariantId());
+        // Kiểm tra xem data có phải sản phẩm con không
+        if (newVariant.getParentId() != -1) {
+            Optional<ProductVariantEntity> parentOfVariantEntity = variantRepository.findById(String.valueOf(newVariant.getParentId()));
+            if (parentOfVariantEntity.isPresent()) {
+                // logic chuyển variant lên bảng products
+                NhanhvnProductResponse.ProductData parentOfVariant = getProductById(posId, parentOfVariantEntity.get().getProductId());
+                if (parentOfVariant == null || parentOfVariant.getParentId() != -2) {
+                    log.warn("Failed to find parent product with id={} of new variant with id={}", newVariant.getParentId(), newVariant.getId());
+                    return false;
+                }
+
+                ProductEntity parentEntity = nhanhvnService.convertToProductEntity(posId, parentOfVariant);
+                productRepository.save(parentEntity);
+                log.info("Converted variant with id={} to product", parentEntity.getProductId());
+            }
         }
+
+        ProductVariantEntity variantEntity = nhanhvnService.convertToVariantEntity(newVariant);
+        variantRepository.save(variantEntity);
+        log.info("Successfully add 1 variant with id={}", variantEntity.getVariantId());
 
         return true;
     }
 
+    /**
+     * Khi cập nhật sp con thành sp độc lập, nếu sp cha của nó không còn sp con nào thì nhanhvn sẽ gửi request với body là sp cha (lúc này là sp độc lập)
+     */
     private boolean handleProductUpdate(String posId, Object data) {
         NhanhvnProductResponse.ProductData productData = objectMapper.convertValue(
                 data, NhanhvnProductResponse.ProductData.class
@@ -126,27 +153,61 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
             return false;
         }
 
-        if (productData.getParentId() == -2) {
-            Optional<ProductVariantEntity> variantEntity = variantRepository.findById(String.valueOf(productData.getId()));
-            if (variantEntity.isPresent()) {
-                variantRepository.deleteById(String.valueOf(productData.getId()));
-                log.info("Deleted variant with id={} because it is now a parent product", variantEntity.get().getVariantId());
-            }
-
+        if (productData.getParentId() == -2) {   // Trường hợp call về body sản phẩm cha
             ProductEntity productEntity = nhanhvnService.convertToProductEntity(posId, productData);
             productRepository.save(productEntity);
             log.info("Successfully update 1 product with id={}", productEntity.getProductId());
-        } else {
+            return true;
+        }
+
+        if (productData.getParentId() == -1) {   // Trường hợp call về body sản phẩm độc lập
+            // Nếu tồn tại sản phẩm cha trong DB thì sản phẩm cha lúc này là sản phẩm độc lập
             Optional<ProductEntity> productEntity = productRepository.findById(String.valueOf(productData.getId()));
             if (productEntity.isPresent()) {
+                // Tìm variant có sản phẩm cha là productEntity
+                List<ProductVariantEntity> variantsOfProductEntity =
+                        variantRepository.findByProductId(productEntity.get().getProductId());
+
+                if (variantsOfProductEntity.size() != 1) {
+                    log.warn("Expected 1 variant but found {} for productId={}", variantsOfProductEntity.size(), productEntity.get().getProductId());
+                    return false;
+                }
+
+                // Sản phẩm con => Sản phẩm độc lập
+                ProductVariantEntity variantOfProductEntity = variantsOfProductEntity.get(0);
+                variantOfProductEntity.setProductId("-1");
+                variantRepository.save(variantOfProductEntity);
+                log.info("Successfully update 1 variant with id={}", variantOfProductEntity.getVariantId());
+
+                // Xóa sản phẩm trong product => chuyển sang sản phẩm độc lập (variant)
                 productRepository.deleteById(String.valueOf(productData.getId()));
                 log.info("Deleted product with id={} because it is now a variant", productEntity.get().getProductId());
             }
+        } else {  // Trường hợp call về body sản phẩm con
+            // Kiểm tra xem sản phẩm cha của productData có đang thuộc bảng product_variant không
+            Optional<ProductVariantEntity> parentOfVariantEntity =
+                    variantRepository.findById(String.valueOf(productData.getParentId()));
+            if (parentOfVariantEntity.isPresent()) {
+                // thêm sản phẩm cha vào bảng products
+                NhanhvnProductResponse.ProductData parentProduct = getProductById(posId, String.valueOf(productData.getParentId()));
+                if (parentProduct == null || parentProduct.getParentId() != -2) {
+                    log.warn("Failed to find parent product with id={}", productData.getParentId());
+                    return false;
+                }
+                ProductEntity parentProductEntity = nhanhvnService.convertToProductEntity(posId, parentProduct);
+                productRepository.save(parentProductEntity);
+                log.info("Converted variant with id={} to product", parentProductEntity.getProductId());
 
-            ProductVariantEntity variantEntity = nhanhvnService.convertToVariantEntity(productData);
-            variantRepository.save(variantEntity);
-            log.info("Successfully update 1 product variant with id={}", variantEntity.getVariantId());
+                // Xóa sản phẩm lúc này là cha ở bảng variant_product
+                variantRepository.deleteById(String.valueOf(parentOfVariantEntity.get().getVariantId()));
+                log.info("Deleted variant with id={} because it is now a parent product", parentOfVariantEntity.get().getVariantId());
+            }
         }
+
+        // Cập nhật sản phẩm con hoặc sản phẩm độc lập vào product_variant
+        ProductVariantEntity variantEntity = nhanhvnService.convertToVariantEntity(productData);
+        variantRepository.save(variantEntity);
+        log.info("Successfully update 1 product variant with id={}", variantEntity.getVariantId());
 
         return true;
     }
@@ -161,22 +222,44 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
             return false;
         }
 
-        String productId = ids.get(0);
+        String id = ids.get(0);
 
-        if (variantRepository.existsById(productId)) {
-            variantRepository.deleteById(productId);
-            log.info("Deleted variant with id={} from posId={}", productId, posId);
-            return true;
+        Optional<ProductVariantEntity> variantEntity = variantRepository.findById(id);
+        if (variantEntity.isEmpty()) {
+            log.warn("Failed to find variant with id={}", id);
+            return false;
         }
 
-        if (productRepository.existsById(productId)) {
-            productRepository.deleteById(productId);
-            log.info("Deleted product with id={} from posId={}", productId, posId);
-            return true;
+        // Kiểm tra xem data có phải sản phẩm con không
+        if (!variantEntity.get().getProductId().equals("-1")) {
+            String parentId = variantEntity.get().getProductId();
+            Optional<ProductEntity> productEntity = productRepository.findById(parentId);
+
+            if (productEntity.isEmpty()) {
+                log.warn("Failed to find parent product with id={}", id);
+                return false;
+            }
+
+            // Kiểm tra xem sản phẩm cha có còn sản phẩm con không
+            NhanhvnProductResponse.ProductData parentProduct = getProductById(posId, parentId);
+            if (parentProduct == null) {
+                log.warn("Failed to find parent product with id={}", parentId);
+                return false;
+            }
+
+            if (parentProduct.getParentId() != -2) {
+                productRepository.deleteById(parentId);
+                log.info("Deleted product with id={} because it is now a variant", parentId);
+
+                ProductVariantEntity variant = nhanhvnService.convertToVariantEntity(parentProduct);
+                variantRepository.save(variant);
+                log.info("Converted product with id={} to variant", variant.getVariantId());
+            }
         }
 
-        log.warn("No product or variant found with id={} for posId={}", productId, posId);
-        return false;
+        variantRepository.deleteById(id);
+        log.info("Deleted variant with id={} from posId={}", id, posId);
+        return true;
     }
 
     private String readBody(HttpServletRequest request) {
@@ -191,7 +274,42 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
         }
         return sb.toString();
     }
+
+    private NhanhvnProductResponse.ProductData getProductById(String posId, String id) {
+        try {
+            // 1. Lấy posEntity từ DB
+            PosEntity posEntity = posRepository.findById(posId)
+                    .orElseThrow(() -> new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_NOTFOUND)));
+
+            Map<String, String> configMap = objectMapper.readValue(
+                    posEntity.getConfig(),
+                    new TypeReference<>() {
+                    }
+            );
+
+            String appId = configMap.get("appId");
+            String businessId = configMap.get("businessId");
+            String accessToken = posEntity.getAccessToken();
+
+            // 3. Build request
+            NhanhvnRequest request = NhanhvnRequest.builder()
+                    .appId(appId)
+                    .businessId(businessId)
+                    .accessToken(accessToken)
+                    .build();
+
+            Optional<NhanhvnProductResponse> responseOpt = nhanhvnClient.getProductById(request, id);
+
+            if (responseOpt.isPresent() && responseOpt.get().getData() != null && !responseOpt.get().getData().isEmpty()) {
+                return responseOpt.get().getData().get(0);
+            }
+
+            // Không tìm thấy sản phẩm
+            return null;
+
+        } catch (Exception e) {
+            log.error("[ProductService.getProductById] Failed for posId={}, productId={}, error={}", posId, id, e.getMessage(), e);
+            return null;
+        }
+    }
 }
-
-
-

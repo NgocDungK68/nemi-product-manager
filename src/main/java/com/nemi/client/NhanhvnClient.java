@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -111,5 +112,51 @@ public class NhanhvnClient {
             return Optional.empty();
         }
     }
-}
 
+    public Optional<NhanhvnProductResponse> getProductById(NhanhvnRequest request, String id) {
+        log.debug("[NhanhvnClient.getProductById] id={}, appId={}, businessId={}", id, request.getAppId(), request.getBusinessId());
+
+        try {
+            String url = nhanhvnConfig.getBaseUrl() + "/"
+                    + nhanhvnConfig.getApiVersion() + "/"
+                    + nhanhvnConfig.getUrlProducts()
+                    + "?appId=" + request.getAppId()
+                    + "&businessId=" + request.getBusinessId();
+
+            log.debug("[NhanhvnClient.getProductById] Calling URL: {}", url);
+
+            // build request body
+            Map<String, Object> requestBody = new HashMap<>();
+            Map<String, Object> filters = new HashMap<>();
+            filters.put("ids", Collections.singletonList(id)); // đưa id vào mảng
+            requestBody.put("filters", filters);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("Authorization", request.getAccessToken());
+
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+
+            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+            String jsonResp = resp.getBody();
+            log.debug("[NhanhvnClient.getProductById] resp={}", resp);
+
+            if (jsonResp == null || jsonResp.isBlank()) {
+                log.warn("[NhanhvnClient.getProductById] Empty response body (status: {})", resp.getStatusCode());
+                return Optional.empty();
+            }
+
+            NhanhvnProductResponse productResponse =
+                    JsonUtils.fromJson(jsonResp, NhanhvnProductResponse.class);
+
+            log.info("[NhanhvnClient.getProductById] Got {} product(s) for id={}",
+                    productResponse.getData() != null ? productResponse.getData().size() : 0, id);
+
+            return Optional.of(productResponse);
+
+        } catch (Exception e) {
+            log.error("[NhanhvnClient.getProductById] Failed for id {}: {}", id, e.getMessage(), e);
+            return Optional.empty();
+        }
+    }
+}
