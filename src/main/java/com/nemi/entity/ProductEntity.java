@@ -9,16 +9,17 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
 
 import java.time.LocalDateTime;
 
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-@Builder
 @Entity
+@SuperBuilder
 @Table(name = "products", schema = "product_manager")
-public class ProductEntity {
+public class ProductEntity extends BaseEntity {
     @Id
     @Column(name = "product_id")
     private String productId;
@@ -46,9 +47,4 @@ public class ProductEntity {
     @Column(name = "images", columnDefinition = "TEXT")
     private String images;
 
-    @Column(name = "created_datetime")
-    private LocalDateTime createdDatetime;
-
-    @Column(name = "updated_datetime")
-    private LocalDateTime updatedDatetime;
 }
