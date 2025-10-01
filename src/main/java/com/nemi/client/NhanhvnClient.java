@@ -159,10 +159,6 @@ public class NhanhvnClient {
         }
     }
 
-
-
-
-
     public Optional<NhanhvnProductResponse> getProductById(NhanhvnRequest request, String id) {
         log.debug("[NhanhvnClient.getProductById] id={}, appId={}, businessId={}", id, request.getAppId(), request.getBusinessId());
 
@@ -177,8 +173,8 @@ public class NhanhvnClient {
 
             // build request body
             Map<String, Object> requestBody = new HashMap<>();
-            Map<String, Object> filters = new HashMap<>();
-            filters.put("ids", Collections.singletonList(id)); // đưa id vào mảng
+            Map<String, String> filters = new HashMap<>();
+            filters.put("ids", id); // đưa id vào mảng
             requestBody.put("filters", filters);
 
             HttpHeaders headers = new HttpHeaders();

@@ -120,8 +120,8 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
             Optional<ProductVariantEntity> parentOfVariantEntity = variantRepository.findById(String.valueOf(newVariant.getParentId()));
             if (parentOfVariantEntity.isPresent()) {
                 // logic chuyển variant lên bảng products
-                NhanhvnProductResponse.ProductData parentOfVariant = getProductById(posId, parentOfVariantEntity.get().getProductId());
-                if (parentOfVariant == null || parentOfVariant.getParentId() != -2) {
+                NhanhvnProductResponse.ProductData parentOfVariant = getProductById(posId, parentOfVariantEntity.get().getVariantId());
+                if (parentOfVariant == null) {
                     log.warn("Failed to find parent product with id={} of new variant with id={}", newVariant.getParentId(), newVariant.getId());
                     return false;
                 }
@@ -129,6 +129,9 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
                 ProductEntity parentEntity = nhanhvnService.convertToProductEntity(posId, parentOfVariant);
                 productRepository.save(parentEntity);
                 log.info("Converted variant with id={} to product", parentEntity.getProductId());
+
+                variantRepository.deleteById(String.valueOf(newVariant.getParentId()));
+                log.info("Deleted variant with id={} because it is now a parent product", newVariant.getParentId());
             }
         }
 
@@ -236,7 +239,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
             Optional<ProductEntity> productEntity = productRepository.findById(parentId);
 
             if (productEntity.isEmpty()) {
-                log.warn("Failed to find parent product with id={}", id);
+                log.warn("Failed to find parent product with id={}", parentId);
                 return false;
             }
 
@@ -255,6 +258,8 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
                 variantRepository.save(variant);
                 log.info("Converted product with id={} to variant", variant.getVariantId());
             }
+
+            log.info("Parent of variant with id={} is still parent product", variantEntity.get().getVariantId());
         }
 
         variantRepository.deleteById(id);
