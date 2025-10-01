@@ -538,6 +538,4 @@ public class NhanhvnServiceImpl implements PosManagementService {
         syncHistoryEntity.setEndTime(LocalDateTime.now());
         return syncHistoryEntity;
     }
-
 }
-
