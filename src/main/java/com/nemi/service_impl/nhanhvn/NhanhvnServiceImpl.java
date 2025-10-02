@@ -194,6 +194,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
             return false;
         }
     }
+
     public void saveAllProductsSync(List<ProductEntity> products) {
         log.info("Saving {} Nhanh.vn products synchronously", products.size());
 
@@ -296,7 +297,8 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 .weightUnit(WeightUnit.GAM.getValue())
                 .build();
     }
-//------------------------------------------------------------------------------------------
+
+    //------------------------------------------------------------------------------------------
     private List<OrderEntity> convertToOrderEntities(String posId, List<NhanhvnOrderResponse.OrderData> apiOrders) {
         return apiOrders.stream()
                 .map(orders -> convertToOrderEntity(posId, orders))
@@ -308,7 +310,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
         int statusCode = apiOrders.getInfo().getStatus();
         Map<Integer, String> mapping = nhanhvnConfig.getOrder().getStatus().getMapping();
-        String status =  mapping.getOrDefault(statusCode, "unknown");
+        String status = mapping.getOrDefault(statusCode, "unknown");
 
 
         return OrderEntity.builder()
@@ -328,9 +330,9 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 .build();
     }
 
-    private BigDecimal totalProductPrice(NhanhvnOrderResponse.OrderData apiOrders){
+    private BigDecimal totalProductPrice(NhanhvnOrderResponse.OrderData apiOrders) {
         BigDecimal totalPrice = BigDecimal.valueOf(0);
-        for(NhanhvnOrderResponse.Product product : apiOrders.getProducts()){
+        for (NhanhvnOrderResponse.Product product : apiOrders.getProducts()) {
             BigDecimal price = product.getPrice(); // BigDecimal
             BigDecimal vat = product.getVat().divide(BigDecimal.valueOf(100)); // vat% -> decimal
             BigDecimal quantity = BigDecimal.valueOf(product.getQuantity());
@@ -350,15 +352,15 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
     private List<OrderItemEntity> convertToOrderItemEntities(List<NhanhvnOrderResponse.OrderData> apiOrders) {
         List<OrderItemEntity> orderItemEntities = new ArrayList<>();
-        for(NhanhvnOrderResponse.OrderData orderData : apiOrders){
+        for (NhanhvnOrderResponse.OrderData orderData : apiOrders) {
             orderItemEntities.addAll(convertToOrderItemEntity(orderData));
         }
-        return  orderItemEntities;
+        return orderItemEntities;
     }
 
     public List<OrderItemEntity> convertToOrderItemEntity(NhanhvnOrderResponse.OrderData apiOrder) {
         List<OrderItemEntity> orderItemEntities = new ArrayList<>();
-        for(NhanhvnOrderResponse.Product product : apiOrder.getProducts()){
+        for (NhanhvnOrderResponse.Product product : apiOrder.getProducts()) {
             BigDecimal quantity = BigDecimal.valueOf(product.getQuantity());
             orderItemEntities.add(OrderItemEntity.builder()
                     .orderItemId(String.valueOf(product.getId()))
@@ -394,9 +396,9 @@ public class NhanhvnServiceImpl implements PosManagementService {
                         i + 1, endIndex, orderEntities.size());
             }
 
-            log.info("Successfully saved all {} Nhanh.vn products", orderEntities.size());
+            log.info("Successfully saved all {} Nhanh.vn orders", orderEntities.size());
         } catch (Exception e) {
-            log.error("Failed to save Nhanh.vn products synchronously: {}", e.getMessage(), e);
+            log.error("Failed to save Nhanh.vn orders synchronously: {}", e.getMessage(), e);
             throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_PERSISTENCE_ERROR));
         }
     }
@@ -405,7 +407,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
         log.info("Saving {} Nhanh.vn order item synchronously", orderItemEntities.size());
 
         if (orderItemEntities.isEmpty()) {
-            log.info("No products to save.");
+            log.info("No order items to save.");
             return;
         }
 
@@ -416,13 +418,13 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 List<OrderItemEntity> batch = orderItemEntities.subList(i, endIndex);
 
                 orderItemRepository.saveAll(batch);
-                log.info("Saved batch {}-{} of {} products",
+                log.info("Saved batch {}-{} of {} orders",
                         i + 1, endIndex, orderItemEntities.size());
             }
 
             log.info("Successfully saved all {} Nhanh.vn order item", orderItemEntities.size());
         } catch (Exception e) {
-            log.error("Failed to save Nhanh.vn products synchronously: {}", e.getMessage(), e);
+            log.error("Failed to save Nhanh.vn order items synchronously: {}", e.getMessage(), e);
             throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_PERSISTENCE_ERROR));
         }
     }
@@ -486,19 +488,19 @@ public class NhanhvnServiceImpl implements PosManagementService {
                         break;
                     }
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.CONNECTION_FAILED, false));
-                    log.info("No products found with paginator: {}", paginator);
+                    log.info("No order found with paginator: {}", paginator);
                     return false;
                 }
 
                 // order
                 List<OrderEntity> pageOrders = convertToOrderEntities(posId, response.getData());
                 allOrders.addAll(pageOrders);
-                log.info("Fetched {} products, total so far: {}", pageOrders.size(), pageOrders.size());
+                log.info("Fetched {} orders, total so far: {}", pageOrders.size(), pageOrders.size());
 
 
                 List<OrderItemEntity> pageOrderItem = convertToOrderItemEntities(response.getData());
                 allOrderItems.addAll(pageOrderItem);
-                log.info("Fetched {} variants, total so far: {}", pageOrderItem.size(), pageOrderItem.size());
+                log.info("Fetched {} order items, total so far: {}", pageOrderItem.size(), pageOrderItem.size());
 
                 // xử lý next
                 if (response.getPaginator() != null && response.getPaginator().getNext() != null) {
@@ -512,8 +514,8 @@ public class NhanhvnServiceImpl implements PosManagementService {
             saveAllOrderItemSync(allOrderItems);
             syncHistoryRepository.save(toSyncHistory(history, null, true));
 
-            log.info("Successfully synced {} products from Nhanh.vn", allOrders.size());
-            log.info("Successfully synced {} variants from Nhanh.vn", allOrderItems.size());
+            log.info("Successfully synced {} orders from Nhanh.vn", allOrders.size());
+            log.info("Successfully synced {} order items from Nhanh.vn", allOrderItems.size());
             return true;
 
         } catch (Exception e) {
@@ -522,10 +524,6 @@ public class NhanhvnServiceImpl implements PosManagementService {
             return false;
         }
     }
-
-
-
-
 
 
     private SyncHistoryEntity toSyncHistory(SyncHistoryEntity syncHistoryEntity, SyncErrorMessage syncErrorMessage, Boolean isSyncSuccess) {
