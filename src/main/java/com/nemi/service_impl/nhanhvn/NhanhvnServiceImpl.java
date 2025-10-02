@@ -332,7 +332,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
         BigDecimal totalPrice = BigDecimal.valueOf(0);
         for(NhanhvnOrderResponse.Product product : apiOrders.getProducts()){
             BigDecimal price = product.getPrice(); // BigDecimal
-            BigDecimal vat = product.getVat().divide(BigDecimal.valueOf(100)); // vat% -> decimal
+            BigDecimal vat = product.getVat().divide(BigDecimal.valueOf(100));
             BigDecimal quantity = BigDecimal.valueOf(product.getQuantity());
             BigDecimal discount = product.getDiscount();
 

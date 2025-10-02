@@ -188,12 +188,12 @@ public class SapoServiceImpl implements PosManagementService {
                 .collect(Collectors.toList())));
 
         // Set timestamps - parse from string format
-        if (apiProduct.getCreatedOn() != null && !apiProduct.getCreatedOn().isEmpty()) {
-            product.setCreatedDatetime(parseSapoDateTime(apiProduct.getCreatedOn()));
-        }
-        if (apiProduct.getModifiedOn() != null && !apiProduct.getModifiedOn().isEmpty()) {
-            product.setUpdatedDatetime(parseSapoDateTime(apiProduct.getModifiedOn()));
-        }
+//        if (apiProduct.getCreatedOn() != null && !apiProduct.getCreatedOn().isEmpty()) {
+//            product.setCreatedDatetime(parseSapoDateTime(apiProduct.getCreatedOn()));
+//        }
+//        if (apiProduct.getModifiedOn() != null && !apiProduct.getModifiedOn().isEmpty()) {
+//            product.setUpdatedDatetime(parseSapoDateTime(apiProduct.getModifiedOn()));
+//        }
         return product;
     }
 

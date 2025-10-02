@@ -237,12 +237,12 @@ public class SapoWebhookImpl implements WebhookService {
             }
 
             // Check and update modified timestamp
-            LocalDateTime newModifiedTime = parseSapoDateTime(payload.getModifiedOn());
-            if (newModifiedTime != null && !newModifiedTime.equals(existingProduct.getUpdatedDatetime())) {
-                log.info("Updating product modified time: {} -> {}", existingProduct.getUpdatedDatetime(), newModifiedTime);
-                existingProduct.setUpdatedDatetime(newModifiedTime);
-                hasChanges = true;
-            }
+//            LocalDateTime newModifiedTime = parseSapoDateTime(payload.getModifiedOn());
+//            if (newModifiedTime != null && !newModifiedTime.equals(existingProduct.getUpdatedDatetime())) {
+//                log.info("Updating product modified time: {} -> {}", existingProduct.getUpdatedDatetime(), newModifiedTime);
+//                existingProduct.setUpdatedDatetime(newModifiedTime);
+//                hasChanges = true;
+//            }
 
             // Save updated product to database if there are changes
             if (hasChanges) {
@@ -296,8 +296,8 @@ public class SapoWebhookImpl implements WebhookService {
                 .collect(Collectors.toList())));
 
         // Set timestamps - parse from string format
-        product.setCreatedDatetime(parseSapoDateTime(payload.getCreatedOn()));
-        product.setUpdatedDatetime(parseSapoDateTime(payload.getModifiedOn()));
+//        product.setCreatedDatetime(parseSapoDateTime(payload.getCreatedOn()));
+//        product.setUpdatedDatetime(parseSapoDateTime(payload.getModifiedOn()));
 
         return product;
     }

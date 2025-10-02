@@ -72,6 +72,23 @@ pancake:
     page-size: 50 # So luong ban ghi lay ve trong 1 lan
     batch-size: 100 # So luong ban ghi xu ly trong 1 lan
     max-concurrent: 1 # So request dong thoi
+  order:
+    status:
+      mapping:
+        0: "new"            # Mới
+        20: "new"            # Đã đặt hàng
+        1: "processing"     # Đã xác nhận
+        11: "processing"     # Chờ hàng
+        12: "processing"     # Chờ in
+        13: "processing"     # Đã in
+        8: "processing"     # Đang đóng hàng
+        9: "ready_to_ship"  # Chờ chuyển hàng
+        2: "shipping"       # Đã gửi hàng
+        3: "delivered"      # Đã nhận
+        16: "delivered"      # Đã thu tiền
+        4: "returned"       # Đang hoàn
+        15: "returned"       # Hoàn một phần (⚠️ partial return – note riêng nếu cần)
+        5: "returned"       # Đã hoàn
 sapo:
   client-id: 50f184d93c834ebaa764cc17c25e31fa
   client-secret: 50ce6b4d47a04ca18aa6f972b698779a
