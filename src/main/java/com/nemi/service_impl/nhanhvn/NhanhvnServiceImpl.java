@@ -149,7 +149,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
                     log.error("Missing required config for posId={}", posId);
                     log.error("Failed to fetch products with paginator: {}", paginator);
-                    return false;
+                    throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
                 }
 
                 NhanhvnProductResponse response = responseOpt.get();
@@ -160,7 +160,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
                     }
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.CONNECTION_FAILED, false));
                     log.info("No products found with paginator: {}", paginator);
-                    return false;
+                    throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
                 }
 
                 // product
@@ -191,7 +191,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
         } catch (Exception e) {
             log.error("Failed to sync Nhanh.vn data - {}", e.getMessage(), e);
             syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
-            return false;
+            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
         }
     }
     public void saveAllProductsSync(List<ProductEntity> products) {

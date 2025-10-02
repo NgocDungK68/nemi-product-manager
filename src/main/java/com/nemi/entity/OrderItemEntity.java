@@ -22,7 +22,7 @@ import java.math.BigDecimal;
 public class OrderItemEntity extends BaseEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+//    @GeneratedValue(strategy = GenerationType.UUID)
     @JsonProperty("order_item_id")
     private String orderItemId;   // ID của order_item (primary key)
 
