@@ -6,18 +6,15 @@ import com.nemi.client.NhanhvnClient;
 import com.nemi.configuration.NhanhvnConfig;
 import com.nemi.constant.enums.NhanhvnEvent;
 import com.nemi.constant.enums.PosName;
-import com.nemi.entity.PosEntity;
-import com.nemi.entity.ProductEntity;
-import com.nemi.entity.ProductVariantEntity;
+import com.nemi.entity.*;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
 import com.nemi.model.request.nhanhvn.NhanhvnRequest;
+import com.nemi.model.response.nhanhvn.NhanhvnOrderResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnWebhookResponse;
-import com.nemi.repository.PosRepository;
-import com.nemi.repository.ProductRepository;
-import com.nemi.repository.ProductVariantRepository;
+import com.nemi.repository.*;
 import com.nemi.service.WebhookService;
 import com.nemi.util.JsonUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -43,6 +40,8 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
     private final ObjectMapper objectMapper;
     private final PosRepository posRepository;
     private final NhanhvnClient nhanhvnClient;
+    private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
 
     @Override
     public String getPosName() {
@@ -89,6 +88,9 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
             case PRODUCT_ADD -> handleProductAdd(posId, data);
             case PRODUCT_UPDATE -> handleProductUpdate(posId, data);
             case PRODUCT_DELETE -> handleProductDelete(posId, data);
+            case ORDER_ADD -> handleOrderAdd(posId, data);
+            case ORDER_UPDATE -> handleOrderUpdate(posId, data);
+            case ORDER_DELETE -> handleOrderDelete(posId, data);
             default -> {
                 log.warn("Unhandled event: {}", event);
                 yield false;
@@ -219,7 +221,8 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
      * body: {"event":"productDelete","businessId":215487,"data":["15"]}
      */
     private boolean handleProductDelete(String posId, Object data) {
-        List<String> ids = objectMapper.convertValue(data, new TypeReference<>() {});
+        List<String> ids = objectMapper.convertValue(data, new TypeReference<>() {
+        });
         if (ids.isEmpty()) {
             log.warn("No product ID provided for deletion");
             return false;
@@ -264,6 +267,113 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
 
         variantRepository.deleteById(id);
         log.info("Deleted variant with id={} from posId={}", id, posId);
+        return true;
+    }
+
+    private boolean handleOrderAdd(String posId, Object data) {
+        NhanhvnOrderResponse.OrderData orderData = objectMapper.convertValue(
+                data, NhanhvnOrderResponse.OrderData.class
+        );
+        log.info("Add OrderData: {}", orderData);
+
+        if (orderData == null || orderData.getInfo() == null) {
+            log.error("Failed to add order data: {}", data);
+            return false;
+        }
+
+        // Convert OrderEntity
+        OrderEntity orderEntity = nhanhvnService.convertToOrderEntity(posId, orderData);
+        if (orderEntity == null) {
+            log.error("Failed to convert orderData={} to OrderEntity", orderData.getInfo().getId());
+            return false;
+        }
+
+        // Save order
+        orderRepository.save(orderEntity);
+        log.info("Successfully saved OrderEntity with id={} and code={}",
+                orderEntity.getOrderId(), orderEntity.getOrderCode());
+
+        // Convert OrderItemEntities
+        List<OrderItemEntity> orderItemEntities = nhanhvnService.convertToOrderItemEntity(orderData);
+        if (orderItemEntities.isEmpty()) {
+            log.warn("Order id={} has no products", orderEntity.getOrderId());
+        } else {
+            orderItemRepository.saveAll(orderItemEntities);
+            log.info("Successfully saved {} OrderItemEntities for orderId={}",
+                    orderItemEntities.size(), orderEntity.getOrderId());
+        }
+
+        return true;
+    }
+
+    private boolean handleOrderUpdate(String posId, Object data) {
+        NhanhvnOrderResponse.OrderData orderData = objectMapper.convertValue(
+                data, NhanhvnOrderResponse.OrderData.class
+        );
+        log.info("Update OrderData: {}", orderData);
+
+        if (orderData == null || orderData.getInfo() == null) {
+            log.error("Failed to update order data: {}", data);
+            return false;
+        }
+
+        // Convert OrderEntity
+        OrderEntity orderEntity = nhanhvnService.convertToOrderEntity(posId, orderData);
+        if (orderEntity == null) {
+            log.error("Failed to convert orderData={} to OrderEntity", orderData.getInfo().getId());
+            return false;
+        }
+
+        // Save (insert/update)
+        orderRepository.save(orderEntity);
+        log.info("Successfully updated OrderEntity with id={} and code={}",
+                orderEntity.getOrderId(), orderEntity.getOrderCode());
+
+        // Sync OrderItems
+        List<OrderItemEntity> orderItemEntities = nhanhvnService.convertToOrderItemEntity(orderData);
+        if (orderItemEntities.isEmpty()) {
+            log.warn("Order id={} has no products", orderEntity.getOrderId());
+            return false;
+        } else {
+            // Xóa items cũ để tránh dữ liệu thừa
+            orderItemRepository.deleteByOrderId(orderEntity.getOrderId());
+
+            // Save lại items mới
+            orderItemRepository.saveAll(orderItemEntities);
+            log.info("Successfully synced {} OrderItemEntities for orderId={}",
+                    orderItemEntities.size(), orderEntity.getOrderId());
+        }
+
+        return true;
+    }
+
+
+    private boolean handleOrderDelete(String posId, Object data) {
+        List<String> ids = objectMapper.convertValue(data, new TypeReference<>() {
+        });
+        if (ids.isEmpty()) {
+            log.warn("No order ID provided for deletion");
+            return false;
+        }
+
+        String orderId = ids.get(0);
+
+        Optional<OrderEntity> orderEntity = orderRepository.findById(orderId);
+        if (orderEntity.isEmpty()) {
+            log.warn("Failed to find order with id={}", orderId);
+            return false;
+        }
+
+        // Nếu xóa cả orderItem liên quan, làm trước khi xóa order
+        List<OrderItemEntity> orderItems = orderItemRepository.findByOrderId(orderId);
+        if (!orderItems.isEmpty()) {
+            orderItemRepository.deleteAll(orderItems);
+            log.info("Deleted {} order items for orderId={}", orderItems.size(), orderId);
+        }
+
+        orderRepository.deleteById(orderId);
+        log.info("Deleted order with id={} from posId={}", orderId, posId);
+
         return true;
     }
 
