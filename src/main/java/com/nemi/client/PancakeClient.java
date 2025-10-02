@@ -1,7 +1,10 @@
 package com.nemi.client;
 
 import com.nemi.configuration.PancakeConfig;
+import com.nemi.model.request.nhanhvn.NhanhvnRequest;
 import com.nemi.model.request.pancake.PancakeRequest;
+import com.nemi.model.response.nhanhvn.NhanhvnOrderResponse;
+import com.nemi.model.response.pancake.PancakeOrderResponse;
 import com.nemi.model.response.pancake.PancakeProductResponse;
 import com.nemi.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -65,6 +69,54 @@ public class PancakeClient {
 
         } catch (Exception e) {
             log.error("[PancakeClient.getProducts] Failed: {}", e.getMessage(), e);
+            return Optional.empty();
+        }
+    }
+
+    public Optional<PancakeOrderResponse> getOrders(PancakeRequest request) {
+        log.debug("[Pancake.getOrders] with pagesize {} and page number", request.getPageSize(),request.getPageNumber());
+
+        try {
+            String url = pancakeConfig.getBaseUrl() + "/"
+                    + "shops" + "/"
+                    + request.getShopId() + "/"
+                    + "orders";
+            log.debug("[Pancake.getProducts] Calling URL: {}", url);
+
+            String urlWithParams = UriComponentsBuilder.fromHttpUrl(url)
+                    .queryParam("api_key", request.getApiKey())
+                    .queryParam("page_size", request.getPageSize())
+                    .queryParam("page_number", request.getPageNumber())
+                    .toUriString();
+            log.debug("[Pancake.getProducts] Calling URL: {}", urlWithParams);
+
+            log.debug("[Pancake.getOrders] Calling URL: {}", url);
+
+            // build request body
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(headers);
+            log.debug("[NhanhvnClient.getProducts] Calling URL: {}", url);
+            ResponseEntity<String> resp = restTemplate.exchange(urlWithParams, HttpMethod.GET, entity, String.class);
+            String jsonResp = resp.getBody();
+            log.debug("[PancakeClient.getProducts] resp {}", resp);
+
+            if (jsonResp == null || jsonResp.isBlank()) {
+                log.warn("[PancakeClient.getProducts] Empty response body (status: {})", resp.getStatusCode());
+                return Optional.empty();
+            }
+
+            PancakeOrderResponse productsResponse =
+                    JsonUtils.fromJson(jsonResp, PancakeOrderResponse.class);
+
+            log.info("[PancakeClient.getProducts] Got {} products",
+                    productsResponse.getData() != null ? productsResponse.getData().size() : 0);
+
+            return Optional.of(productsResponse);
+
+        } catch (Exception e) {
+            log.error("[NhanhvnClient.getOrders] Failed: {}", e.getMessage(), e);
             return Optional.empty();
         }
     }

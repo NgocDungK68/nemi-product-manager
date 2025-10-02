@@ -4,6 +4,8 @@ import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.Map;
+
 @Data
 @Configuration
 @ConfigurationProperties("pancake")
@@ -24,6 +26,19 @@ public class PancakeConfig {
         private int pageSize;
         private int batchSize;
         private int maxConcurrent;
+    }
+
+    //---status-----
+    private NhanhvnConfig.OrderConfig order; // ánh xạ nhanhvn.order
+
+    @Data
+    public static class OrderConfig {
+        private NhanhvnConfig.OrderConfig.StatusConfig status; // ánh xạ nhanhvn.order.status
+
+        @Data
+        public static class StatusConfig {
+            private Map<Integer, String> mapping;
+        }
     }
 
 }

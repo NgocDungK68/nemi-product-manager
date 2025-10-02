@@ -23,7 +23,7 @@ import java.time.LocalDateTime;
 public class OrderEntity extends BaseEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+//    @GeneratedValue(strategy = GenerationType.UUID)
     @JsonProperty("order_id")
     private String  orderId;
 
