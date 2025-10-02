@@ -24,9 +24,9 @@ public class SapoOrderResponse {
         private Long id; //orderID
         private LocalDateTime closedOn;
         @JsonProperty("created_on")
-        private LocalDateTime createdOn; //created_at
+        private String createdOn; //created_at
         @JsonProperty("modified_on")
-        private LocalDateTime modifiedOn; //updated_at
+        private String modifiedOn; //updated_at
         @JsonProperty("total_price")
         private BigDecimal totalPrice;//total_price
         @JsonProperty("total_discounts")

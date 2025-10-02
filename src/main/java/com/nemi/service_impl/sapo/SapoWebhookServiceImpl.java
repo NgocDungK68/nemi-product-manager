@@ -307,9 +307,14 @@ public class SapoWebhookServiceImpl implements WebhookService {
         product.setPosId(posId);
         product.setCategory(payload.getProductType());
         product.setBrand(payload.getVendor());
-        product.setImages(JsonUtils.toJson(payload.getImages().stream()
-                .map(SapoProductResponse.Image::getSrc) // Dùng method reference
-                .collect(Collectors.toList())));
+        // Handle null images
+        if (payload.getImages() != null && !payload.getImages().isEmpty()) {
+            product.setImages(JsonUtils.toJson(payload.getImages().stream()
+                    .map(SapoProductResponse.Image::getSrc) // Dùng method reference
+                    .collect(Collectors.toList())));
+        } else {
+            product.setImages(null);
+        }
 
         // Set timestamps - parse from string format
         product.setCreatedAt(parseSapoDateTime(payload.getCreatedOn()));
@@ -458,23 +463,28 @@ public class SapoWebhookServiceImpl implements WebhookService {
      * Convert SapoOrder to OrderEntity
      */
     private OrderEntity convertToOrderEntity(String posId, SapoOrderResponse.SapoOrder sapoOrder) {
+        SapoOrderResponse.SapoAddress billing = sapoOrder.getBillingAddress();
+        
+        // Debug logging to understand the issue
+        log.info("Converting SapoOrder to OrderEntity - ID: {}, Name: {}", sapoOrder.getId(), sapoOrder.getName());
+
         return OrderEntity.builder()
-                .orderId(sapoOrder.getId().toString())
+                .orderId(sapoOrder.getId() != null ? sapoOrder.getId().toString() : "UNKNOWN")
                 .orderCode(sapoOrder.getName())
                 .posId(posId)
-                .customerName(sapoOrder.getBillingAddress().getName())
-                .customerPhone(sapoOrder.getBillingAddress().getPhone())
+                .customerName(billing != null ? billing.getName() : null)
+                .customerPhone(billing != null ? billing.getPhone() : null)
                 .customerEmail(sapoOrder.getContactEmail())
-                .shippingAddress(sapoOrder.getBillingAddress().getAddress1())
+                .shippingAddress(billing !=null ? billing.getAddress1() : null)
                 .status(null)
                 .paymentMethod(sapoOrder.getPaymentGatewayNames() != null && !sapoOrder.getPaymentGatewayNames().isEmpty()
                         ? String.join(", ", sapoOrder.getPaymentGatewayNames()) : null)
-                .shippingMethod(sapoOrder.getShippingLines().getTitle())
+                .shippingMethod(sapoOrder.getShippingLines() != null ? sapoOrder.getShippingLines().getTitle() : null)
                 .totalPrice(sapoOrder.getTotalPrice())
-                .shippingFee(sapoOrder.getShippingLines().getPrice())
+                .shippingFee(sapoOrder.getShippingLines() != null && sapoOrder.getShippingLines().getPrice() != null ? sapoOrder.getShippingLines().getPrice() : null)
                 .discountAmount(sapoOrder.getTotalDiscounts() != null ? sapoOrder.getTotalDiscounts().doubleValue() : 0.0)
-                .createdAt(sapoOrder.getCreatedOn())
-                .updatedAt(sapoOrder.getModifiedOn())
+                .createdAt(parseSapoDateTime(sapoOrder.getCreatedOn()))
+                .updatedAt(parseSapoDateTime(sapoOrder.getModifiedOn()))
                 .build();
     }
 
