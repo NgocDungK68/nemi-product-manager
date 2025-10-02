@@ -16,10 +16,10 @@ import java.time.LocalDateTime;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-@SuperBuilder
 @Entity
+@SuperBuilder
 @Table(name = "products", schema = "product_manager")
-public class ProductEntity extends BaseEntity{
+public class ProductEntity extends BaseEntity {
     @Id
     @Column(name = "product_id")
     private String productId;
