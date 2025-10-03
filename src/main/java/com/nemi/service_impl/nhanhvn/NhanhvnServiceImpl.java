@@ -191,7 +191,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
         } catch (Exception e) {
             log.error("Failed to sync Nhanh.vn data - {}", e.getMessage(), e);
             syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
-            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
+            return false;
         }
     }
 

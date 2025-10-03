@@ -97,7 +97,7 @@ public class PancakeClient {
             headers.setContentType(MediaType.APPLICATION_JSON);
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(headers);
-            log.debug("[NhanhvnClient.getProducts] Calling URL: {}", url);
+            log.debug("[PancakeClient.getProducts] Calling URL: {}", url);
             ResponseEntity<String> resp = restTemplate.exchange(urlWithParams, HttpMethod.GET, entity, String.class);
             String jsonResp = resp.getBody();
             log.debug("[PancakeClient.getProducts] resp {}", resp);
@@ -116,7 +116,7 @@ public class PancakeClient {
             return Optional.of(productsResponse);
 
         } catch (Exception e) {
-            log.error("[NhanhvnClient.getOrders] Failed: {}", e.getMessage(), e);
+            log.error("[Pancakeclient.getOrders] Failed: {}", e.getMessage(), e);
             return Optional.empty();
         }
     }

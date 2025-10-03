@@ -48,4 +48,8 @@ public class SyncHistoryEntity {
     @Column(name = "error_message", length = 100)
     private String errorMessage;
 
+    @Column(name = "sync_type", nullable = false, length = 50)
+    private String syncType;
+
+
 }
