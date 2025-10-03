@@ -1,6 +1,6 @@
 package com.nemi.service_impl.sapo;
 
-import com.nemi.constant.enums.PosName;
+import com.nemi.enums.PosName;
 import com.nemi.util.JsonUtils;
 import com.nemi.entity.OrderEntity;
 import com.nemi.entity.OrderItemEntity;
