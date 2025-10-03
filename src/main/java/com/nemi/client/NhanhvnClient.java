@@ -1,9 +1,10 @@
 package com.nemi.client;
 
+import com.nemi.configuration.NhanhvnConfig;
+import com.nemi.constant.NhanhvnConstants;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
-import com.nemi.configuration.NhanhvnConfig;
 import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.request.nhanhvn.NhanhvnAccessTokenRequest;
 import com.nemi.model.request.nhanhvn.NhanhvnRequest;
@@ -11,18 +12,14 @@ import com.nemi.model.response.nhanhvn.NhanhvnAccessTokenResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnOrderResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
 import com.nemi.util.JsonUtils;
+import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -31,6 +28,7 @@ import java.util.Optional;
 @Slf4j
 @Service
 public class NhanhvnClient {
+    @Resource(name = "nhanhvnRestTemplate")
     private final RestTemplate restTemplate;
     private final NhanhvnConfig nhanhvnConfig;
 
@@ -72,26 +70,25 @@ public class NhanhvnClient {
         log.debug("[NhanhvnClient.getProducts] paginator: {}", request.getPaginator());
 
         try {
-            String url = nhanhvnConfig.getBaseUrl() + "/"
-                    + nhanhvnConfig.getApiVersion() + "/"
-                    + nhanhvnConfig.getUrlProducts()
-                    + "?appId=" + request.getAppId()
-                    + "&businessId=" + request.getBusinessId();
-            log.debug("[NhanhvnClient.getProducts] Calling URL: {}", url);
+            String relativeUri = UriComponentsBuilder.fromPath(nhanhvnConfig.getUrlProducts())
+                    .queryParam(NhanhvnConstants.APP_ID, request.getAppId())
+                    .queryParam(NhanhvnConstants.BUSINESS_ID, request.getBusinessId())
+                    .toUriString();
+
+            log.debug("[NhanhvnClient.getProducts] Calling URL: {}", restTemplate.getUriTemplateHandler().expand(relativeUri));
 
             // build request body
             Map<String, Object> requestBody = new HashMap<>();
             if (request.getPaginator() != null && !request.getPaginator().isEmpty()) {
-                requestBody.put("paginator", request.getPaginator());
+                requestBody.put(NhanhvnConstants.PAGINATOR, request.getPaginator());
             }
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("Authorization", request.getAccessToken());
+            headers.set(HttpHeaders.AUTHORIZATION, request.getAccessToken());
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-            log.debug("[NhanhvnClient.getProducts] Calling URL: {}", url);
-            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+            ResponseEntity<String> resp = restTemplate.exchange(relativeUri, HttpMethod.POST, entity, String.class);
             String jsonResp = resp.getBody();
             log.debug("[NhanhvnClient.getProducts] resp {}", resp);
 

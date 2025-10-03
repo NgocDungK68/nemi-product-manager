@@ -1,6 +1,6 @@
 package com.nemi.service;
 
-import com.nemi.constant.enums.PosStatus;
+import com.nemi.enums.PosStatus;
 import com.nemi.entity.PosEntity;
 import com.nemi.entity.SyncHistoryEntity;
 import com.nemi.exception.TechnicalAlertCode;
