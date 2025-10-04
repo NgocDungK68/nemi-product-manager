@@ -1,10 +1,7 @@
 package com.nemi.entity;
 
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,12 +16,14 @@ import java.time.LocalDateTime;
 @Entity
 @SuperBuilder
 @Table(name = "products", schema = "product_manager")
+@IdClass(ProductId.class)
 public class ProductEntity extends BaseEntity {
     @Id
     @Column(name = "product_id")
     private String productId;
 
-    @Column(name = "posId")
+    @Id
+    @Column(name = "pos_id")
     private String posId;
 
     @Column(name = "code")

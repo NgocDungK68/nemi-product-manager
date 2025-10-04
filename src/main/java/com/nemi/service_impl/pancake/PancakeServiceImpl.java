@@ -95,7 +95,7 @@ public class PancakeServiceImpl implements PosManagementService {
     }
 
     @Override
-    public boolean syncData(String posId) {
+    public boolean syncProduct(String posId) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
                 .startTime(LocalDateTime.now())
