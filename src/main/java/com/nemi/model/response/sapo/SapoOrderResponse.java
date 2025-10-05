@@ -63,6 +63,8 @@ public class SapoOrderResponse {
         private String token;
         @JsonProperty("total_discounts")
         private BigDecimal totalDiscounts;
+        @JsonProperty("shipping_lines")
+        private ShippingLine shippingLines;
         @JsonProperty("total_line_items_price")
         private BigDecimal totalLineItemsPrice;
         @JsonProperty("total_price")
@@ -192,6 +194,15 @@ public class SapoOrderResponse {
         @JsonProperty("tracking_url")
         private String trackingUrl;
     }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ShippingLine {
+        private String title; // shipping_method
+        private BigDecimal price; //shipping_fee
+    }
+
 
     @Data
     @NoArgsConstructor
