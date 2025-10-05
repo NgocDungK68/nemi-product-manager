@@ -10,6 +10,7 @@ import com.nemi.model.response.PosConnectionResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnAccessTokenResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
 import com.nemi.model.response.sapo.SapoAccessTokenResponse;
+import com.nemi.model.response.sapo.SapoOrderResponse;
 import com.nemi.model.response.sapo.SapoProductResponse;
 import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
@@ -22,6 +23,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.Optional;
 
@@ -85,6 +87,47 @@ public class SapoClient {
 
             SapoProductResponse productsResponse =
                     JsonUtils.fromJson(jsonResp, SapoProductResponse.class);
+
+            log.info("[SapoClient.getProducts] Got products response successfully");
+
+            return Optional.of(productsResponse);
+
+        } catch (Exception e) {
+            log.error("[SapoClient.getProducts] Failed: {}", e.getMessage(), e);
+            return Optional.empty();
+        }
+    }
+
+    public Optional<SapoOrderResponse> getOrders(SapoRequest request) {
+
+
+        try {
+            String url = "https://" + request.getStoreName() + ".mysapo.net/admin/orders.json";
+            log.debug("[SapoClient.getProducts] Calling URL: {}", url);
+
+            String urlWithParams = UriComponentsBuilder.fromHttpUrl(url)
+                    .queryParam("limit", request.getLimit())
+                    .queryParam("page", request.getPage())
+                    .toUriString();
+            log.debug("[SapoClient.getProducts] URL with params: {}", urlWithParams);
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("X-Sapo-Access-Token", request.getAccessToken());
+
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            log.debug("[SapoClient.getProducts] Request headers: {}", headers);
+
+            ResponseEntity<String> resp = restTemplate.exchange(urlWithParams, HttpMethod.GET, entity, String.class);
+            String jsonResp = resp.getBody();
+            log.debug("[SapoClient.getProducts] Response: {}", resp);
+
+            if (jsonResp == null || jsonResp.isBlank()) {
+                log.warn("[SapoClient.getProducts] Empty response body (status: {})", resp.getStatusCode());
+                return Optional.empty();
+            }
+
+               SapoOrderResponse productsResponse =
+                    JsonUtils.fromJson(jsonResp, SapoOrderResponse.class);
 
             log.info("[SapoClient.getProducts] Got products response successfully");
 

@@ -29,7 +29,7 @@ public class PancakeConfig {
     }
 
     //---status-----
-    private NhanhvnConfig.OrderConfig order; // ánh xạ nhanhvn.order
+    private OrderConfig order; // ánh xạ nhanhvn.order
 
     @Data
     public static class OrderConfig {

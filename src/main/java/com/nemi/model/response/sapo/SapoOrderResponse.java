@@ -1,195 +1,235 @@
 package com.nemi.model.response.sapo;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.List;
 
-@Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Data
+@JsonIgnoreProperties(ignoreUnknown = true)
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class SapoOrderResponse {
-    
-    @JsonProperty("orders")
-    private List<SapoOrder> orders;
+
+    private List<Order> orders;
 
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class SapoOrder {
-        private Long id; //orderID
-        private LocalDateTime closedOn;
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Order {
+        private Long id;
+        @JsonProperty("buyer_accepts_marketing")
+        private Boolean buyerAcceptsMarketing;
+        @JsonProperty("cancel_reason")
+        private String cancelReason;
+        @JsonProperty("cancelled_on")
+        private String cancelledOn;
+        @JsonProperty("confirmed_on")
+        private String confirmedOn;
         @JsonProperty("created_on")
-        private String createdOn; //created_at
-        @JsonProperty("modified_on")
-        private String modifiedOn; //updated_at
-        @JsonProperty("total_price")
-        private BigDecimal totalPrice;//total_price
+        private String createdOn;
+        private String currency;
+        private String email;
+        private String phone;
+        @JsonProperty("customer_group_id")
+        private Long customerGroupId;
+        @JsonProperty("fulfillment_status")
+        private String fulfillmentStatus;
+        @JsonProperty("financial_status")
+        private String financialStatus;
+        private String status;
+        @JsonProperty("return_status")
+        private String returnStatus;
+        private String name;
+        private String note;
+        private Integer number;
+        @JsonProperty("order_number")
+        private Integer orderNumber;
+        @JsonProperty("processed_on")
+        private String processedOn;
+        @JsonProperty("processing_method")
+        private String processingMethod;
+        @JsonProperty("source_name")
+        private String sourceName;
+        private String source;
+        private String gateway;
+        private String token;
         @JsonProperty("total_discounts")
-        private BigDecimal totalDiscounts; //discount_amount
-        private String name; //code
-        private List<String> paymentGatewayNames; //payment_method(bang chua cong thanh toan)
+        private BigDecimal totalDiscounts;
+        @JsonProperty("total_line_items_price")
+        private BigDecimal totalLineItemsPrice;
+        @JsonProperty("total_price")
+        private BigDecimal totalPrice;
+        @JsonProperty("total_weight")
+        private BigDecimal totalWeight;
         private String tags;
-        private String contactEmail;
+        private User user;
+        private User assignee;
         @JsonProperty("line_items")
-        private List<SapoLineItem> lineItems;
-        @JsonProperty("shipping_lines")
-        private ShippingLine shippingLines;
-        @JsonProperty("billing_address")
-        private SapoAddress billingAddress;
-        @JsonProperty("shipping_address")
-        private SapoAddress shippingAddress;
+        private List<LineItem> lineItems;
         private List<Fulfillment> fulfillments;
-        private SapoCustomer customer;
-
+        @JsonProperty("payment_gateway_names")
+        private List<String> paymentGatewayNames;
+        @JsonProperty("total_shipping_price")
+        private BigDecimal totalShippingPrice;
+        @JsonProperty("total_tax")
+        private BigDecimal totalTax;
+        @JsonProperty("subtotal_price")
+        private BigDecimal subtotalPrice;
     }
 
-    // Supporting classes
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class SapoLineItem {
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class User {
         private Long id;
-        private Long variantId;
-        private String title;
-        private Integer quantity;
+        @JsonProperty("first_name")
+        private String firstName;
+        @JsonProperty("last_name")
+        private String lastName;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class LineItem {
+        private Long id;
         private BigDecimal price;
-        private Integer grams;
-        private String sku;
-        private String variantTitle;
-        private String vendor;
-        private String fulfillmentService;
+        @JsonProperty("total_discount")
+        private BigDecimal totalDiscount;
+        @JsonProperty("fulfillment_status")
+        private String fulfillmentStatus;
+        private Integer quantity;
+        @JsonProperty("current_quantity")
+        private Integer currentQuantity;
+        @JsonProperty("product_id")
         private Long productId;
-        private Boolean requiresShipping;
+        @JsonProperty("variant_id")
+        private Long variantId;
+        private String name;
+        private String title;
+        @JsonProperty("variant_title")
+        private String variantTitle;
+        private String sku;
+        private String vendor;
+        @JsonProperty("discounted_unit_price")
+        private BigDecimal discountedUnitPrice;
+        @JsonProperty("discounted_total")
+        private BigDecimal discountedTotal;
+        @JsonProperty("original_total")
+        private BigDecimal originalTotal;
         private Boolean taxable;
         private Boolean giftCard;
-        private String name;
-        private String variantInventoryManagement;
-        private List<Property> properties;
-        private Boolean productExists;
-        private Integer fulfillableQuantity;
-        private BigDecimal totalDiscount;
-        private String fulfillmentStatus;
-
+        private Boolean requiresShipping;
+        private Boolean deleted;
     }
 
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class SapoAddress {
-        private String firstName;
-        private String address1; //customer_address
-        private String phone; //customer_phone
-        private String city;
-        private String zip;
-        private String province;
-        private String country;
-        private String lastName;
-        private String address2;
-        private String company;
-        private Double latitude;
-        private Double longitude;
-        private String name; //customer_name
-        private String countryCode;
-        private String provinceCode;
-        private String countryName;
-        private Boolean defaultAddress;
-
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class SapoCustomer {
-        private Long id;
-        private String email;
-        private Boolean acceptsMarketing;
-        private LocalDateTime createdOn;
-        private LocalDateTime modifiedOn;
-        private String firstName;
-        private String lastName;
-        private Integer ordersCount;
-        private String state;
-        private BigDecimal totalSpent;
-        private Long lastOrderId;
-        private String note;
-        private Boolean verifiedEmail;
-        private String multipassIdentifier;
-        private Boolean taxExempt;
-        private String tags;
-        private String lastOrderName;
-        private SapoAddress defaultAddress;
-
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class Property {
-        private String name;
-        private String value;
-
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class ShippingLine {
-        private String title; // shipping_method
-        private BigDecimal price; //shipping_fee
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Fulfillment {
         private Long id;
-        private Long orderId;
+        private String name;
         private String status;
-        private LocalDateTime createdOn;
-        private String service;
-        private LocalDateTime modifiedOn;
+        @JsonProperty("shipment_status")
+        private String shipmentStatus;
+        @JsonProperty("origin_address")
+        private OriginAddress originAddress;
+        @JsonProperty("tracking_info")
+        private TrackingInfo trackingInfo;
+        @JsonProperty("line_items")
+        private List<FulfillmentLineItem> lineItems;
+        @JsonProperty("delivery_method")
+        private String deliveryMethod;
+        @JsonProperty("shipping_label_slip_url")
+        private String shippingLabelSlipUrl;
+        @JsonProperty("package_category")
+        private String packageCategory;
+        @JsonProperty("shipment_category")
+        private String shipmentCategory;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class OriginAddress {
+        private String name;
+        private String email;
+        private String phone;
+        private String address1;
+        private String province;
+        private String city;
+        private String country;
+        @JsonProperty("country_code")
+        private String countryCode;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class TrackingInfo {
+        @JsonProperty("tracking_company")
         private String trackingCompany;
+        private String carrier;
+        @JsonProperty("carrier_name")
+        private String carrierName;
+        @JsonProperty("tracking_number")
         private String trackingNumber;
+        @JsonProperty("tracking_numbers")
         private List<String> trackingNumbers;
+        @JsonProperty("tracking_url")
         private String trackingUrl;
-        private List<String> trackingUrls;
-        private Receipt receipt;
-        private List<SapoLineItem> lineItems;
     }
 
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class Receipt {
-        private Boolean testcase;
-        private String authorization;
-
-    }
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class RefundLineItem {
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class FulfillmentLineItem {
         private Long id;
-        private Integer quantity;
+        @JsonProperty("line_item_id")
         private Long lineItemId;
-        private SapoLineItem lineItem;
-
-    }
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class OrderAdjustment {
-        private Long id;
-        private Long orderId;
-        private Long refundId;
-        private BigDecimal amount;
-        private BigDecimal taxAmount;
-        private String kind;
-        private String reason;
+        private BigDecimal price;
+        private BigDecimal totalDiscount;
+        private String fulfillmentStatus;
+        private Integer quantity;
+        @JsonProperty("effective_quantity")
+        private Integer effectiveQuantity;
+        @JsonProperty("product_id")
+        private Long productId;
+        @JsonProperty("variant_id")
+        private Long variantId;
+        private String name;
+        private String title;
+        @JsonProperty("variant_title")
+        private String variantTitle;
+        @JsonProperty("product_title")
+        private String productTitle;
+        private String sku;
+        private String vendor;
+        @JsonProperty("discounted_unit_price")
+        private BigDecimal discountedUnitPrice;
+        @JsonProperty("discounted_total")
+        private BigDecimal discountedTotal;
+        @JsonProperty("original_total")
+        private BigDecimal originalTotal;
+        private Boolean taxable;
+        private Boolean giftCard;
+        @JsonProperty("requires_shipping")
+        private Boolean requiresShipping;
+        @JsonProperty("fulfillment_service")
+        private String fulfillmentService;
     }
 }

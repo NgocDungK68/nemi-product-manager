@@ -16,5 +16,7 @@ public class SapoRequest {
     private String clientId;
     private String clientSecret;
     private String accessToken;
+    private int limit;
+    private int page;
     private Map<String, Object> paginator;
 }
