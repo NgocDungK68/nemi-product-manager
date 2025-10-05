@@ -12,7 +12,7 @@ public interface PosManagementService {
      */
     PosConnectionResponse connectPos(PosConnectionRequest posConnectionRequest);
 
-    boolean syncData(String posId);
+    boolean syncProduct(String posId);
 
     boolean syncOrder(String posId);
 

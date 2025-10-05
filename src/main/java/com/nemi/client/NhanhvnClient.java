@@ -1,9 +1,10 @@
 package com.nemi.client;
 
+import com.nemi.configuration.NhanhvnConfig;
+import com.nemi.constant.NhanhvnConstants;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
-import com.nemi.configuration.NhanhvnConfig;
 import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.request.nhanhvn.NhanhvnAccessTokenRequest;
 import com.nemi.model.request.nhanhvn.NhanhvnRequest;
@@ -11,18 +12,14 @@ import com.nemi.model.response.nhanhvn.NhanhvnAccessTokenResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnOrderResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
 import com.nemi.util.JsonUtils;
+import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -31,19 +28,17 @@ import java.util.Optional;
 @Slf4j
 @Service
 public class NhanhvnClient {
+    @Resource(name = "nhanhvnRestTemplate")
     private final RestTemplate restTemplate;
     private final NhanhvnConfig nhanhvnConfig;
 
     public NhanhvnAccessTokenResponse getAccessToken(PosConnectionRequest posConnectionRequest) {
-        String url = nhanhvnConfig.getBaseUrl() + "/"
-                + nhanhvnConfig.getApiVersion() + "/"
-                + nhanhvnConfig.getUrlAccessToken();
-
-        String urlWithParams = UriComponentsBuilder.fromHttpUrl(url)
-                .queryParam("appId", posConnectionRequest.getAppId())
-                .queryParam("businessId", posConnectionRequest.getBusinessId())
+        String relativeUri = UriComponentsBuilder.fromPath(nhanhvnConfig.getUrlAccessToken())
+                .queryParam(NhanhvnConstants.APP_ID, posConnectionRequest.getAppId())
+                .queryParam(NhanhvnConstants.BUSINESS_ID, posConnectionRequest.getBusinessId())
                 .toUriString();
-        log.debug("[NhanhvnClient.getAccessToken] Request URL with params: {}", url);
+
+        log.debug("[NhanhvnClient.getAccessToken] Calling URL: {}", restTemplate.getUriTemplateHandler().expand(relativeUri));
 
         // 2. Request body chỉ chứa accessCode và secretKey
         NhanhvnAccessTokenRequest requestBody = NhanhvnAccessTokenRequest.builder()
@@ -58,7 +53,7 @@ public class NhanhvnClient {
         log.info("[NhanhvnClient.getAccessToken] Request Entity: {}", headers);
 
         // 3. Gọi API với URL đã có query parameters
-        ResponseEntity<String> resp = restTemplate.exchange(urlWithParams, HttpMethod.POST, entity, String.class);
+        ResponseEntity<String> resp = restTemplate.exchange(relativeUri, HttpMethod.POST, entity, String.class);
         log.info("[NhanhvnClient.getAccessToken] response: {}", resp);
 
         if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
@@ -72,26 +67,28 @@ public class NhanhvnClient {
         log.debug("[NhanhvnClient.getProducts] paginator: {}", request.getPaginator());
 
         try {
-            String url = nhanhvnConfig.getBaseUrl() + "/"
-                    + nhanhvnConfig.getApiVersion() + "/"
-                    + nhanhvnConfig.getUrlProducts()
-                    + "?appId=" + request.getAppId()
-                    + "&businessId=" + request.getBusinessId();
-            log.debug("[NhanhvnClient.getProducts] Calling URL: {}", url);
+            String relativeUri = UriComponentsBuilder.fromPath(nhanhvnConfig.getUrlProducts())
+                    .queryParam(NhanhvnConstants.APP_ID, request.getAppId())
+                    .queryParam(NhanhvnConstants.BUSINESS_ID, request.getBusinessId())
+                    .toUriString();
+
+            log.debug("[NhanhvnClient.getProducts] Calling URL: {}", restTemplate.getUriTemplateHandler().expand(relativeUri));
 
             // build request body
             Map<String, Object> requestBody = new HashMap<>();
-            if (request.getPaginator() != null && !request.getPaginator().isEmpty()) {
-                requestBody.put("paginator", request.getPaginator());
+            if (request.getPaginator() != null) {
+                requestBody.put(NhanhvnConstants.PAGINATOR, request.getPaginator());
+            }
+            if (request.getFilters() != null && !request.getFilters().isEmpty()) {
+                requestBody.put(NhanhvnConstants.FILTERS, request.getFilters());
             }
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("Authorization", request.getAccessToken());
+            headers.set(HttpHeaders.AUTHORIZATION, request.getAccessToken());
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-            log.debug("[NhanhvnClient.getProducts] Calling URL: {}", url);
-            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+            ResponseEntity<String> resp = restTemplate.exchange(relativeUri, HttpMethod.POST, entity, String.class);
             String jsonResp = resp.getBody();
             log.debug("[NhanhvnClient.getProducts] resp {}", resp);
 
@@ -113,30 +110,33 @@ public class NhanhvnClient {
             return Optional.empty();
         }
     }
+
     public Optional<NhanhvnOrderResponse> getOrders(NhanhvnRequest request) {
         log.debug("[NhanhvnClient.getOrders] paginator: {}", request.getPaginator());
 
         try {
-            String url = nhanhvnConfig.getBaseUrl() + "/"
-                    + nhanhvnConfig.getApiVersion() + "/"
-                    + nhanhvnConfig.getUrlOrders()
-                    + "?appId=" + request.getAppId()
-                    + "&businessId=" + request.getBusinessId();
-            log.debug("[NhanhvnClient.getOrders] Calling URL: {}", url);
+            String relativeUri = UriComponentsBuilder.fromPath(nhanhvnConfig.getUrlOrders())
+                    .queryParam(NhanhvnConstants.APP_ID, request.getAppId())
+                    .queryParam(NhanhvnConstants.BUSINESS_ID, request.getBusinessId())
+                    .toUriString();
+
+            log.debug("[NhanhvnClient.getOrders] Calling URL: {}", restTemplate.getUriTemplateHandler().expand(relativeUri));
 
             // build request body
             Map<String, Object> requestBody = new HashMap<>();
-            if (request.getPaginator() != null && !request.getPaginator().isEmpty()) {
-                requestBody.put("paginator", request.getPaginator());
+            if (request.getPaginator() != null) {
+                requestBody.put(NhanhvnConstants.PAGINATOR, request.getPaginator());
+            }
+            if (request.getFilters() != null && !request.getFilters().isEmpty()) {
+                requestBody.put(NhanhvnConstants.FILTERS, request.getFilters());
             }
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("Authorization", request.getAccessToken());
+            headers.set(HttpHeaders.AUTHORIZATION, request.getAccessToken());
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-            log.debug("[NhanhvnClient.getOrders] Calling URL: {}", url);
-            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+            ResponseEntity<String> resp = restTemplate.exchange(relativeUri, HttpMethod.POST, entity, String.class);
             String jsonResp = resp.getBody();
             log.debug("[NhanhvnClient.getOrders] resp {}", resp);
 
@@ -155,53 +155,6 @@ public class NhanhvnClient {
 
         } catch (Exception e) {
             log.error("[NhanhvnClient.getOrders] Failed: {}", e.getMessage(), e);
-            return Optional.empty();
-        }
-    }
-
-    public Optional<NhanhvnProductResponse> getProductById(NhanhvnRequest request, String id) {
-        log.debug("[NhanhvnClient.getProductById] id={}, appId={}, businessId={}", id, request.getAppId(), request.getBusinessId());
-
-        try {
-            String url = nhanhvnConfig.getBaseUrl() + "/"
-                    + nhanhvnConfig.getApiVersion() + "/"
-                    + nhanhvnConfig.getUrlProducts()
-                    + "?appId=" + request.getAppId()
-                    + "&businessId=" + request.getBusinessId();
-
-            log.debug("[NhanhvnClient.getProductById] Calling URL: {}", url);
-
-            // build request body
-            Map<String, Object> requestBody = new HashMap<>();
-            Map<String, String> filters = new HashMap<>();
-            filters.put("ids", id); // đưa id vào mảng
-            requestBody.put("filters", filters);
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("Authorization", request.getAccessToken());
-
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-
-            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
-            String jsonResp = resp.getBody();
-            log.debug("[NhanhvnClient.getProductById] resp={}", resp);
-
-            if (jsonResp == null || jsonResp.isBlank()) {
-                log.warn("[NhanhvnClient.getProductById] Empty response body (status: {})", resp.getStatusCode());
-                return Optional.empty();
-            }
-
-            NhanhvnProductResponse productResponse =
-                    JsonUtils.fromJson(jsonResp, NhanhvnProductResponse.class);
-
-            log.info("[NhanhvnClient.getProductById] Got {} product(s) for id={}",
-                    productResponse.getData() != null ? productResponse.getData().size() : 0, id);
-
-            return Optional.of(productResponse);
-
-        } catch (Exception e) {
-            log.error("[NhanhvnClient.getProductById] Failed for id {}: {}", id, e.getMessage(), e);
             return Optional.empty();
         }
     }

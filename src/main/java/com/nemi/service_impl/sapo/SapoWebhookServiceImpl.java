@@ -1,11 +1,8 @@
 package com.nemi.service_impl.sapo;
 
-import com.nemi.constant.enums.PosName;
+import com.nemi.entity.*;
+import com.nemi.enums.PosName;
 import com.nemi.util.JsonUtils;
-import com.nemi.entity.OrderEntity;
-import com.nemi.entity.OrderItemEntity;
-import com.nemi.entity.ProductEntity;
-import com.nemi.entity.ProductVariantEntity;
 import com.nemi.model.response.sapo.SapoOrderResponse;
 import com.nemi.model.response.sapo.SapoProductResponse;
 import com.nemi.repository.OrderItemRepository;
@@ -172,7 +169,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
             log.info("Deleted variants for product: {}", productId);
 
             // Delete product
-            productRepository.deleteById(String.valueOf(productId));
+            productRepository.deleteById(new ProductId(String.valueOf(productId), posId));
             log.info("Successfully processed Sapo product delete webhook for product: {}", productId);
 
             return true;
@@ -196,7 +193,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
             }
 
             // Find existing product in database
-            Optional<ProductEntity> existingProductOpt = productRepository.findById(String.valueOf(productId));
+            Optional<ProductEntity> existingProductOpt = productRepository.findById(new ProductId(String.valueOf(productId), posId));
             if (existingProductOpt.isEmpty()) {
                 log.warn("Product with ID {} not found in database, creating new product", productId);
                 return processProductWebhook(posId, payload); // Create new product

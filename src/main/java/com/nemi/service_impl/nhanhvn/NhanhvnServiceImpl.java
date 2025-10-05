@@ -4,16 +4,12 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.client.NhanhvnClient;
 import com.nemi.configuration.NhanhvnConfig;
-import com.nemi.constant.enums.PosName;
-import com.nemi.constant.enums.PosStatus;
-import com.nemi.constant.enums.SyncErrorMessage;
-import com.nemi.constant.enums.WeightUnit;
-import com.nemi.entity.OrderEntity;
-import com.nemi.entity.OrderItemEntity;
-import com.nemi.entity.PosEntity;
-import com.nemi.entity.ProductEntity;
-import com.nemi.entity.ProductVariantEntity;
-import com.nemi.entity.SyncHistoryEntity;
+import com.nemi.constant.NhanhvnConstants;
+import com.nemi.entity.*;
+import com.nemi.enums.PosName;
+import com.nemi.enums.PosStatus;
+import com.nemi.enums.SyncErrorMessage;
+import com.nemi.enums.WeightUnit;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
@@ -23,12 +19,7 @@ import com.nemi.model.response.PosConnectionResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnAccessTokenResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnOrderResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
-import com.nemi.repository.OrderItemRepository;
-import com.nemi.repository.OrderRepository;
-import com.nemi.repository.PosRepository;
-import com.nemi.repository.ProductRepository;
-import com.nemi.repository.ProductVariantRepository;
-import com.nemi.repository.SyncHistoryRepository;
+import com.nemi.repository.*;
 import com.nemi.service.PosManagementService;
 import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
@@ -67,14 +58,14 @@ public class NhanhvnServiceImpl implements PosManagementService {
             String userId = claimUtil.getUserId();
 
             Map<String, String> configMap = new HashMap<>();
-            configMap.put("secretId", posConnectionRequest.getAppSecret());
-            configMap.put("appId", posConnectionRequest.getAppId());
-            configMap.put("businessId", posConnectionRequest.getBusinessId());
+            configMap.put(NhanhvnConstants.SECRET_ID, posConnectionRequest.getAppSecret());
+            configMap.put(NhanhvnConstants.APP_ID, posConnectionRequest.getAppId());
+            configMap.put(NhanhvnConstants.BUSINESS_ID, posConnectionRequest.getBusinessId());
 
             NhanhvnAccessTokenResponse tokenResponse = nhanhvnClient.getAccessToken(posConnectionRequest);
 
             if (tokenResponse.getData() == null || tokenResponse.getData().getAccessToken() == null) {
-                log.error("Nhanhvn response is null, stop persist to db {}", tokenResponse);
+                log.error("[NhanhvnServiceImpl.connectPos] Nhanhvn response is null, stop persist to db {}", tokenResponse);
                 throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
             }
 
@@ -92,39 +83,29 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
             posRepository.save(posEntityBuilder);
             PosConnectionResponse posConnectionResponse = PosConnectionResponse.toPosConnectionResponse(posEntityBuilder);
-            log.info("Nhanhvn response is {}", posConnectionResponse);
+            log.info("[NhanhvnServiceImpl.connectPos] Nhanhvn response is {}", posConnectionResponse);
             return posConnectionResponse;
         } catch (Exception e) {
-            log.error("Exchange token failed: {}", e.getMessage(), e);
+            log.error("[NhanhvnServiceImpl.connectPos] Exchange token failed: {}", e.getMessage(), e);
             throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
         }
     }
 
     @Override
-    public boolean syncData(String posId) {
+    public boolean syncProduct(String posId) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
                 .startTime(LocalDateTime.now())
                 .syncStatus(PosStatus.FAIL.name())
                 .build();
         try {
-            // B1: lấy PosEntity và validate posName
+            // lấy PosEntity và validate posName
             PosEntity posEntity = getPos(posId);
+            NhanhvnRequest request = buildRequest(posEntity);
 
-            // B2: parse config
-            Map<String, String> configMap = objectMapper.readValue(
-                    posEntity.getConfig(),
-                    new TypeReference<>() {
-                    }
-            );
-
-            String appId = configMap.get("appId");
-            String businessId = configMap.get("businessId");
-            String accessToken = posEntity.getAccessToken();
-
-            if (appId == null || businessId == null || accessToken == null) {
+            if (isInvalidRequest(request)) {
                 syncHistoryRepository.save(toSyncHistory(history, (SyncErrorMessage.MISSING_CONFIG), false));
-                log.error("Missing required config for posId={}", posId); // throw techial
+                log.error("[NhanhvnServiceImpl.syncProduct] Missing required config for posId={}", posId);
                 return false;
             }
 
@@ -132,23 +113,17 @@ public class NhanhvnServiceImpl implements PosManagementService {
             List<ProductVariantEntity> allVariants = new ArrayList<>();
 
             // set size mỗi page
-            Map<String, Object> paginator = new HashMap<>();
-            paginator.put("size", 50);
-
-            NhanhvnRequest request = NhanhvnRequest.builder()
-                    .appId(appId)
-                    .businessId(businessId)
-                    .accessToken(accessToken)
-                    .paginator(paginator)
-                    .build();
+            NhanhvnRequest.Paginator paginator = new NhanhvnRequest.Paginator();
+            paginator.setSize(50);
+            request.setPaginator(paginator);
 
             while (true) {
                 Optional<NhanhvnProductResponse> responseOpt = nhanhvnClient.getProducts(request);
 
                 if (responseOpt.isEmpty()) {
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
-                    log.error("Missing required config for posId={}", posId);
-                    log.error("Failed to fetch products with paginator: {}", paginator);
+                    log.error("[NhanhvnServiceImpl.syncProduct] Missing required config for posId={}", posId);
+                    log.error("[NhanhvnServiceImpl.syncProduct] Failed to fetch products with paginator: {}", paginator);
                     throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
                 }
 
@@ -159,23 +134,23 @@ public class NhanhvnServiceImpl implements PosManagementService {
                         break;
                     }
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.CONNECTION_FAILED, false));
-                    log.info("No products found with paginator: {}", paginator);
+                    log.info("[NhanhvnServiceImpl.syncProduct] No products found with paginator: {}", paginator);
                     throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
                 }
 
                 // product
                 List<ProductEntity> pageProducts = convertToProductEntities(posId, response.getData());
                 allProducts.addAll(pageProducts);
-                log.info("Fetched {} products, total so far: {}", pageProducts.size(), allProducts.size());
+                log.info("[NhanhvnServiceImpl.syncProduct] Fetched {} products, total so far: {}", pageProducts.size(), allProducts.size());
 
                 // variant
                 List<ProductVariantEntity> pageVariants = convertToVariantEntities(response.getData());
                 allVariants.addAll(pageVariants);
-                log.info("Fetched {} variants, total so far: {}", pageVariants.size(), allVariants.size());
+                log.info("[NhanhvnServiceImpl.syncProduct] Fetched {} variants, total so far: {}", pageVariants.size(), allVariants.size());
 
                 // xử lý next
                 if (response.getPaginator() != null && response.getPaginator().getNext() != null) {
-                    paginator.put("next", response.getPaginator().getNext());
+                    paginator.setNext(response.getPaginator().getNext());
                 } else {
                     break; // hết data
                 }
@@ -184,22 +159,22 @@ public class NhanhvnServiceImpl implements PosManagementService {
             saveAllProductsSync(allProducts);
             saveAllVariantsSync(allVariants);
 
-            log.info("Successfully synced {} products from Nhanh.vn", allProducts.size());
-            log.info("Successfully synced {} variants from Nhanh.vn", allVariants.size());
+            log.info("[NhanhvnServiceImpl.syncProduct] Successfully synced {} products from Nhanh.vn", allProducts.size());
+            log.info("[NhanhvnServiceImpl.syncProduct] Successfully synced {} variants from Nhanh.vn", allVariants.size());
             return true;
 
         } catch (Exception e) {
-            log.error("Failed to sync Nhanh.vn data - {}", e.getMessage(), e);
+            log.error("[NhanhvnServiceImpl.syncProduct] Failed to sync Nhanh.vn data - {}", e.getMessage(), e);
             syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
             return false;
         }
     }
 
     public void saveAllProductsSync(List<ProductEntity> products) {
-        log.info("Saving {} Nhanh.vn products synchronously", products.size());
+        log.info("[NhanhvnServiceImpl.saveAllProductsSync] Saving {} Nhanh.vn products synchronously", products.size());
 
         if (products.isEmpty()) {
-            log.info("No products to save.");
+            log.info("[NhanhvnServiceImpl.saveAllProductsSync] No products to save.");
             return;
         }
 
@@ -210,22 +185,22 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 List<ProductEntity> batch = products.subList(i, endIndex);
 
                 productRepository.saveAll(batch);
-                log.info("Saved batch {}-{} of {} products",
+                log.info("[NhanhvnServiceImpl.saveAllProductsSync] Saved batch {}-{} of {} products",
                         i + 1, endIndex, products.size());
             }
 
-            log.info("Successfully saved all {} Nhanh.vn products", products.size());
+            log.info("[NhanhvnServiceImpl.saveAllProductsSync] Successfully saved all {} Nhanh.vn products", products.size());
         } catch (Exception e) {
-            log.error("Failed to save Nhanh.vn products synchronously: {}", e.getMessage(), e);
+            log.error("[NhanhvnServiceImpl.saveAllProductsSync] Failed to save Nhanh.vn products synchronously: {}", e.getMessage(), e);
             throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_PERSISTENCE_ERROR));
         }
     }
 
     public void saveAllVariantsSync(List<ProductVariantEntity> variants) {
-        log.info("Saving {} Nhanh.vn variants synchronously", variants.size());
+        log.info("[NhanhvnServiceImpl.saveAllVariantsSync] Saving {} Nhanh.vn variants synchronously", variants.size());
 
         if (variants.isEmpty()) {
-            log.info("No variants to save.");
+            log.info("[NhanhvnServiceImpl.saveAllVariantsSync] No variants to save.");
             return;
         }
 
@@ -236,24 +211,24 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 List<ProductVariantEntity> batch = variants.subList(i, endIndex);
 
                 productVariantRepository.saveAll(batch);
-                log.info("Saved batch {}-{} of {} variants",
+                log.info("[NhanhvnServiceImpl.saveAllVariantsSync] Saved batch {}-{} of {} variants",
                         i + 1, endIndex, variants.size());
             }
 
-            log.info("Successfully saved all {} Nhanh.vn variants", variants.size());
+            log.info("[NhanhvnServiceImpl.saveAllVariantsSync] Successfully saved all {} Nhanh.vn variants", variants.size());
         } catch (Exception e) {
-            log.error("Failed to save Nhanh.vn variants synchronously: {}", e.getMessage(), e);
+            log.error("[NhanhvnServiceImpl.saveAllVariantsSync] Failed to save Nhanh.vn variants synchronously: {}", e.getMessage(), e);
             throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_PERSISTENCE_ERROR));
         }
     }
 
-    public PosEntity getPos(String posId) {
-        log.debug("[NhanhvnSyncDataImpl.getPos] posId: {}", posId);
+    private PosEntity getPos(String posId) {
+        log.debug("[NhanhvnServiceImpl.getPos] posId: {}", posId);
 
         // Lấy PosEntity từ DB
         return posRepository.findById(posId)
                 .orElseThrow(() -> {
-                    log.error("Error [NhanhvnSyncDataImpl.getPos] not found posId: {}", posId);
+                    log.error("Error [NhanhvnServiceImpl.getPos] not found posId: {}", posId);
                     return new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_INVALID));
                 });
     }
@@ -378,10 +353,10 @@ public class NhanhvnServiceImpl implements PosManagementService {
     }
 
     public void saveAllOrdersSync(List<OrderEntity> orderEntities) {
-        log.info("Saving {} Nhanh.vn order synchronously", orderEntities.size());
+        log.info("[NhanhvnServiceImpl.saveAllOrdersSync] Saving {} Nhanh.vn orders synchronously", orderEntities.size());
 
         if (orderEntities.isEmpty()) {
-            log.info("No products to save.");
+            log.info("[NhanhvnServiceImpl.saveAllOrdersSync] No order to save.");
             return;
         }
 
@@ -392,22 +367,22 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 List<OrderEntity> batch = orderEntities.subList(i, endIndex);
 
                 orderRepository.saveAll(batch);
-                log.info("Saved batch {}-{} of {} products",
+                log.info("[NhanhvnServiceImpl.saveAllOrdersSync] Saved batch {}-{} of {} orders",
                         i + 1, endIndex, orderEntities.size());
             }
 
-            log.info("Successfully saved all {} Nhanh.vn orders", orderEntities.size());
+            log.info("[NhanhvnServiceImpl.saveAllOrdersSync] Successfully saved all {} Nhanh.vn orders", orderEntities.size());
         } catch (Exception e) {
-            log.error("Failed to save Nhanh.vn orders synchronously: {}", e.getMessage(), e);
+            log.error("[NhanhvnServiceImpl.saveAllOrdersSync] Failed to save Nhanh.vn orders synchronously: {}", e.getMessage(), e);
             throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_PERSISTENCE_ERROR));
         }
     }
 
     public void saveAllOrderItemSync(List<OrderItemEntity> orderItemEntities) {
-        log.info("Saving {} Nhanh.vn order item synchronously", orderItemEntities.size());
+        log.info("[NhanhvnServiceImpl.saveAllOrderItemSync] Saving {} Nhanh.vn order item synchronously", orderItemEntities.size());
 
         if (orderItemEntities.isEmpty()) {
-            log.info("No order items to save.");
+            log.info("[NhanhvnServiceImpl.saveAllOrderItemSync] No order item to save.");
             return;
         }
 
@@ -418,13 +393,13 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 List<OrderItemEntity> batch = orderItemEntities.subList(i, endIndex);
 
                 orderItemRepository.saveAll(batch);
-                log.info("Saved batch {}-{} of {} orders",
+                log.info("[NhanhvnServiceImpl.saveAllOrderItemSync] Saved batch {}-{} of {} order items",
                         i + 1, endIndex, orderItemEntities.size());
             }
 
-            log.info("Successfully saved all {} Nhanh.vn order item", orderItemEntities.size());
+            log.info("[NhanhvnServiceImpl.saveAllOrderItemSync] Successfully saved all {} Nhanh.vn order items", orderItemEntities.size());
         } catch (Exception e) {
-            log.error("Failed to save Nhanh.vn order items synchronously: {}", e.getMessage(), e);
+            log.error("[NhanhvnServiceImpl.saveAllOrderItemSync] Failed to save Nhanh.vn order items synchronously: {}", e.getMessage(), e);
             throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_PERSISTENCE_ERROR));
         }
     }
@@ -437,23 +412,13 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 .syncStatus(PosStatus.FAIL.name())
                 .build();
         try {
-            // B1: lấy PosEntity và validate posName
+            // lấy PosEntity và validate posName
             PosEntity posEntity = getPos(posId);
+            NhanhvnRequest request = buildRequest(posEntity);
 
-            // B2: parse config
-            Map<String, String> configMap = objectMapper.readValue(
-                    posEntity.getConfig(),
-                    new TypeReference<>() {
-                    }
-            );
-
-            String appId = configMap.get("appId");
-            String businessId = configMap.get("businessId");
-            String accessToken = posEntity.getAccessToken();
-
-            if (appId == null || businessId == null || accessToken == null) {
+            if (isInvalidRequest(request)) {
                 syncHistoryRepository.save(toSyncHistory(history, (SyncErrorMessage.MISSING_CONFIG), false));
-                log.error("Missing required config for posId={}", posId); // throw techial
+                log.error("[NhanhvnServiceImpl.syncOrder] Missing required config for posId={}", posId); // throw techial
                 return false;
             }
 
@@ -461,23 +426,17 @@ public class NhanhvnServiceImpl implements PosManagementService {
             List<OrderItemEntity> allOrderItems = new ArrayList<>();
 
             // set size mỗi page
-            Map<String, Object> paginator = new HashMap<>();
-            paginator.put("size", 50);
-
-            NhanhvnRequest request = NhanhvnRequest.builder()
-                    .appId(appId)
-                    .businessId(businessId)
-                    .accessToken(accessToken)
-                    .paginator(paginator)
-                    .build();
+            NhanhvnRequest.Paginator paginator = new NhanhvnRequest.Paginator();
+            paginator.setSize(50);
+            request.setPaginator(paginator);
 
             while (true) {
                 Optional<NhanhvnOrderResponse> responseOpt = nhanhvnClient.getOrders(request);
 
                 if (responseOpt.isEmpty()) {
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
-                    log.error("Missing required config for posId={}", posId);
-                    log.error("Failed to fetch products with paginator: {}", paginator);
+                    log.error("[NhanhvnServiceImpl.syncOrder] Missing required config for posId={}", posId);
+                    log.error("[NhanhvnServiceImpl.syncOrder] Failed to fetch products with paginator: {}", paginator);
                     return false;
                 }
 
@@ -488,23 +447,23 @@ public class NhanhvnServiceImpl implements PosManagementService {
                         break;
                     }
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.CONNECTION_FAILED, false));
-                    log.info("No order found with paginator: {}", paginator);
+                    log.info("[NhanhvnServiceImpl.syncOrder] No order found with paginator: {}", paginator);
                     return false;
                 }
 
                 // order
                 List<OrderEntity> pageOrders = convertToOrderEntities(posId, response.getData());
                 allOrders.addAll(pageOrders);
-                log.info("Fetched {} orders, total so far: {}", pageOrders.size(), pageOrders.size());
+                log.info("[NhanhvnServiceImpl.syncOrder] Fetched {} orders, total so far: {}", pageOrders.size(), pageOrders.size());
 
 
                 List<OrderItemEntity> pageOrderItem = convertToOrderItemEntities(response.getData());
                 allOrderItems.addAll(pageOrderItem);
-                log.info("Fetched {} order items, total so far: {}", pageOrderItem.size(), pageOrderItem.size());
+                log.info("[NhanhvnServiceImpl.syncOrder] Fetched {} order items, total so far: {}", pageOrderItem.size(), pageOrderItem.size());
 
                 // xử lý next
                 if (response.getPaginator() != null && response.getPaginator().getNext() != null) {
-                    paginator.put("next", response.getPaginator().getNext());
+                    paginator.setNext(response.getPaginator().getNext());
                 } else {
                     break; // hết data
                 }
@@ -514,12 +473,12 @@ public class NhanhvnServiceImpl implements PosManagementService {
             saveAllOrderItemSync(allOrderItems);
             syncHistoryRepository.save(toSyncHistory(history, null, true));
 
-            log.info("Successfully synced {} orders from Nhanh.vn", allOrders.size());
-            log.info("Successfully synced {} order items from Nhanh.vn", allOrderItems.size());
+            log.info("[NhanhvnServiceImpl.syncOrder] Successfully synced {} orders from Nhanh.vn", allOrders.size());
+            log.info("[NhanhvnServiceImpl.syncOrder] Successfully synced {} order items from Nhanh.vn", allOrderItems.size());
             return true;
 
         } catch (Exception e) {
-            log.error("Failed to sync Nhanh.vn data order - {}", e.getMessage(), e);
+            log.error("[NhanhvnServiceImpl.syncOrder] Failed to sync Nhanh.vn data order - {}", e.getMessage(), e);
             syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
             return false;
         }
@@ -535,5 +494,33 @@ public class NhanhvnServiceImpl implements PosManagementService {
         syncHistoryEntity.setSyncStatus(PosStatus.SUCCESS.name());
         syncHistoryEntity.setEndTime(LocalDateTime.now());
         return syncHistoryEntity;
+    }
+
+    public NhanhvnRequest buildRequest(PosEntity posEntity) {
+        try {
+            // parse config
+            Map<String, String> configMap = objectMapper.readValue(
+                    posEntity.getConfig(),
+                    new TypeReference<>() {
+                    }
+            );
+
+            String appId = configMap.get(NhanhvnConstants.APP_ID);
+            String businessId = configMap.get(NhanhvnConstants.BUSINESS_ID);
+            String accessToken = posEntity.getAccessToken();
+
+            return NhanhvnRequest.builder()
+                    .appId(appId)
+                    .businessId(businessId)
+                    .accessToken(accessToken)
+                    .build();
+        } catch (Exception e) {
+            log.error("[NhanhvnServiceImpl.buildRequest] Build Nhanh.vn request failed: {}", e.getMessage(), e);
+            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.JSON_PARSE_ERROR));
+        }
+    }
+
+    private boolean isInvalidRequest(NhanhvnRequest request) {
+        return request.getAppId() == null || request.getBusinessId() == null || request.getAccessToken() == null;
     }
 }

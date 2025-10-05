@@ -1,9 +1,7 @@
 package com.nemi.client;
 
 import com.nemi.configuration.PancakeConfig;
-import com.nemi.model.request.nhanhvn.NhanhvnRequest;
 import com.nemi.model.request.pancake.PancakeRequest;
-import com.nemi.model.response.nhanhvn.NhanhvnOrderResponse;
 import com.nemi.model.response.pancake.PancakeOrderResponse;
 import com.nemi.model.response.pancake.PancakeProductResponse;
 import com.nemi.util.JsonUtils;
@@ -14,7 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 

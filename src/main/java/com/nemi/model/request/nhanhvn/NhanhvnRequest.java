@@ -17,5 +17,13 @@ public class NhanhvnRequest {
     private String appId;
     private String businessId;
     private String accessToken;
-    private Map<String, Object> paginator;
+    private Paginator paginator;
+    private Map<String, Object> filters;
+
+    @Data
+    public static class Paginator {
+        private int size;
+        private Object sort;
+        private Object next;
+    }
 }

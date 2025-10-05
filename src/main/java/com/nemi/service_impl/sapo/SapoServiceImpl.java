@@ -3,11 +3,11 @@ package com.nemi.service_impl.sapo;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.client.SapoClient;
+import com.nemi.enums.BatchSize;
+import com.nemi.enums.PosName;
+import com.nemi.enums.PosStatus;
+import com.nemi.enums.SyncErrorMessage;
 import com.nemi.configuration.SapoConfig;
-import com.nemi.constant.enums.BatchSize;
-import com.nemi.constant.enums.PosName;
-import com.nemi.constant.enums.PosStatus;
-import com.nemi.constant.enums.SyncErrorMessage;
 import com.nemi.entity.OrderEntity;
 import com.nemi.entity.OrderItemEntity;
 import com.nemi.entity.PosEntity;
@@ -108,7 +108,7 @@ public class SapoServiceImpl implements PosManagementService {
     }
 
     @Override
-    public boolean syncData(String posId) {
+    public boolean syncProduct(String posId) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
                 .startTime(LocalDateTime.now())
@@ -203,7 +203,6 @@ public class SapoServiceImpl implements PosManagementService {
             return false;
         }
     }
-
 
     private ProductEntity convertToProductEntity(String posId, SapoProductResponse.Product apiProduct) {
         ProductEntity product = new ProductEntity();
@@ -368,7 +367,6 @@ public class SapoServiceImpl implements PosManagementService {
         if (Boolean.FALSE.equals(isSyncSuccess)) {
             syncHistoryEntity.setEndTime(LocalDateTime.now());
             syncHistoryEntity.setErrorMessage(syncErrorMessage != null ? syncErrorMessage.getMessage() : null);
-            syncHistoryEntity.setSyncStatus(PosStatus.FAIL.name());
             return syncHistoryEntity;
         }
         syncHistoryEntity.setSyncStatus(PosStatus.SUCCESS.name());

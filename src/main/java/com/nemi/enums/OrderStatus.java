@@ -1,4 +1,4 @@
-package com.nemi.constant.enums;
+package com.nemi.enums;
 
 public enum OrderStatus {
     NEW("new"),
