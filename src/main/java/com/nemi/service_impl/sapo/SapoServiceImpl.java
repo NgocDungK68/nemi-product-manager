@@ -146,7 +146,7 @@ public class SapoServiceImpl implements PosManagementService {
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
                     log.error("[SapoServiceImpl.syncProduct] Missing required config for posId={}", posId);
                     log.error("[SapoServiceImpl.syncProduct] Failed to fetch products with paginator: {}", paginator);
-                    throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
+                    return false;
                 }
 
                 SapoProductResponse response = responseOpt.get();
