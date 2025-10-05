@@ -51,6 +51,7 @@ public class SapoClient {
             SapoAccessTokenResponse tokenResponse =
                     JsonUtils.fromJson(resp.getBody(), SapoAccessTokenResponse.class);
 
+            assert tokenResponse != null;
             if (tokenResponse.getAccessToken() == null) {
                 log.error("[SapoClient.getAccessToken] Response does not contain accessToken: {}", resp.getBody());
                 throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
@@ -95,6 +96,7 @@ public class SapoClient {
 
             log.info("[SapoClient.getProducts] Got products response successfully");
 
+            assert productsResponse != null;
             return Optional.of(productsResponse);
 
         } catch (Exception e) {
