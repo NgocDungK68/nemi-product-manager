@@ -3,6 +3,7 @@ package com.nemi.service_impl.sapo;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.client.SapoClient;
+import com.nemi.constant.SapoConstants;
 import com.nemi.enums.PosName;
 import com.nemi.enums.PosStatus;
 import com.nemi.enums.SyncErrorMessage;
@@ -27,6 +28,7 @@ import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -61,9 +63,10 @@ public class SapoServiceImpl implements PosManagementService {
             String userId = claimUtil.getUserId();
 
             Map<String, String> configMap = new HashMap<>();
-            configMap.put("clientId", posConnectionRequest.getClientId());
-            configMap.put("clientSecret", posConnectionRequest.getClientSecret());
-            configMap.put("storeName", posConnectionRequest.getStoreName());
+            configMap.put(SapoConstants.CLIENT_ID, posConnectionRequest.getClientId());
+            configMap.put(SapoConstants.CLIENT_SECRET, posConnectionRequest.getClientSecret());
+            configMap.put(SapoConstants.STORE_NAME, posConnectionRequest.getStoreName());
+
 
             SapoAccessTokenResponse tokenResponse = sapoClient.getAccessToken(posConnectionRequest);
             if (tokenResponse.getAccessToken() == null) {
@@ -107,9 +110,9 @@ public class SapoServiceImpl implements PosManagementService {
                     new TypeReference<>() {
                     }
             );
-            String clientId = configMap.get("clientId");
-            String clientSecret = configMap.get("clientSecret");
-            String storeName = configMap.get("storeName");
+            String clientId = configMap.get(SapoConstants.CLIENT_ID);
+            String clientSecret = configMap.get(SapoConstants.CLIENT_SECRET);
+            String storeName = configMap.get(SapoConstants.STORE_NAME);
             String accessToken = posEntity.getAccessToken();
 
             if (clientId == null || clientSecret == null || storeName == null || accessToken == null) {
@@ -140,9 +143,10 @@ public class SapoServiceImpl implements PosManagementService {
                 Optional<SapoProductResponse> responseOpt = sapoClient.getProducts(request);
 
                 if (responseOpt.isEmpty()) {
-                    log.error("[SapoServiceImpl.syncData] response is empty");
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
-                    return false;
+                    log.error("[SapoServiceImpl.syncProduct] Missing required config for posId={}", posId);
+                    log.error("[SapoServiceImpl.syncProduct] Failed to fetch products with paginator: {}", paginator);
+                    throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
                 }
 
                 SapoProductResponse response = responseOpt.get();
@@ -168,7 +172,6 @@ public class SapoServiceImpl implements PosManagementService {
                 if (response.getProducts().size() >= limit) {
                     page++;
                     paginator.put("page", page);
-                    continue;
                 } else {
                     break; // hết data
                 }
@@ -273,6 +276,17 @@ public class SapoServiceImpl implements PosManagementService {
         variant.setWeightUnit(apiVariant.getWeightUnit() != null ? apiVariant.getWeightUnit() : "kg");
 
         // Convert attributes to JSON
+        Map<String, String> attributes = getStringStringMap(apiVariant);
+        variant.setAttributes(JsonUtils.toJson(attributes));
+
+        // Warehouse quantities - for now empty, can be extended later
+        variant.setWarehouseQuantities("{}");
+
+        return variant;
+    }
+
+    @NotNull
+    private static Map<String, String> getStringStringMap(SapoProductResponse.Variant apiVariant) {
         Map<String, String> attributes = new HashMap<>();
         if (apiVariant.getOption1() != null && !apiVariant.getOption1().isEmpty()) {
             attributes.put("option1", apiVariant.getOption1());
@@ -283,12 +297,7 @@ public class SapoServiceImpl implements PosManagementService {
         if (apiVariant.getOption3() != null && !apiVariant.getOption3().isEmpty()) {
             attributes.put("option3", apiVariant.getOption3());
         }
-        variant.setAttributes(JsonUtils.toJson(attributes));
-
-        // Warehouse quantities - for now empty, can be extended later
-        variant.setWarehouseQuantities("{}");
-
-        return variant;
+        return attributes;
     }
 
     public void saveAllProductsSync(List<ProductEntity> products) {

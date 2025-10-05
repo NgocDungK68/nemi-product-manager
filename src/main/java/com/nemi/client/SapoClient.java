@@ -1,5 +1,6 @@
 package com.nemi.client;
 
+import com.nemi.constant.SapoConstants;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
@@ -13,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.Optional;
 
@@ -24,29 +26,39 @@ public class SapoClient {
 
     public SapoAccessTokenResponse getAccessToken(PosConnectionRequest posConnectionRequest) {
         try {
+            // Build full URL dynamically because each merchant has different storeName
+            String baseUrl = "https://" + posConnectionRequest.getStoreName() + ".mysapo.net";
+            String url = UriComponentsBuilder.fromHttpUrl(baseUrl)
+                    .path(SapoConstants.PATH_OAUTH_ACCESS_TOKEN)
+                    .queryParam(SapoConstants.CLIENT_ID, posConnectionRequest.getClientId())
+                    .queryParam(SapoConstants.CLIENT_SECRET, posConnectionRequest.getClientSecret())
+                    .queryParam(SapoConstants.CODE, posConnectionRequest.getCode())
+                    .toUriString();
 
-            String url = "https://" + posConnectionRequest.getStoreName() + ".mysapo.net/admin/oauth/access_token"
-                    + "?client_id=" + posConnectionRequest.getClientId()
-                    + "&client_secret=" + posConnectionRequest.getClientSecret()
-                    + "&code=" + posConnectionRequest.getCode();
+            log.info("[SapoClient.getAccessToken] Calling URL: {}", url);
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            log.info("Sapo Request URL: {}", url);
-            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.POST, new HttpEntity<>(headers), String.class);
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            
+            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
 
             if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
-                log.error("Sapo exchange token failed, status: {}", resp.getStatusCode());
+                log.error("[SapoClient.getAccessToken] Failed, status: {}", resp.getStatusCode());
+                throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
             }
+            
             SapoAccessTokenResponse tokenResponse =
                     JsonUtils.fromJson(resp.getBody(), SapoAccessTokenResponse.class);
 
             if (tokenResponse.getAccessToken() == null) {
-                log.error("Sapo response does not contain accessToken: {}", resp.getBody());
+                log.error("[SapoClient.getAccessToken] Response does not contain accessToken: {}", resp.getBody());
+                throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
             }
+            
             return tokenResponse;
         } catch (Exception e) {
-            log.error("Exchange token failed: {}", e.getMessage(), e);
+            log.error("[SapoClient.getAccessToken] Failed: {}", e.getMessage(), e);
             throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
         }
     }
@@ -55,12 +67,16 @@ public class SapoClient {
         log.debug("[SapoClient.getProducts] paginator: {}", request.getPaginator());
 
         try {
-            String url = "https://" + request.getStoreName() + ".mysapo.net/admin/products.json";
+            String baseUrl = "https://" + request.getStoreName() + ".mysapo.net";
+            String url = UriComponentsBuilder.fromHttpUrl(baseUrl)
+                    .path(SapoConstants.PATH_PRODUCTS)
+                    .toUriString();
+            
             log.debug("[SapoClient.getProducts] Calling URL: {}", url);
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("X-Sapo-Access-Token", request.getAccessToken());
+            headers.set(SapoConstants.X_SAPO_ACCESS_TOKEN, request.getAccessToken());
 
             HttpEntity<String> entity = new HttpEntity<>(headers);
             log.debug("[SapoClient.getProducts] Request headers: {}", headers);

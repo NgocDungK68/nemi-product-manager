@@ -12,4 +12,6 @@ public class SapoConfig {
     private String clientSecret;
     private String accessToken;
     private String url;
+    private String baseUrl;
+    private String storeName;
 }

@@ -26,4 +26,8 @@ public class RestTemplateConfig {
 
         return restTemplate;
     }
+
+    // Note: Sapo doesn't need a dedicated RestTemplate bean because each merchant 
+    // has a different storeName (e.g., store1.mysapo.net, store2.mysapo.net)
+    // So we build the full URL dynamically in SapoClient instead
 }
