@@ -1,10 +1,12 @@
 package com.nemi.client;
 
 import com.nemi.configuration.PancakeConfig;
+import com.nemi.constant.PancakeConstatns;
 import com.nemi.model.request.pancake.PancakeRequest;
 import com.nemi.model.response.pancake.PancakeOrderResponse;
 import com.nemi.model.response.pancake.PancakeProductResponse;
 import com.nemi.util.JsonUtils;
+import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
@@ -19,7 +21,7 @@ import java.util.Optional;
 @Slf4j
 @RequiredArgsConstructor
 public class PancakeClient {
-
+    @Resource(name = "pancakeRestTemplate")
     private final RestTemplate restTemplate;
     private final PancakeConfig pancakeConfig;
 
@@ -27,27 +29,23 @@ public class PancakeClient {
     public Optional<PancakeProductResponse> getProducts(PancakeRequest request) {
 
         try {
-            String url = pancakeConfig.getBaseUrl() + "/"
-                    + "shops" + "/"
-                    + request.getShopId() + "/"
-                    + "products/variations";
-            log.debug("[Pancake.getProducts] Calling URL: {}", url);
 
-            String urlWithParams = UriComponentsBuilder.fromHttpUrl(url)
-                    .queryParam("api_key", request.getApiKey())
+
+            String relativeUri = UriComponentsBuilder.fromPath(request.getShopId() + "/products/variations")
+                    .queryParam(PancakeConstatns.API_KEY, request.getApiKey())
                     .queryParam("page_size", request.getPageSize())
                     .queryParam("page_number", request.getPageNumber())
                     .toUriString();
-            log.debug("[Pancake.getProducts] Calling URL: {}", urlWithParams);
 
+            log.debug("[Pancake.getProducts] Calling relative URI: {}", relativeUri);
             // build request body
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(headers);
-            log.debug("[NhanhvnClient.getProducts] Calling URL: {}", url);
-            ResponseEntity<String> resp = restTemplate.exchange(urlWithParams, HttpMethod.GET, entity, String.class);
+            log.debug("[NhanhvnClient.getProducts] Calling URL: {}", relativeUri);
+            ResponseEntity<String> resp = restTemplate.exchange(relativeUri, HttpMethod.GET, entity, String.class);
             String jsonResp = resp.getBody();
             log.debug("[PancakeClient.getProducts] resp {}", resp);
 
@@ -74,28 +72,22 @@ public class PancakeClient {
         log.debug("[Pancake.getOrders] with pagesize {} and page number", request.getPageSize(),request.getPageNumber());
 
         try {
-            String url = pancakeConfig.getBaseUrl() + "/"
-                    + "shops" + "/"
-                    + request.getShopId() + "/"
-                    + "orders";
-            log.debug("[Pancake.getProducts] Calling URL: {}", url);
 
-            String urlWithParams = UriComponentsBuilder.fromHttpUrl(url)
-                    .queryParam("api_key", request.getApiKey())
+            String relativeUri = UriComponentsBuilder.fromPath(request.getShopId() + "/orders")
+                    .queryParam(PancakeConstatns.API_KEY, request.getApiKey())
                     .queryParam("page_size", request.getPageSize())
                     .queryParam("page_number", request.getPageNumber())
                     .toUriString();
-            log.debug("[Pancake.getProducts] Calling URL: {}", urlWithParams);
 
-            log.debug("[Pancake.getOrders] Calling URL: {}", url);
+            log.debug("[Pancake.getProducts] Calling relative URI: {}", relativeUri);
 
             // build request body
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(headers);
-            log.debug("[PancakeClient.getProducts] Calling URL: {}", url);
-            ResponseEntity<String> resp = restTemplate.exchange(urlWithParams, HttpMethod.GET, entity, String.class);
+            log.debug("[PancakeClient.getProducts] Calling URL: {}", relativeUri);
+            ResponseEntity<String> resp = restTemplate.exchange(relativeUri, HttpMethod.GET, entity, String.class);
             String jsonResp = resp.getBody();
             log.debug("[PancakeClient.getProducts] resp {}", resp);
 

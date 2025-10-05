@@ -10,11 +10,13 @@ import org.springframework.web.util.DefaultUriBuilderFactory;
 @RequiredArgsConstructor
 public class RestTemplateConfig {
     private final NhanhvnConfig nhanhvnConfig;
+    private final PancakeConfig pancakeConfig;
 
     @Bean
     public RestTemplate restTemplate() {
         return new RestTemplate();
     }
+
 
     @Bean("nhanhvnRestTemplate")
     public RestTemplate nhanhvnRestTemplate() {
@@ -22,6 +24,16 @@ public class RestTemplateConfig {
 
         restTemplate.setUriTemplateHandler(new DefaultUriBuilderFactory(
                 nhanhvnConfig.getBaseUrl() + "/" + nhanhvnConfig.getApiVersion() + "/")
+        );
+
+        return restTemplate;
+    }
+    @Bean("pancakeRestTemplate")
+    public RestTemplate pancakeRestTemplate() {
+        RestTemplate restTemplate = new RestTemplate();
+
+        restTemplate.setUriTemplateHandler(new DefaultUriBuilderFactory(
+                pancakeConfig.getBaseUrl() + "/shops/")
         );
 
         return restTemplate;

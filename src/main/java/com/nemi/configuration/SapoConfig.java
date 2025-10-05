@@ -14,6 +14,7 @@ public class SapoConfig {
     private String clientSecret;
     private String accessToken;
     private String url;
+    private BatchConfig sync;
     //---status-----
 
     private OrderConfig order;
@@ -26,5 +27,12 @@ public class SapoConfig {
         public static class StatusConfig {
             private Map<String, String> mapping;
         }
+    }
+    @Data
+    public static class BatchConfig {
+        private int order;
+        private int orderItem;
+        private int product;
+        private int pageStart;
     }
 }

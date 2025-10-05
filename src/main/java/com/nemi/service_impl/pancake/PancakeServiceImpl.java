@@ -30,6 +30,7 @@ import com.nemi.repository.SyncHistoryRepository;
 import com.nemi.service.PosManagementService;
 import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -53,10 +54,19 @@ public class PancakeServiceImpl implements PosManagementService {
     private final OrderItemRepository orderItemRepository;
     private final PancakeConfig pancakeConfig;
 
-    int orderBatchSize = BatchSize.ORDER.getSize();
-    int orderItemBatchSize = BatchSize.ORDER_ITEM.getSize();
-    int productBatchSize = BatchSize.PRODUCT.getSize();
-    int pageStartNumber = BatchSize.PAGE_NUMBER.getSize();
+    private int orderBatchSize;
+    private int orderItemBatchSize;
+    private int productBatchSize;
+    private int pageStartNumber;
+
+    @PostConstruct
+    public void init() {
+        orderBatchSize = pancakeConfig.getSync().getOrder();
+        orderItemBatchSize = pancakeConfig.getSync().getOrderItem();
+        productBatchSize = pancakeConfig.getSync().getProduct();
+        pageStartNumber = pancakeConfig.getSync().getPageStart();
+    }
+
 
     @Override
     public String getPosName() {
@@ -131,6 +141,7 @@ public class PancakeServiceImpl implements PosManagementService {
                 if (responseOpt.isEmpty()) {
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.PRODUCT_CONNECTION_FAILED, false));
                     log.error("No response from Pancake API when fetching products, posId={}", posId);
+                    saveAllProductsSync(allProducts);
                     return false;
                 }
 
@@ -138,6 +149,7 @@ public class PancakeServiceImpl implements PosManagementService {
                 if (!response.isSuccess()) {
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.PRODUCT_INVALID_CREDENTIAL, false));
                     log.error("Invalid API key or shopId when fetching products, posId={}", posId);
+                    saveAllProductsSync(allProducts);
                     return false;
                 }
 
