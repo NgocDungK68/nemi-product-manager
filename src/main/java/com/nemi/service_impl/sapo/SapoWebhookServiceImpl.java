@@ -115,7 +115,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
             // Process variants if any
             if (payload.getVariants() != null && !payload.getVariants().isEmpty()) {
                 for (SapoProductResponse.Variant variant : payload.getVariants()) {
-                    ProductVariantEntity variantEntity = convertToVariantEntity(variant, payload.getId());
+                    ProductVariantEntity variantEntity = convertToVariantEntity(posId, variant, payload.getId());
                     productVariantRepository.save(variantEntity);
                     log.info("Successfully saved variant: {} for product: {}",
                             variantEntity.getVariantId(), product.getProductId());
@@ -252,7 +252,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
 
                 // Save new variants
                 for (SapoProductResponse.Variant variant : payload.getVariants()) {
-                    ProductVariantEntity variantEntity = convertToVariantEntity(variant, productId);
+                    ProductVariantEntity variantEntity = convertToVariantEntity(posId, variant, productId);
                     productVariantRepository.save(variantEntity);
                     log.info("Updated variant: {} for product: {}", variantEntity.getVariantId(), productId);
                 }
@@ -303,9 +303,10 @@ public class SapoWebhookServiceImpl implements WebhookService {
     /**
      * Convert Sapo variant to ProductVariantEntity
      */
-    private ProductVariantEntity convertToVariantEntity(SapoProductResponse.Variant variant, Long productId) {
+    private ProductVariantEntity convertToVariantEntity(String posId, SapoProductResponse.Variant variant, Long productId) {
         return ProductVariantEntity.builder()
                 .variantId(String.valueOf(variant.getId()))
+                .posId(posId)
                 .productId(String.valueOf(productId))
                 .sku(variant.getSku())
                 .barcode(variant.getBarcode())

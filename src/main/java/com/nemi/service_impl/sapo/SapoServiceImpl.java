@@ -146,9 +146,9 @@ public class SapoServiceImpl implements PosManagementService {
                     new TypeReference<>() {
                     }
             );
-            String clientId = configMap.get(SapoConstants.CLIENT_ID);
-            String clientSecret = configMap.get(SapoConstants.CLIENT_SECRET);
-            String storeName = configMap.get(SapoConstants.STORE_NAME);
+            String clientId = configMap.get("clientId");
+            String clientSecret = configMap.get("clientSecret");
+            String storeName = configMap.get("storeName");
             String accessToken = posEntity.getAccessToken();
 
             if (clientId == null || clientSecret == null || storeName == null || accessToken == null) {
@@ -197,7 +197,7 @@ public class SapoServiceImpl implements PosManagementService {
 
                     // Convert variants
                     if (sapoProduct.getVariants() != null && !sapoProduct.getVariants().isEmpty()) {
-                        List<ProductVariantEntity> variants = convertToVariantEntities(productEntity.getProductId(), sapoProduct.getVariants());
+                        List<ProductVariantEntity> variants = convertToVariantEntities(posId, productEntity.getProductId(), sapoProduct.getVariants());
                         allVariants.addAll(variants);
                     }
                 }
@@ -263,17 +263,18 @@ public class SapoServiceImpl implements PosManagementService {
         return product;
     }
 
-    private List<ProductVariantEntity> convertToVariantEntities(String productId, List<SapoProductResponse.Variant> apiVariants) {
+    private List<ProductVariantEntity> convertToVariantEntities(String posId, String productId, List<SapoProductResponse.Variant> apiVariants) {
         return apiVariants.stream()
-                .map(apiVariant -> convertToVariantEntity(productId, apiVariant))
+                .map(apiVariant -> convertToVariantEntity(posId, productId, apiVariant))
                 .collect(Collectors.toList());
     }
 
-    private ProductVariantEntity convertToVariantEntity(String productId, SapoProductResponse.Variant apiVariant) {
+    private ProductVariantEntity convertToVariantEntity(String posId, String productId, SapoProductResponse.Variant apiVariant) {
         ProductVariantEntity variant = new ProductVariantEntity();
 
         // Required fields
         variant.setVariantId(String.valueOf(apiVariant.getId()));
+        variant.setPosId(posId);
         variant.setProductId(productId);
 
         // Handle nullable fields with defaults
