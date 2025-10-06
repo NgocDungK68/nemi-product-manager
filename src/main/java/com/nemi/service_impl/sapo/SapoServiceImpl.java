@@ -19,6 +19,7 @@ import com.nemi.model.request.sapo.SapoRequest;
 import com.nemi.model.response.PosConnectionResponse;
 import com.nemi.model.response.sapo.SapoAccessTokenResponse;
 import com.nemi.model.response.sapo.SapoProductResponse;
+import com.nemi.model.response.sapo.SapoWebhookResponse;
 import com.nemi.repository.PosRepository;
 import com.nemi.repository.ProductRepository;
 import com.nemi.repository.ProductVariantRepository;
@@ -84,6 +85,15 @@ public class SapoServiceImpl implements PosManagementService {
                     .build();
 
             posRepository.save(posEntityBuilder);
+            
+            // Register webhooks
+            List<SapoWebhookResponse> webhooks = sapoClient.registerWebhook(
+                    posConnectionRequest.getStoreName(),
+                    tokenResponse.getAccessToken(),
+                    posEntityBuilder.getId()
+            );
+            log.info("Registered {} webhooks for POS: {}", webhooks.size(), posEntityBuilder.getId());
+            
             PosConnectionResponse posConnectionResponse = PosConnectionResponse.toPosConnectionResponse(posEntityBuilder);
             log.info("Sapo response is {}", posConnectionResponse);
             return posConnectionResponse;

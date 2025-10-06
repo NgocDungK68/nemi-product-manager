@@ -96,6 +96,26 @@ sapo:
   client-secret: 50ce6b4d47a04ca18aa6f972b698779a
   access-token: 59d0c4eea0fc497e81733f693d3e4641
   url: https://nemi-test.mysapo.net/
+  url-register-webhook: https://nemi-dev-02.ecombase.net/nemi-product-manager/webhook/v1/sapo/
+  # API Paths
+  path-oauth-access-token: /admin/oauth/access_token
+  path-products: /admin/products.json
+  path-webhooks: /admin/webhooks.json
+  webhook:
+    topic:
+      - orders/create
+      - orders/delete
+      - orders/updated
+      - orders/paid                # Khi đơn hàng được thanh toán thành công
+      - orders/cancelled           # Khi đơn hàng bị hủy
+      - orders/fulfilled           # Khi đơn hàng đã được giao (hoàn tất)
+      - orders/partially_fulfilled # Khi đơn hàng được giao một phần
+
+      # Product events
+      - products/create
+      - products/update
+      - products/delete
+
 
 secret:
   jwt-public-key: "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArh1qU7sGe0uiquAuZo9+T4RTLZoG5NdtHtPCxcFp04EaTJFF+EmN/hwC0v3BXjNbvHYOPfUkmZ98QGeGXE6Q8xp3RGJafrmg6IAOzcWVSaVS4X0hlZjUNs5gW197ojhCCPRuWUSdSmAJG1i+CLQPn+pCBK7Wy2sJ6JTVtnuvs6LaUeqL9B7yE4LaMgEJo9ubi/TCrkD6dI4mxrqsVQVDpaHxau+sZbBsbGD/V4rWfFv7XqAbqWbam3gF/Qr2q/321sLkYjoSEG5sLxaDLgrDPk2moZ1PyLtuDpeF1DWygcK7XRsZjD3j4LkV2K4Ubi+P2wQCI+oZfM1XVlslzKKnVQIDAQAB"

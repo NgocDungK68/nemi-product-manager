@@ -1,5 +1,6 @@
 package com.nemi.service_impl.sapo;
 
+import com.nemi.client.SapoClient;
 import com.nemi.entity.*;
 import com.nemi.enums.PosName;
 import com.nemi.util.JsonUtils;
@@ -64,8 +65,9 @@ public class SapoWebhookServiceImpl implements WebhookService {
                     log.error("Failed to parse webhook payload ");
                     return false;
                 }
+            
                 
-                // 4. Process webhook data based on event type
+                // 5. Process webhook data based on event type
                 String topic = request.getHeader("x-sapo-topic");
                 return switch (topic) {
                     case "products/create" -> processProductWebhook(posId, payloadProduct);
@@ -117,7 +119,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
     }
 
     /**
-     * Process product create/update webhook
+     * Process product create webhook
      */
 
     private boolean processProductWebhook(String posId, SapoProductResponse.Product payload) {
