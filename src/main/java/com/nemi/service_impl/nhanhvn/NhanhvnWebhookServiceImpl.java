@@ -119,7 +119,9 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
 
         // Kiểm tra xem data có phải sản phẩm con không
         if (newVariant.getParentId() != -1) {
-            Optional<ProductVariantEntity> parentOfVariantEntity = variantRepository.findByVariantId(String.valueOf(newVariant.getParentId()));
+            VariantId variantId = new VariantId(String.valueOf(newVariant.getParentId()), posId);
+            Optional<ProductVariantEntity> parentOfVariantEntity = variantRepository.findById(variantId);
+
             if (parentOfVariantEntity.isPresent()) {
                 // logic chuyển variant lên bảng products
                 NhanhvnProductResponse.ProductData parentOfVariant = getProductById(posId, parentOfVariantEntity.get().getVariantId());
@@ -132,7 +134,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
                 productRepository.save(parentEntity);
                 log.info("[NhanhvnWebhookServiceImpl.handleProductAdd] Converted variant with id={} to product", parentEntity.getProductId());
 
-                variantRepository.deleteByVariantId(String.valueOf(newVariant.getParentId()));
+                variantRepository.deleteById(variantId);
                 log.info("[NhanhvnWebhookServiceImpl.handleProductAdd] Deleted variant with id={} because it is now a parent product", newVariant.getParentId());
             }
         }
@@ -195,7 +197,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
         } else {  // Trường hợp call về body sản phẩm con
             // Kiểm tra xem sản phẩm cha của productData có đang thuộc bảng product_variant không
             Optional<ProductVariantEntity> parentOfVariantEntity =
-                    variantRepository.findByVariantId(String.valueOf(productData.getParentId()));
+                    variantRepository.findById(new VariantId(String.valueOf(productData.getParentId()), posId));
             if (parentOfVariantEntity.isPresent()) {
                 // thêm sản phẩm cha vào bảng products
                 NhanhvnProductResponse.ProductData parentProduct = getProductById(posId, String.valueOf(productData.getParentId()));
@@ -208,7 +210,8 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
                 log.info("[NhanhvnWebhookServiceImpl.handleProductUpdate] Converted variant with id={} to product", parentProductEntity.getProductId());
 
                 // Xóa sản phẩm lúc này là cha ở bảng variant_product
-                variantRepository.deleteByVariantId(String.valueOf(parentOfVariantEntity.get().getVariantId()));
+                variantRepository.deleteById(new VariantId(String.valueOf(parentOfVariantEntity.get().getVariantId()), posId));
+
                 log.info("[NhanhvnWebhookServiceImpl.handleProductUpdate] Deleted variant with id={} because it is now a parent product", parentOfVariantEntity.get().getVariantId());
             }
         }
@@ -233,8 +236,8 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
         }
 
         String id = ids.get(0);
-
-        Optional<ProductVariantEntity> variantEntity = variantRepository.findByVariantId(id);
+        VariantId variantId = new VariantId(id, posId);
+        Optional<ProductVariantEntity> variantEntity = variantRepository.findById(variantId);
         if (variantEntity.isEmpty()) {
             log.warn("[NhanhvnWebhookServiceImpl.handleProductDelete] Failed to find variant with id={}", id);
             return false;
@@ -271,7 +274,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
             log.info("[NhanhvnWebhookServiceImpl.handleProductDelete] Parent of variant with id={} is still parent product", variantEntity.get().getVariantId());
         }
 
-        variantRepository.deleteByVariantId(id);
+        variantRepository.deleteById(variantId);
         log.info("[NhanhvnWebhookServiceImpl.handleProductDelete] Deleted variant with id={} from posId={}", id, posId);
         return true;
     }
