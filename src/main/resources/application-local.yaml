@@ -60,7 +60,11 @@ nhanhvn:
         72: "returned"      # Đã chuyển hoàn
         73: "returned"      # Đổi kho xuất hàng
         74: "returned"      # Xác nhận hoàn
-
+  sync:
+    order: 100
+    order-item: 200
+    product: 100
+    page-start: 1
 pancake:
   secret: elqsF9ERiFWGacWQO9Gg5XC4kXojot
   base-url: https://pos.pages.fm/api/v1
@@ -70,10 +74,6 @@ pancake:
   retry:
     max-attempts: 3
     backoff-delay: 2000
-  sync:
-    page-size: 50 # So luong ban ghi lay ve trong 1 lan
-    batch-size: 100 # So luong ban ghi xu ly trong 1 lan
-    max-concurrent: 1 # So request dong thoi
   order:
     status:
       mapping:
@@ -91,6 +91,12 @@ pancake:
         4: "returned"       # Đang hoàn
         15: "returned"       # Hoàn một phần (⚠️ partial return – note riêng nếu cần)
         5: "returned"       # Đã hoàn
+  sync:
+    order: 100
+    order-item: 200
+    product: 100
+    page-start: 1
+
 sapo:
   client-id: 50f184d93c834ebaa764cc17c25e31fa
   client-secret: 50ce6b4d47a04ca18aa6f972b698779a
@@ -115,6 +121,18 @@ sapo:
       - products/create
       - products/update
       - products/delete
+
+  order:
+    status:
+      mapping:
+        open: "processing"     # Tất cả các order đang hoạt động
+        closed: "delivered"    # Các order đã lưu trữ
+        cancelled: "cancelled" # Các order bị hủy
+  sync:
+    order: 100
+    order-item: 200
+    product: 100
+    page-start: 1
 
 
 secret:

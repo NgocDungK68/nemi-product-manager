@@ -3,14 +3,15 @@ package com.nemi.service_impl.sapo;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.client.SapoClient;
+import com.nemi.configuration.SapoConfig;
 import com.nemi.constant.SapoConstants;
+import com.nemi.entity.*;
 import com.nemi.enums.PosName;
 import com.nemi.enums.PosStatus;
 import com.nemi.enums.SyncErrorMessage;
-import com.nemi.entity.PosEntity;
-import com.nemi.entity.ProductEntity;
-import com.nemi.entity.ProductVariantEntity;
-import com.nemi.entity.SyncHistoryEntity;
+import com.nemi.enums.PosName;
+import com.nemi.enums.PosStatus;
+import com.nemi.enums.SyncErrorMessage;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
@@ -18,8 +19,11 @@ import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.request.sapo.SapoRequest;
 import com.nemi.model.response.PosConnectionResponse;
 import com.nemi.model.response.sapo.SapoAccessTokenResponse;
+import com.nemi.model.response.sapo.SapoOrderResponse;
 import com.nemi.model.response.sapo.SapoProductResponse;
 import com.nemi.model.response.sapo.SapoWebhookResponse;
+import com.nemi.repository.OrderItemRepository;
+import com.nemi.repository.OrderRepository;
 import com.nemi.repository.PosRepository;
 import com.nemi.repository.ProductRepository;
 import com.nemi.repository.ProductVariantRepository;
@@ -27,17 +31,24 @@ import com.nemi.repository.SyncHistoryRepository;
 import com.nemi.service.PosManagementService;
 import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
+import jakarta.annotation.PostConstruct;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @Slf4j
@@ -51,6 +62,21 @@ public class SapoServiceImpl implements PosManagementService {
     private final ProductVariantRepository productVariantRepository;
     private final SyncHistoryRepository syncHistoryRepository;
     private final ObjectMapper objectMapper;
+    private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
+    private final SapoConfig sapoConfig;
+    private int orderBatchSize;
+    private int orderItemBatchSize;
+    private int productBatchSize;
+    private int pageStartNumber;
+
+    @PostConstruct
+    public void init() {
+        orderBatchSize = sapoConfig.getSync().getOrder();
+        orderItemBatchSize = sapoConfig.getSync().getOrderItem();
+        productBatchSize = sapoConfig.getSync().getProduct();
+        pageStartNumber = sapoConfig.getSync().getPageStart();
+    }
 
 
     @Override
@@ -120,9 +146,9 @@ public class SapoServiceImpl implements PosManagementService {
                     new TypeReference<>() {
                     }
             );
-            String clientId = configMap.get(SapoConstants.CLIENT_ID);
-            String clientSecret = configMap.get(SapoConstants.CLIENT_SECRET);
-            String storeName = configMap.get(SapoConstants.STORE_NAME);
+            String clientId = configMap.get("clientId");
+            String clientSecret = configMap.get("clientSecret");
+            String storeName = configMap.get("storeName");
             String accessToken = posEntity.getAccessToken();
 
             if (clientId == null || clientSecret == null || storeName == null || accessToken == null) {
@@ -153,9 +179,8 @@ public class SapoServiceImpl implements PosManagementService {
                 Optional<SapoProductResponse> responseOpt = sapoClient.getProducts(request);
 
                 if (responseOpt.isEmpty()) {
+                    log.error("[SapoServiceImpl.syncData] response is empty");
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
-                    log.error("[SapoServiceImpl.syncProduct] Missing required config for posId={}", posId);
-                    log.error("[SapoServiceImpl.syncProduct] Failed to fetch products with paginator: {}", paginator);
                     return false;
                 }
 
@@ -198,11 +223,6 @@ public class SapoServiceImpl implements PosManagementService {
             syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
             return false;
         }
-    }
-
-    @Override
-    public boolean syncOrder(String posId) {
-        return false;
     }
 
     public PosEntity getPos(String posId) {
@@ -391,5 +411,197 @@ public class SapoServiceImpl implements PosManagementService {
         syncHistoryEntity.setSyncStatus(PosStatus.SUCCESS.name());
         syncHistoryEntity.setEndTime(LocalDateTime.now());
         return syncHistoryEntity;
+    }
+
+    //-------------------------------------------------------------------------------------------
+    private List<OrderEntity> convertToOrderEntities(String posId, List<SapoOrderResponse.Order> apiOrders) {
+        return apiOrders.stream()
+                .map(orders -> convertToOrderEntity(posId, orders))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    public OrderEntity convertToOrderEntity(String posId, SapoOrderResponse.Order order) {
+
+        Map<String, String> mapping = sapoConfig.getOrder().getStatus().getMapping();
+        String status = mapping.getOrDefault(order.getStatus(), "unknown");
+
+        SapoOrderResponse.Fulfillment fulfillment = order.getFulfillments() != null && !order.getFulfillments().isEmpty()
+                ? order.getFulfillments().get(0)
+                : null;
+        SapoOrderResponse.OriginAddress origin = fulfillment != null ? fulfillment.getOriginAddress() : null;
+
+        return OrderEntity.builder()
+                .posId(posId)
+                .orderId(order.getId().toString())
+                .orderCode(order.getName())
+                .customerName(origin != null ? origin.getName() : null)
+                .customerPhone(origin != null ? origin.getPhone() : null)
+                .customerEmail(origin != null ? origin.getEmail() : null)
+                .shippingAddress(origin != null
+                        ? String.join(", ",
+                        Stream.of(origin.getAddress1(), origin.getProvince(), origin.getCity())
+                                .filter(Objects::nonNull)
+                                .toList())
+                        : null)
+                .status(status.toUpperCase())
+                .paymentMethod(order.getPaymentGatewayNames() != null && !order.getPaymentGatewayNames().isEmpty()
+                        ? order.getPaymentGatewayNames().get(0)
+                        : null)
+                .shippingMethod(fulfillment != null ? fulfillment.getDeliveryMethod() : null)
+                .totalPrice(order.getTotalPrice())
+                .shippingFee(BigDecimal.ZERO)
+                .discountAmount(order.getTotalDiscounts() != null ? order.getTotalDiscounts().doubleValue() : 0.0)
+                .build();
+    }
+
+    private List<OrderItemEntity> convertToOrderItemEntities(List<SapoOrderResponse.Order> apiOrders) {
+        List<OrderItemEntity> orderItemEntities = new ArrayList<>();
+        for (SapoOrderResponse.Order orderData : apiOrders) {
+            orderItemEntities.addAll(convertToOrderItemEntity(orderData));
+        }
+        return orderItemEntities;
+    }
+
+    public List<OrderItemEntity> convertToOrderItemEntity(SapoOrderResponse.Order apiOrder) {
+        List<OrderItemEntity> orderItemEntities = new ArrayList<>();
+        for (SapoOrderResponse.LineItem product : apiOrder.getLineItems()) {
+            orderItemEntities.add(OrderItemEntity.builder()
+                    .orderItemId(String.valueOf(product.getId()))
+                    .orderId(String.valueOf(apiOrder.getId()))
+                    .quantity(product.getQuantity())
+                    .sku(product.getSku())
+                    .variantName(product.getVariantTitle())
+                    .price(product.getPrice())
+                    .totalPrice(product.getTotalDiscount())
+                    .productName(product.getName())
+                    .fulfillableQuantity(product.getCurrentQuantity())
+                    .createdBy(claimUtil.getUserName())
+                    .build());
+        }
+        return orderItemEntities;
+    }
+
+    public void saveAllOrdersSync(List<OrderEntity> orderEntities) {
+        log.info("Saving {} Pancake orders synchronously", orderEntities.size());
+        if (orderEntities.isEmpty()) {
+            log.info("No orders to save.");
+            return;
+        }
+        try {
+            int batchSize = orderBatchSize;
+            for (int i = 0; i < orderEntities.size(); i += batchSize) {
+                int endIndex = Math.min(i + batchSize, orderEntities.size());
+                List<OrderEntity> batch = orderEntities.subList(i, endIndex);
+                orderRepository.saveAll(batch);
+                log.info("Saved batch {}-{} of {} orders", i + 1, endIndex, orderEntities.size());
+            }
+            log.info("Successfully saved all {} Pancake orders", orderEntities.size());
+        } catch (Exception e) {
+            log.error("Failed to save Pancake orders synchronously: {}", e.getMessage(), e);
+            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_PERSISTENCE_ERROR));
+        }
+    }
+
+    public void saveAllOrderItemSync(List<OrderItemEntity> orderItemEntities) {
+        log.info("Saving {} Pancake order items synchronously", orderItemEntities.size());
+        if (orderItemEntities.isEmpty()) {
+            log.info("No order items to save.");
+            return;
+        }
+        try {
+            int batchSize = orderItemBatchSize;
+            for (int i = 0; i < orderItemEntities.size(); i += batchSize) {
+                int endIndex = Math.min(i + batchSize, orderItemEntities.size());
+                List<OrderItemEntity> batch = orderItemEntities.subList(i, endIndex);
+                orderItemRepository.saveAll(batch);
+                log.info("Saved batch {}-{} of {} order items", i + 1, endIndex, orderItemEntities.size());
+            }
+            log.info("Successfully saved all {} Pancake order items", orderItemEntities.size());
+        } catch (Exception e) {
+            log.error("Failed to save Pancake order items synchronously: {}", e.getMessage(), e);
+            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_PERSISTENCE_ERROR));
+        }
+    }
+
+
+    @Override
+    public boolean syncOrder(String posId) {
+        SyncHistoryEntity history = SyncHistoryEntity.builder()
+                .posId(posId)
+                .startTime(LocalDateTime.now())
+                .syncStatus(PosStatus.FAIL.name())
+                .build();
+        try {
+            PosEntity posEntity = getPos(posId);
+
+            Map<String, String> configMap = objectMapper.readValue(
+                    posEntity.getConfig(), new TypeReference<>() {
+                    });
+            String cliendId = configMap.get("clientId");
+            String clientSecret = configMap.get("clientSecret");
+            String storeName = configMap.get("storeName");
+            String accessToken = posEntity.getAccessToken();
+
+            if (cliendId == null || clientSecret == null || storeName == null || accessToken == null) {
+                syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.MISSING_CONFIG, false));
+                log.error("Missing required config for posId={}", posId);
+                return false;
+            }
+
+            int pageNumber = pageStartNumber;
+            List<OrderEntity> allOrders = new ArrayList<>();
+            List<OrderItemEntity> allOrderItems = new ArrayList<>();
+
+            SapoRequest request = SapoRequest.builder()
+                    .limit(orderBatchSize)
+                    .page(pageNumber)
+                    .storeName(storeName)
+                    .accessToken(accessToken)
+                    .build();
+
+            while (true) {
+                Optional<SapoOrderResponse> responseOpt = sapoClient.getOrders(request);
+                if (responseOpt.isEmpty()) {
+                    syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.ORDER_CONNECTION_FAILED, false));
+                    log.error("No response from Pancake API when fetching orders, posId={}", posId);
+                    if (!allOrders.isEmpty()) {
+                        saveAllOrdersSync(allOrders);
+                    }
+                    if (!allOrderItems.isEmpty()) {
+                        saveAllOrderItemSync(allOrderItems);
+                    }
+                    return false;
+                }
+
+                SapoOrderResponse response = responseOpt.get();
+
+                if (response.getOrders() == null || response.getOrders().isEmpty()) {
+                    log.info("No orders found with page number: {}", pageNumber);
+                    break;
+                } else {
+                    request.setPage(request.getPage() + 1);
+                }
+
+                List<OrderEntity> pageOrders = convertToOrderEntities(posId, response.getOrders());
+                allOrders.addAll(pageOrders);
+
+                List<OrderItemEntity> pageOrderItems = convertToOrderItemEntities(response.getOrders());
+                allOrderItems.addAll(pageOrderItems);
+
+            }
+
+            saveAllOrdersSync(allOrders);
+            saveAllOrderItemSync(allOrderItems);
+
+            syncHistoryRepository.save(toSyncHistory(history, null, true));
+            log.info("Successfully synced {} orders from Pancake", allOrders.size());
+            log.info("Successfully synced {} order items from Pancake", allOrderItems.size());
+            return true;
+        } catch (Exception e) {
+            log.error("Failed to sync Pancake orders - {}", e.getMessage(), e);
+            syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.ORDER_TECHNICAL_ERROR, false));
+            return false;
+        }
     }
 }

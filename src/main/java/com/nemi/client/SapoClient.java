@@ -9,6 +9,7 @@ import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.request.sapo.SapoRequest;
 import com.nemi.model.request.sapo.SapoWebhookRequest;
 import com.nemi.model.response.sapo.SapoAccessTokenResponse;
+import com.nemi.model.response.sapo.SapoOrderResponse;
 import com.nemi.model.response.sapo.SapoProductResponse;
 import com.nemi.model.response.sapo.SapoWebhookResponse;
 import com.nemi.util.JsonUtils;
@@ -112,6 +113,47 @@ public class SapoClient {
         }
     }
 
+    public Optional<SapoOrderResponse> getOrders(SapoRequest request) {
+
+
+        try {
+            String url = "https://" + request.getStoreName() + ".mysapo.net/admin/orders.json";
+            log.debug("[SapoClient.getProducts] Calling URL: {}", url);
+
+            String urlWithParams = UriComponentsBuilder.fromHttpUrl(url)
+                    .queryParam("limit", request.getLimit())
+                    .queryParam("page", request.getPage())
+                    .toUriString();
+            log.debug("[SapoClient.getProducts] URL with params: {}", urlWithParams);
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("X-Sapo-Access-Token", request.getAccessToken());
+
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            log.debug("[SapoClient.getProducts] Request headers: {}", headers);
+
+            ResponseEntity<String> resp = restTemplate.exchange(urlWithParams, HttpMethod.GET, entity, String.class);
+            String jsonResp = resp.getBody();
+            log.debug("[SapoClient.getProducts] Response: {}", resp);
+
+            if (jsonResp == null || jsonResp.isBlank()) {
+                log.warn("[SapoClient.getProducts] Empty response body (status: {})", resp.getStatusCode());
+                return Optional.empty();
+            }
+
+               SapoOrderResponse productsResponse =
+                    JsonUtils.fromJson(jsonResp, SapoOrderResponse.class);
+
+            log.info("[SapoClient.getProducts] Got products response successfully");
+
+            return Optional.of(productsResponse);
+
+        } catch (Exception e) {
+            log.error("[SapoClient.getProducts] Failed: {}", e.getMessage(), e);
+            return Optional.empty();
+        }
+    }
+
     /**
      * Register webhooks for a POS with automatic webhook URL generation
      * @param storeName The store name
@@ -122,14 +164,14 @@ public class SapoClient {
     public List<SapoWebhookResponse> registerWebhook(String storeName, String accessToken, String posId) {
         // Build webhook URL automatically
         String webhookUrl = sapoConfig.getUrlRegisterWebhook() + posId;
-        
+
         SapoWebhookRequest webhookRequest = SapoWebhookRequest.builder()
                 .storeName(storeName)
                 .accessToken(accessToken)
                 .address(webhookUrl)
                 .format("json")
                 .build();
-        
+
         return registerWebhook(webhookRequest);
     }
 
@@ -140,43 +182,43 @@ public class SapoClient {
      */
     public List<SapoWebhookResponse> registerWebhook(SapoWebhookRequest webhookRequest) {
         log.info("[SapoClient.registerWebhook] Starting webhook registration for store: {}", webhookRequest.getStoreName());
-        
+
         // Get topics from configuration
         List<String> topics = sapoConfig.getWebhook().getTopic();
         if (topics == null || topics.isEmpty()) {
             log.warn("[SapoClient.registerWebhook] No webhook topics configured");
             return List.of();
         }
-        
+
         log.info("[SapoClient.registerWebhook] Found {} topics to register: {}", topics.size(), topics);
-        
+
         List<SapoWebhookResponse> responses = new java.util.ArrayList<>();
-        
+
         // Register webhook for each topic
         for (String topic : topics) {
             try {
                 log.debug("[SapoClient.registerWebhook] Registering webhook for topic: {}", topic);
-                
+
                 SapoWebhookResponse response = registerSingleWebhook(webhookRequest, topic);
                 if (response != null) {
                     responses.add(response);
-                    log.info("[SapoClient.registerWebhook] Successfully registered webhook for topic: {} with ID: {}", 
+                    log.info("[SapoClient.registerWebhook] Successfully registered webhook for topic: {} with ID: {}",
                             topic, response.getWebhook().getId());
                 } else {
                     log.error("[SapoClient.registerWebhook] Failed to register webhook for topic: {}", topic);
                 }
-                
+
             } catch (Exception e) {
                 log.error("[SapoClient.registerWebhook] Error registering webhook for topic {}: {}", topic, e.getMessage(), e);
             }
         }
-        
-        log.info("[SapoClient.registerWebhook] Completed webhook registration. Successfully registered {}/{} webhooks", 
+
+        log.info("[SapoClient.registerWebhook] Completed webhook registration. Successfully registered {}/{} webhooks",
                 responses.size(), topics.size());
-        
+
         return responses;
     }
-    
+
     /**
      * Register a single webhook for a specific topic
      */
@@ -186,41 +228,41 @@ public class SapoClient {
             String url = UriComponentsBuilder.fromHttpUrl(baseUrl)
                     .path(sapoConfig.getPathWebhooks())
                     .toUriString();
-            
+
             log.debug("[SapoClient.registerSingleWebhook] Calling URL: {} for topic: {}", url, topic);
-            
+
             // Build request body
             Map<String, Object> webhookData = new HashMap<>();
             webhookData.put("topic", topic);
             webhookData.put("address", webhookRequest.getAddress());
             webhookData.put("format", webhookRequest.getFormat() != null ? webhookRequest.getFormat() : "json");
-            
+
             Map<String, Object> requestBody = new HashMap<>();
             requestBody.put("webhook", webhookData);
-            
+
             // Set headers
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.set(SapoConstants.X_SAPO_ACCESS_TOKEN, webhookRequest.getAccessToken());
-            
+
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
             log.debug("[SapoClient.registerSingleWebhook] Request body: {}", JsonUtils.toJson(requestBody));
-            
+
             ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
             String jsonResp = resp.getBody();
             log.debug("[SapoClient.registerSingleWebhook] Response: {}", resp);
-            
+
             if (!resp.getStatusCode().is2xxSuccessful() || jsonResp == null || jsonResp.isBlank()) {
-                log.error("[SapoClient.registerSingleWebhook] Failed to register webhook for topic {}, status: {}", 
+                log.error("[SapoClient.registerSingleWebhook] Failed to register webhook for topic {}, status: {}",
                         topic, resp.getStatusCode());
                 return null;
             }
-            
+
             SapoWebhookResponse webhookResponse = JsonUtils.fromJson(jsonResp, SapoWebhookResponse.class);
             assert webhookResponse != null;
-            
+
             return webhookResponse;
-            
+
         } catch (Exception e) {
             log.error("[SapoClient.registerSingleWebhook] Failed to register webhook for topic {}: {}", topic, e.getMessage(), e);
             return null;
