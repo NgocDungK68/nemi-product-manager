@@ -75,8 +75,8 @@ public class PancakeClient {
 
             String relativeUri = UriComponentsBuilder.fromPath(request.getShopId() + "/orders")
                     .queryParam(PancakeConstatns.API_KEY, request.getApiKey())
-                    .queryParam("page_size", request.getPageSize())
-                    .queryParam("page_number", request.getPageNumber())
+                    .queryParam(PancakeConstatns.PAGE_SIZE, request.getPageSize())
+                    .queryParam(PancakeConstatns.PAGE_NUMBER, request.getPageNumber())
                     .toUriString();
 
             log.debug("[Pancake.getProducts] Calling relative URI: {}", relativeUri);
