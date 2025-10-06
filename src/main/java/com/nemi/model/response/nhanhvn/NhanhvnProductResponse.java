@@ -4,8 +4,10 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.nemi.configuration.BrandDeserializer;
-import com.nemi.configuration.TypeDeserializer;
+import com.nemi.configuration.deserializer.BrandDeserializer;
+import com.nemi.configuration.deserializer.CategoryDeserializer;
+import com.nemi.configuration.deserializer.TypeDeserializer;
+import com.nemi.configuration.deserializer.WarrantyDeserializer;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -37,17 +39,25 @@ public class NhanhvnProductResponse {
         private String otherName;
         private Integer status;
         private Integer vat;
-        private List<Category> category;
-        private List<Category> internalCategory;
+
+        @JsonDeserialize(using = CategoryDeserializer.class)
+        private Category category;
+
+        @JsonDeserialize(using = CategoryDeserializer.class)
+        private Category internalCategory;
+
         private Prices prices;
         private Images images;
-        private List<Warranty> warranty;
+
+        @JsonDeserialize(using = WarrantyDeserializer.class)
+        private Warranty warranty;
 
         @JsonDeserialize(using = BrandDeserializer.class)
         private Brand brand;
 
         @JsonDeserialize(using = TypeDeserializer.class)
         private Type type;
+
         private Shipping shipping;
         private String countryName;
         private Units units;
