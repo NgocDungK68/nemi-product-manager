@@ -1,6 +1,5 @@
 package com.nemi.service_impl.sapo;
 
-import com.nemi.client.SapoClient;
 import com.nemi.entity.*;
 import com.nemi.enums.PosName;
 import com.nemi.model.response.sapo.SapoOrderResponse;
@@ -441,29 +440,25 @@ public class SapoWebhookServiceImpl implements WebhookService {
      * Convert SapoOrder to OrderEntity
      */
     private OrderEntity convertToOrderEntity(String posId, SapoOrderResponse.Order sapoOrder) {
-        SapoOrderResponse.OriginAddress billing = sapoOrder.getFulfillments() != null && !sapoOrder.getFulfillments().isEmpty()
-                ? sapoOrder.getFulfillments().get(0).getOriginAddress()
-                : null;
+        SapoOrderResponse.OriginAddress originAddress = extractOriginAddress(sapoOrder);
 
-
-        // Debug logging to understand the issue
-        log.info("Converting SapoOrder to OrderEntity - ID: {}, Name: {}", sapoOrder.getId(), sapoOrder.getName());
+        log.info("Converting SapoOrder to OrderEntity - ID: {}, Name: {}",
+                sapoOrder.getId(), sapoOrder.getName());
 
         return OrderEntity.builder()
                 .orderId(sapoOrder.getId() != null ? sapoOrder.getId().toString() : "UNKNOWN")
                 .orderCode(sapoOrder.getName())
                 .posId(posId)
-                .customerName(billing != null ? billing.getName() : null)
-                .customerPhone(billing != null ? billing.getPhone() : null)
+                .customerName(extractOriginAddressName(originAddress))
+                .customerPhone(extractOriginAddressPhone(originAddress))
                 .customerEmail(sapoOrder.getEmail())
-                .shippingAddress(billing !=null ? billing.getAddress1() : null)
+                .shippingAddress(extractOriginAddressAddress(originAddress))
                 .status(null)
-                .paymentMethod(sapoOrder.getPaymentGatewayNames() != null && !sapoOrder.getPaymentGatewayNames().isEmpty()
-                        ? String.join(", ", sapoOrder.getPaymentGatewayNames()) : null)
-                .shippingMethod(sapoOrder.getShippingLines() != null && !sapoOrder.getShippingLines().isEmpty() ? sapoOrder.getShippingLines().get(0).getTitle() : null)
+                .paymentMethod(extractPaymentMethods(sapoOrder))
+                .shippingMethod(extractShippingMethod(sapoOrder))
                 .totalPrice(sapoOrder.getTotalPrice())
-                .shippingFee(sapoOrder.getShippingLines() != null && !sapoOrder.getShippingLines().isEmpty() && sapoOrder.getShippingLines().get(0).getPrice() != null ? sapoOrder.getShippingLines().get(0).getPrice() : null)
-                .discountAmount(sapoOrder.getTotalDiscounts() != null ? sapoOrder.getTotalDiscounts().doubleValue() : 0.0)
+                .shippingFee(extractShippingFee(sapoOrder))
+                .discountAmount(extractDiscountAmount(sapoOrder))
                 .createdAt(parseSapoDateTime(sapoOrder.getCreatedOn()))
                 .updatedAt(parseSapoDateTime(sapoOrder.getCancelledOn()))
                 .build();
@@ -487,6 +482,65 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
+    }
+
+    // Extract origin address from fulfillments
+    private SapoOrderResponse.OriginAddress extractOriginAddress(SapoOrderResponse.Order sapoOrder) {
+        return Optional.ofNullable(sapoOrder.getFulfillments())
+                .filter(fulfillments -> !fulfillments.isEmpty())
+                .map(fulfillments -> fulfillments.get(0).getOriginAddress())
+                .orElse(null);
+    }
+
+    // Extract fields from OriginAddress
+    private String extractOriginAddressName(SapoOrderResponse.OriginAddress originAddress) {
+        return Optional.ofNullable(originAddress)
+                .map(SapoOrderResponse.OriginAddress::getName)
+                .orElse(null);
+    }
+
+    private String extractOriginAddressPhone(SapoOrderResponse.OriginAddress originAddress) {
+        return Optional.ofNullable(originAddress)
+                .map(SapoOrderResponse.OriginAddress::getPhone)
+                .orElse(null);
+    }
+
+    private String extractOriginAddressAddress(SapoOrderResponse.OriginAddress originAddress) {
+        return Optional.ofNullable(originAddress)
+                .map(SapoOrderResponse.OriginAddress::getAddress1)
+                .orElse(null);
+    }
+
+    // Extract payment methods
+    private String extractPaymentMethods(SapoOrderResponse.Order sapoOrder) {
+        return Optional.ofNullable(sapoOrder.getPaymentGatewayNames())
+                .filter(methods -> !methods.isEmpty())
+                .map(methods -> String.join(", ", methods))
+                .orElse(null);
+    }
+
+    // Extract shipping method
+    private String extractShippingMethod(SapoOrderResponse.Order sapoOrder) {
+        return Optional.ofNullable(sapoOrder.getShippingLines())
+                .filter(lines -> !lines.isEmpty())
+                .map(lines -> lines.get(0).getTitle())
+                .orElse(null);
+    }
+
+    // Extract shipping fee
+    private BigDecimal extractShippingFee(SapoOrderResponse.Order sapoOrder) {
+        return Optional.ofNullable(sapoOrder.getShippingLines())
+                .filter(lines -> !lines.isEmpty())
+                .map(lines -> lines.get(0))
+                .map(SapoOrderResponse.ShippingLine::getPrice)
+                .orElse(null);
+    }
+
+    // Extract discount amount
+    private Double extractDiscountAmount(SapoOrderResponse.Order sapoOrder) {
+        return Optional.ofNullable(sapoOrder.getTotalDiscounts())
+                .map(BigDecimal::doubleValue)
+                .orElse(0.0);
     }
 
     // Helper methods for extracting data from SapoOrder
