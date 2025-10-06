@@ -64,7 +64,7 @@ public class SapoOrderResponse {
         @JsonProperty("total_discounts")
         private BigDecimal totalDiscounts;
         @JsonProperty("shipping_lines")
-        private ShippingLine shippingLines;
+        private List<ShippingLine> shippingLines;
         @JsonProperty("total_line_items_price")
         private BigDecimal totalLineItemsPrice;
         @JsonProperty("total_price")
