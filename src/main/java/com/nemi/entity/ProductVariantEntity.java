@@ -1,9 +1,6 @@
 package com.nemi.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,10 +14,15 @@ import java.math.BigDecimal;
 @Builder
 @Entity
 @Table(name = "product_variant", schema = "product_manager")
+@IdClass(VariantId.class)
 public class ProductVariantEntity {
     @Id
     @Column(name = "variant_id")
     private String variantId;
+
+    @Id
+    @Column(name = "pos_id")
+    private String posId;
 
     @Column(name = "product_id")
     private String productId;
