@@ -57,7 +57,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
             log.info("Payload body: {}", body);
 
             // 3. Parse JSON payload using JsonUtils
-            if (body != null && !body.trim().isEmpty()) {
+            if (!body.trim().isEmpty()) {
                 SapoProductResponse.Product payloadProduct = JsonUtils.fromJson(body, SapoProductResponse.Product.class);
                 SapoOrderResponse.Order payloadOrder = JsonUtils.fromJson(body, SapoOrderResponse.Order.class);
                 if (payloadProduct == null || payloadOrder == null) {
@@ -67,23 +67,18 @@ public class SapoWebhookServiceImpl implements WebhookService {
 
                 // 4. Process webhook data based on event type
                 String topic = request.getHeader("x-sapo-topic");
-                switch (topic) {
-                    case "products/create":
-                        return processProductWebhook(posId, payloadProduct);
-                    case "products/delete":
-                        return processProductDeleteWebhook(posId, payloadProduct);
-                    case "products/update":
-                        return processProductUpdateWebhook(posId, payloadProduct);
-                    case "orders/create":
-                        return processOrderCreateWebhook(posId, payloadOrder);
-                    case "orders/delete":
-                        return processOrderDeleteWebhook(posId, payloadOrder);
-                    case "orders/update":
-                        return processOrderUpdateWebhook(posId, payloadOrder);
-                    default:
+                return switch (topic) {
+                    case "products/create" -> processProductWebhook(posId, payloadProduct);
+                    case "products/delete" -> processProductDeleteWebhook(posId, payloadProduct);
+                    case "products/update" -> processProductUpdateWebhook(posId, payloadProduct);
+                    case "orders/create" -> processOrderCreateWebhook(posId, payloadOrder);
+                    case "orders/delete" -> processOrderDeleteWebhook(posId, payloadOrder);
+                    case "orders/update" -> processOrderUpdateWebhook(posId, payloadOrder);
+                    default -> {
                         log.warn("Unhandled webhook event type: {}", topic);
-                        return true; // Return true for unhandled events to acknowledge receipt
-                }
+                        yield true; // Return true for unhandled events to acknowledge receipt
+                    }
+                };
             } else {
                 log.warn("Empty webhook body received");
                 return false;
@@ -242,6 +237,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 String newImages = JsonUtils.toJson(payload.getImages().stream()
                         .map(SapoProductResponse.Image::getSrc)
                         .collect(Collectors.toList()));
+                assert newImages != null;
                 if (!newImages.equals(existingProduct.getImages())) {
                     log.info("Updating product images");
                     existingProduct.setImages(newImages);

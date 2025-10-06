@@ -35,4 +35,6 @@ public class SapoConfig {
         private int product;
         private int pageStart;
     }
+    private String baseUrl;
+    private String storeName;
 }

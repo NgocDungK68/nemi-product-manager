@@ -3,10 +3,6 @@ package com.nemi.service_impl.sapo;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.client.SapoClient;
-import com.nemi.enums.BatchSize;
-import com.nemi.enums.PosName;
-import com.nemi.enums.PosStatus;
-import com.nemi.enums.SyncErrorMessage;
 import com.nemi.configuration.SapoConfig;
 import com.nemi.entity.OrderEntity;
 import com.nemi.entity.OrderItemEntity;
@@ -14,14 +10,15 @@ import com.nemi.entity.PosEntity;
 import com.nemi.entity.ProductEntity;
 import com.nemi.entity.ProductVariantEntity;
 import com.nemi.entity.SyncHistoryEntity;
+import com.nemi.enums.PosName;
+import com.nemi.enums.PosStatus;
+import com.nemi.enums.SyncErrorMessage;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
 import com.nemi.model.request.PosConnectionRequest;
-import com.nemi.model.request.pancake.PancakeRequest;
 import com.nemi.model.request.sapo.SapoRequest;
 import com.nemi.model.response.PosConnectionResponse;
-import com.nemi.model.response.pancake.PancakeOrderResponse;
 import com.nemi.model.response.sapo.SapoAccessTokenResponse;
 import com.nemi.model.response.sapo.SapoOrderResponse;
 import com.nemi.model.response.sapo.SapoProductResponse;
@@ -34,6 +31,8 @@ import com.nemi.repository.SyncHistoryRepository;
 import com.nemi.service.PosManagementService;
 import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
+import jakarta.annotation.PostConstruct;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -42,7 +41,12 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -58,15 +62,21 @@ public class SapoServiceImpl implements PosManagementService {
     private final ProductVariantRepository productVariantRepository;
     private final SyncHistoryRepository syncHistoryRepository;
     private final ObjectMapper objectMapper;
-    private final OrderRepository  orderRepository;
+    private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final SapoConfig sapoConfig;
-    int orderBatchSize = BatchSize.ORDER.getSize();
-    int orderItemBatchSize = BatchSize.ORDER_ITEM.getSize();
-    int productBatchSize = BatchSize.PRODUCT.getSize();
-    int pageStartNumber = BatchSize.PAGE_NUMBER.getSize();
+    private int orderBatchSize;
+    private int orderItemBatchSize;
+    private int productBatchSize;
+    private int pageStartNumber;
 
-
+    @PostConstruct
+    public void init() {
+        orderBatchSize = sapoConfig.getSync().getOrder();
+        orderItemBatchSize = sapoConfig.getSync().getOrderItem();
+        productBatchSize = sapoConfig.getSync().getProduct();
+        pageStartNumber = sapoConfig.getSync().getPageStart();
+    }
 
 
     @Override
@@ -206,6 +216,18 @@ public class SapoServiceImpl implements PosManagementService {
         }
     }
 
+    public PosEntity getPos(String posId) {
+        log.debug("[SapoSyncDataImpl.getPos] posId: {}", posId);
+
+        // Lấy PosEntity từ DB
+        return posRepository.findById(posId)
+                .orElseThrow(() -> {
+                    log.error("Error [SapoSyncDataImpl.getPos] not found posId: {}", posId);
+                    return new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_INVALID));
+                });
+    }
+
+
     private ProductEntity convertToProductEntity(String posId, SapoProductResponse.Product apiProduct) {
         ProductEntity product = new ProductEntity();
 
@@ -275,6 +297,17 @@ public class SapoServiceImpl implements PosManagementService {
         variant.setWeightUnit(apiVariant.getWeightUnit() != null ? apiVariant.getWeightUnit() : "kg");
 
         // Convert attributes to JSON
+        Map<String, String> attributes = getStringStringMap(apiVariant);
+        variant.setAttributes(JsonUtils.toJson(attributes));
+
+        // Warehouse quantities - for now empty, can be extended later
+        variant.setWarehouseQuantities("{}");
+
+        return variant;
+    }
+
+    @NotNull
+    private static Map<String, String> getStringStringMap(SapoProductResponse.Variant apiVariant) {
         Map<String, String> attributes = new HashMap<>();
         if (apiVariant.getOption1() != null && !apiVariant.getOption1().isEmpty()) {
             attributes.put("option1", apiVariant.getOption1());
@@ -285,12 +318,7 @@ public class SapoServiceImpl implements PosManagementService {
         if (apiVariant.getOption3() != null && !apiVariant.getOption3().isEmpty()) {
             attributes.put("option3", apiVariant.getOption3());
         }
-        variant.setAttributes(JsonUtils.toJson(attributes));
-
-        // Warehouse quantities - for now empty, can be extended later
-        variant.setWarehouseQuantities("{}");
-
-        return variant;
+        return attributes;
     }
 
     public void saveAllProductsSync(List<ProductEntity> products) {
@@ -375,15 +403,8 @@ public class SapoServiceImpl implements PosManagementService {
         syncHistoryEntity.setEndTime(LocalDateTime.now());
         return syncHistoryEntity;
     }
+
     //-------------------------------------------------------------------------------------------
-    public PosEntity getPos(String posId) {
-        log.debug("[PancakeSyncDataImpl.getPos] posId: {}", posId);
-        return posRepository.findById(posId)
-                .orElseThrow(() -> {
-                    log.error("Error [PancakeSyncDataImpl.getPos] not found posId: {}", posId);
-                    return new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_INVALID));
-                });
-    }
     private List<OrderEntity> convertToOrderEntities(String posId, List<SapoOrderResponse.Order> apiOrders) {
         return apiOrders.stream()
                 .map(orders -> convertToOrderEntity(posId, orders))
