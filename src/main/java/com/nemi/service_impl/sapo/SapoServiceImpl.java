@@ -146,9 +146,9 @@ public class SapoServiceImpl implements PosManagementService {
                     new TypeReference<>() {
                     }
             );
-            String clientId = configMap.get("clientId");
-            String clientSecret = configMap.get("clientSecret");
-            String storeName = configMap.get("storeName");
+            String clientId = configMap.get(SapoConstants.CLIENT_ID);
+            String clientSecret = configMap.get(SapoConstants.CLIENT_SECRET);
+            String storeName = configMap.get(SapoConstants.STORE_NAME);
             String accessToken = posEntity.getAccessToken();
 
             if (clientId == null || clientSecret == null || storeName == null || accessToken == null) {
@@ -538,12 +538,12 @@ public class SapoServiceImpl implements PosManagementService {
             Map<String, String> configMap = objectMapper.readValue(
                     posEntity.getConfig(), new TypeReference<>() {
                     });
-            String cliendId = configMap.get("clientId");
+            String clientId = configMap.get("clientId");
             String clientSecret = configMap.get("clientSecret");
             String storeName = configMap.get("storeName");
             String accessToken = posEntity.getAccessToken();
 
-            if (cliendId == null || clientSecret == null || storeName == null || accessToken == null) {
+            if (clientId == null || clientSecret == null || storeName == null || accessToken == null) {
                 syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.MISSING_CONFIG, false));
                 log.error("Missing required config for posId={}", posId);
                 return false;
