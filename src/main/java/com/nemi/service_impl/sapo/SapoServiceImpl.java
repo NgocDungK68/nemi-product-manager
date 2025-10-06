@@ -4,12 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.client.SapoClient;
 import com.nemi.configuration.SapoConfig;
-import com.nemi.entity.OrderEntity;
-import com.nemi.entity.OrderItemEntity;
-import com.nemi.entity.PosEntity;
-import com.nemi.entity.ProductEntity;
-import com.nemi.entity.ProductVariantEntity;
-import com.nemi.entity.SyncHistoryEntity;
+import com.nemi.entity.*;
 import com.nemi.enums.PosName;
 import com.nemi.enums.PosStatus;
 import com.nemi.enums.SyncErrorMessage;
@@ -22,15 +17,11 @@ import com.nemi.model.response.PosConnectionResponse;
 import com.nemi.model.response.sapo.SapoAccessTokenResponse;
 import com.nemi.model.response.sapo.SapoOrderResponse;
 import com.nemi.model.response.sapo.SapoProductResponse;
-import com.nemi.repository.OrderItemRepository;
-import com.nemi.repository.OrderRepository;
-import com.nemi.repository.PosRepository;
-import com.nemi.repository.ProductRepository;
-import com.nemi.repository.ProductVariantRepository;
-import com.nemi.repository.SyncHistoryRepository;
+import com.nemi.repository.*;
 import com.nemi.service.PosManagementService;
 import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
+import com.nemi.utils.PosUtils;
 import jakarta.annotation.PostConstruct;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
@@ -38,15 +29,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -197,7 +181,6 @@ public class SapoServiceImpl implements PosManagementService {
                 if (response.getProducts().size() >= limit) {
                     page++;
                     paginator.put("page", page);
-                    continue;
                 } else {
                     break; // hết data
                 }
@@ -246,10 +229,10 @@ public class SapoServiceImpl implements PosManagementService {
 
         // Set timestamps - parse from string format
         if (apiProduct.getCreatedOn() != null && !apiProduct.getCreatedOn().isEmpty()) {
-            product.setCreatedAt(parseSapoDateTime(apiProduct.getCreatedOn()));
+            product.setCreatedAt(PosUtils.parseDateTime(apiProduct.getCreatedOn()));
         }
         if (apiProduct.getModifiedOn() != null && !apiProduct.getModifiedOn().isEmpty()) {
-            product.setUpdatedAt(parseSapoDateTime(apiProduct.getModifiedOn()));
+            product.setUpdatedAt(PosUtils.parseDateTime(apiProduct.getModifiedOn()));
         }
         return product;
     }
@@ -368,28 +351,6 @@ public class SapoServiceImpl implements PosManagementService {
         } catch (Exception e) {
             log.error("Failed to save Sapo variants synchronously: {}", e.getMessage(), e);
             throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_PERSISTENCE_ERROR));
-        }
-    }
-
-
-    private LocalDateTime parseSapoDateTime(String dateTimeString) {
-        if (dateTimeString == null || dateTimeString.trim().isEmpty()) {
-            return null;
-        }
-
-        try {
-            // 1. Dùng Instant để xử lý chuỗi ISO 8601 có 'Z' (Zulu/UTC)
-            // Instant.parse() xử lý định dạng "yyyy-MM-ddTHH:mm:ssZ" hoặc có mili giây.
-            Instant instant = Instant.parse(dateTimeString.trim());
-
-            // 2. Chuyển Instant (UTC time) sang LocalDateTime (bỏ thông tin múi giờ)
-            // Sử dụng ZoneOffset.UTC để đảm bảo chuyển đổi chính xác từ UTC.
-            return LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
-
-        } catch (Exception e) {
-            // Ghi log chi tiết hơn để dễ debug
-            log.warn("[SapoServiceImpl] Failed to parse date time '{}'. Error: {}", dateTimeString, e.getMessage());
-            return null;
         }
     }
 
