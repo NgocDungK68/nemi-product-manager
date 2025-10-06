@@ -466,6 +466,9 @@ public class SapoServiceImpl implements PosManagementService {
     }
 
     public List<OrderItemEntity> convertToOrderItemEntity(SapoOrderResponse.Order apiOrder) {
+        SapoOrderResponse.LineItem sapoLineItem = new SapoOrderResponse.LineItem();
+        BigDecimal totalPrice = sapoLineItem.getPrice().multiply(BigDecimal.valueOf(sapoLineItem.getQuantity()));
+
         List<OrderItemEntity> orderItemEntities = new ArrayList<>();
         for (SapoOrderResponse.LineItem product : apiOrder.getLineItems()) {
             orderItemEntities.add(OrderItemEntity.builder()
@@ -475,7 +478,7 @@ public class SapoServiceImpl implements PosManagementService {
                     .sku(product.getSku())
                     .variantName(product.getVariantTitle())
                     .price(product.getPrice())
-                    .totalPrice(product.getTotalDiscount())
+                    .totalPrice(totalPrice)
                     .productName(product.getName())
                     .fulfillableQuantity(product.getCurrentQuantity())
                     .createdBy(claimUtil.getUserName())

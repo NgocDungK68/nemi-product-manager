@@ -10,6 +10,7 @@ import com.nemi.repository.OrderRepository;
 import com.nemi.repository.ProductRepository;
 import com.nemi.repository.ProductVariantRepository;
 import com.nemi.service.WebhookService;
+import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
 import com.nemi.utils.PosUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -34,6 +35,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final SapoConfig sapoConfig;
+    private final ClaimUtil claimUtil;
     @Override
     public String getPosName() {
         return PosName.SAPO.getValue();
@@ -485,7 +487,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 .totalPrice(totalPrice)
                 .fulfillableQuantity(sapoLineItem.getCurrentQuantity())
                 .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
+                .createdBy(claimUtil.getUserName())
                 .build();
     }
 
