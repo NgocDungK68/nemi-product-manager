@@ -486,7 +486,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
 
     private SyncHistoryEntity toSyncHistory(SyncHistoryEntity syncHistoryEntity, SyncErrorMessage syncErrorMessage, Boolean isSyncSuccess) {
-        if (isSyncSuccess == false) {
+        if (Boolean.FALSE.equals(isSyncSuccess)) {
             syncHistoryEntity.setEndTime(LocalDateTime.now());
             syncHistoryEntity.setErrorMessage(syncErrorMessage.getMessage());
             return syncHistoryEntity;
