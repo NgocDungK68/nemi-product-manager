@@ -1,5 +1,6 @@
 package com.nemi.service_impl.sapo;
 
+import com.nemi.configuration.SapoConfig;
 import com.nemi.entity.*;
 import com.nemi.enums.PosName;
 import com.nemi.model.response.sapo.SapoOrderResponse;
@@ -32,6 +33,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
     private final ProductVariantRepository productVariantRepository;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
+    private final SapoConfig sapoConfig;
     @Override
     public String getPosName() {
         return PosName.SAPO.getValue();
@@ -279,7 +281,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
         product.setCode(null);
         product.setName(payload.getName());
         product.setDescription(payload.getContent()); // Using content as description
-        product.setStatus(payload.getStatus());
+        product.setStatus(payload.getStatus().toUpperCase());
         product.setPosId(posId);
         product.setCategory(payload.getProductType());
         product.setBrand(payload.getVendor());
@@ -442,6 +444,9 @@ public class SapoWebhookServiceImpl implements WebhookService {
     private OrderEntity convertToOrderEntity(String posId, SapoOrderResponse.Order sapoOrder) {
         SapoOrderResponse.OriginAddress originAddress = extractOriginAddress(sapoOrder);
 
+        Map<String, String> mapping = sapoConfig.getOrder().getStatus().getMapping();
+        String status = mapping.getOrDefault(sapoOrder.getStatus(), "unknown");
+
         log.info("Converting SapoOrder to OrderEntity - ID: {}, Name: {}",
                 sapoOrder.getId(), sapoOrder.getName());
 
@@ -453,7 +458,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 .customerPhone(extractOriginAddressPhone(originAddress))
                 .customerEmail(sapoOrder.getEmail())
                 .shippingAddress(extractOriginAddressAddress(originAddress))
-                .status(null)
+                .status(status.toUpperCase())
                 .paymentMethod(extractPaymentMethods(sapoOrder))
                 .shippingMethod(extractShippingMethod(sapoOrder))
                 .totalPrice(sapoOrder.getTotalPrice())

@@ -248,7 +248,7 @@ public class SapoServiceImpl implements PosManagementService {
         product.setDescription(apiProduct.getContent());
         product.setBrand(apiProduct.getVendor());
         product.setCategory(apiProduct.getProductType());
-        product.setStatus(apiProduct.getStatus());
+        product.setStatus(apiProduct.getStatus().toUpperCase());
         product.setImages(JsonUtils.toJson(apiProduct.getImages().stream()
                 .map(SapoProductResponse.Image::getSrc) // Dùng method reference
                 .collect(Collectors.toList())));
@@ -423,6 +423,7 @@ public class SapoServiceImpl implements PosManagementService {
     }
 
     public OrderEntity convertToOrderEntity(String posId, SapoOrderResponse.Order order) {
+
 
         Map<String, String> mapping = sapoConfig.getOrder().getStatus().getMapping();
         String status = mapping.getOrDefault(order.getStatus(), "unknown");
