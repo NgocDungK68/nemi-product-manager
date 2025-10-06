@@ -3,7 +3,6 @@ package com.nemi.service_impl.sapo;
 import com.nemi.client.SapoClient;
 import com.nemi.entity.*;
 import com.nemi.enums.PosName;
-import com.nemi.util.JsonUtils;
 import com.nemi.model.response.sapo.SapoOrderResponse;
 import com.nemi.model.response.sapo.SapoProductResponse;
 import com.nemi.repository.OrderItemRepository;
@@ -11,23 +10,19 @@ import com.nemi.repository.OrderRepository;
 import com.nemi.repository.ProductRepository;
 import com.nemi.repository.ProductVariantRepository;
 import com.nemi.service.WebhookService;
+import com.nemi.util.JsonUtils;
+import com.nemi.utils.PosUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.BufferedReader;
-import java.io.IOException;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.math.BigDecimal;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -54,7 +49,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
             headers.forEach((k, v) -> log.info("  {} = {}", k, v));
 
             // 2. Read raw body
-            String body = readBody(request);
+            String body = PosUtils.readBody(request);
             log.info("Payload body: {}", body);
 
             // 3. Parse JSON payload using JsonUtils
@@ -103,19 +98,6 @@ public class SapoWebhookServiceImpl implements WebhookService {
             }
         }
         return map;
-    }
-
-    private String readBody(HttpServletRequest request) {
-        StringBuilder sb = new StringBuilder();
-        try (BufferedReader reader = request.getReader()) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line);
-            }
-        } catch (IOException e) {
-            log.error("Error reading body", e);
-        }
-        return sb.toString();
     }
 
     /**
