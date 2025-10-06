@@ -18,19 +18,21 @@ public class NhanhvnConfig {
     private String apiVersion;
     private String verifyToken;
     private String secretKey;
+    private ProductConfig product;
+    private OrderConfig order;
 
-    //---status-----
-    private OrderConfig order; // ánh xạ nhanhvn.order
+    @Data
+    public static class ProductConfig {
+        private StatusConfig status;
+    }
 
     @Data
     public static class OrderConfig {
-        private StatusConfig status; // ánh xạ nhanhvn.order.status
-
-        @Data
-        public static class StatusConfig {
-            private Map<Integer, String> mapping;
-        }
+        private StatusConfig status;
     }
 
-
+    @Data
+    public static class StatusConfig {
+        private Map<Integer, String> mapping;
+    }
 }

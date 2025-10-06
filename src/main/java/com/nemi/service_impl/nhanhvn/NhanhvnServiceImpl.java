@@ -243,12 +243,17 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
     public ProductEntity convertToProductEntity(String posId, NhanhvnProductResponse.ProductData apiProduct) {
         if (apiProduct.getParentId() != -2) return null;
+
+        int statusCode = apiProduct.getStatus();
+        Map<Integer, String> mapping = nhanhvnConfig.getProduct().getStatus().getMapping();
+        String status = mapping.getOrDefault(statusCode, "unknown");
+
         return ProductEntity.builder()
                 .posId(posId)
                 .productId(String.valueOf(apiProduct.getId()))
                 .code(apiProduct.getCode())
                 .name(apiProduct.getName())
-                .status(apiProduct.getStatus().toString())
+                .status(status.toUpperCase())
                 .build();
     }
 
@@ -278,30 +283,30 @@ public class NhanhvnServiceImpl implements PosManagementService {
     //------------------------------------------------------------------------------------------
     private List<OrderEntity> convertToOrderEntities(String posId, List<NhanhvnOrderResponse.OrderData> apiOrders) {
         return apiOrders.stream()
-                .map(orders -> convertToOrderEntity(posId, orders))
+                .map(apiOrder -> convertToOrderEntity(posId, apiOrder))
                 .filter(Objects::nonNull)
                 .toList();
     }
 
-    public OrderEntity convertToOrderEntity(String posId, NhanhvnOrderResponse.OrderData apiOrders) {
+    public OrderEntity convertToOrderEntity(String posId, NhanhvnOrderResponse.OrderData apiOrder) {
 
-        int statusCode = apiOrders.getInfo().getStatus();
+        int statusCode = apiOrder.getInfo().getStatus();
         Map<Integer, String> mapping = nhanhvnConfig.getOrder().getStatus().getMapping();
         String status = mapping.getOrDefault(statusCode, "unknown");
 
 
         return OrderEntity.builder()
                 .posId(posId)
-                .orderId(String.valueOf(apiOrders.getInfo().getId()))
-                .orderCode(apiOrders.getCarrier().getCarrierCode())
-                .customerName(apiOrders.getShippingAddress().getName())
-                .customerEmail(apiOrders.getShippingAddress().getEmail())
-                .customerPhone(apiOrders.getShippingAddress().getMobile())// khi user co du thi them custemer phone va email
-                .shippingAddress(apiOrders.getShippingAddress().getAddress())
-                .shippingMethod(apiOrders.getCarrier().getName())
-                .paymentMethod(apiOrders.getPayment().getBusinessPayment().toString())
-                .shippingFee(apiOrders.getCarrier().getShipFee())
-                .totalPrice(totalProductPrice(apiOrders))
+                .orderId(String.valueOf(apiOrder.getInfo().getId()))
+                .orderCode(apiOrder.getCarrier().getCarrierCode())
+                .customerName(apiOrder.getShippingAddress().getName())
+                .customerEmail(apiOrder.getShippingAddress().getEmail())
+                .customerPhone(apiOrder.getShippingAddress().getMobile())// khi user co du thi them custemer phone va email
+                .shippingAddress(apiOrder.getShippingAddress().getAddress())
+                .shippingMethod(apiOrder.getCarrier().getName())
+                .paymentMethod(apiOrder.getPayment().getBusinessPayment().toString())
+                .shippingFee(apiOrder.getCarrier().getShipFee())
+                .totalPrice(totalProductPrice(apiOrder))
                 .status(status.toUpperCase())
                 .createdBy(claimUtil.getUserName())
                 .build();

@@ -34,7 +34,7 @@ public class PancakeConfig {
 
     @Data
     public static class OrderConfig {
-        private NhanhvnConfig.OrderConfig.StatusConfig status; // ánh xạ nhanhvn.order.status
+        private OrderConfig.StatusConfig status; // ánh xạ nhanhvn.order.status
 
         @Data
         public static class StatusConfig {
