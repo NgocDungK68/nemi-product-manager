@@ -14,6 +14,7 @@ public class PancakeConfig {
     private String apiKey;
     private String shopId;
     private int timeout;
+    private BatchConfig sync;
 
     @Data
     public static class Retry {
@@ -29,7 +30,7 @@ public class PancakeConfig {
     }
 
     //---status-----
-    private NhanhvnConfig.OrderConfig order; // ánh xạ nhanhvn.order
+    private OrderConfig order; // ánh xạ nhanhvn.order
 
     @Data
     public static class OrderConfig {
@@ -39,6 +40,14 @@ public class PancakeConfig {
         public static class StatusConfig {
             private Map<Integer, String> mapping;
         }
+    }
+
+    @Data
+    public static class BatchConfig {
+        private int order;
+        private int orderItem;
+        private int product;
+        private int pageStart;
     }
 
 }

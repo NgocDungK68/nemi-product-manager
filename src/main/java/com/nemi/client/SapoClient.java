@@ -7,6 +7,7 @@ import com.nemi.exception.pojo.AlertMessages;
 import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.request.sapo.SapoRequest;
 import com.nemi.model.response.sapo.SapoAccessTokenResponse;
+import com.nemi.model.response.sapo.SapoOrderResponse;
 import com.nemi.model.response.sapo.SapoProductResponse;
 import com.nemi.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
@@ -97,6 +98,47 @@ public class SapoClient {
             log.info("[SapoClient.getProducts] Got products response successfully");
 
             assert productsResponse != null;
+            return Optional.of(productsResponse);
+
+        } catch (Exception e) {
+            log.error("[SapoClient.getProducts] Failed: {}", e.getMessage(), e);
+            return Optional.empty();
+        }
+    }
+
+    public Optional<SapoOrderResponse> getOrders(SapoRequest request) {
+
+
+        try {
+            String url = "https://" + request.getStoreName() + ".mysapo.net/admin/orders.json";
+            log.debug("[SapoClient.getProducts] Calling URL: {}", url);
+
+            String urlWithParams = UriComponentsBuilder.fromHttpUrl(url)
+                    .queryParam("limit", request.getLimit())
+                    .queryParam("page", request.getPage())
+                    .toUriString();
+            log.debug("[SapoClient.getProducts] URL with params: {}", urlWithParams);
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("X-Sapo-Access-Token", request.getAccessToken());
+
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            log.debug("[SapoClient.getProducts] Request headers: {}", headers);
+
+            ResponseEntity<String> resp = restTemplate.exchange(urlWithParams, HttpMethod.GET, entity, String.class);
+            String jsonResp = resp.getBody();
+            log.debug("[SapoClient.getProducts] Response: {}", resp);
+
+            if (jsonResp == null || jsonResp.isBlank()) {
+                log.warn("[SapoClient.getProducts] Empty response body (status: {})", resp.getStatusCode());
+                return Optional.empty();
+            }
+
+               SapoOrderResponse productsResponse =
+                    JsonUtils.fromJson(jsonResp, SapoOrderResponse.class);
+
+            log.info("[SapoClient.getProducts] Got products response successfully");
+
             return Optional.of(productsResponse);
 
         } catch (Exception e) {
