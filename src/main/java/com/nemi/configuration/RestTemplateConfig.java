@@ -10,6 +10,7 @@ import org.springframework.web.util.DefaultUriBuilderFactory;
 @RequiredArgsConstructor
 public class RestTemplateConfig {
     private final NhanhvnConfig nhanhvnConfig;
+    private final PancakeConfig pancakeConfig;
 
     @Bean
     public RestTemplate restTemplate() {
@@ -26,4 +27,18 @@ public class RestTemplateConfig {
 
         return restTemplate;
     }
+    @Bean("pancakeRestTemplate")
+    public RestTemplate pancakeRestTemplate() {
+        RestTemplate restTemplate = new RestTemplate();
+
+        restTemplate.setUriTemplateHandler(new DefaultUriBuilderFactory(
+                pancakeConfig.getBaseUrl() + "/shops/")
+        );
+
+        return restTemplate;
+    }
+
+    // Note: Sapo doesn't need a dedicated RestTemplate bean because each merchant
+    // has a different storeName (e.g., store1.mysapo.net, store2.mysapo.net)
+    // So we build the full URL dynamically in SapoClient instead
 }

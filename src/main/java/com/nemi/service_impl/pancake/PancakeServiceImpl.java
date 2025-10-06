@@ -4,16 +4,15 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.client.PancakeClient;
 import com.nemi.configuration.PancakeConfig;
-import com.nemi.enums.BatchSize;
-import com.nemi.enums.OrderStatus;
-import com.nemi.enums.PosName;
-import com.nemi.enums.PosStatus;
-import com.nemi.enums.SyncErrorMessage;
 import com.nemi.entity.OrderEntity;
 import com.nemi.entity.OrderItemEntity;
 import com.nemi.entity.PosEntity;
 import com.nemi.entity.ProductEntity;
 import com.nemi.entity.SyncHistoryEntity;
+import com.nemi.enums.OrderStatus;
+import com.nemi.enums.PosName;
+import com.nemi.enums.PosStatus;
+import com.nemi.enums.SyncErrorMessage;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
@@ -30,13 +29,19 @@ import com.nemi.repository.SyncHistoryRepository;
 import com.nemi.service.PosManagementService;
 import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -53,10 +58,19 @@ public class PancakeServiceImpl implements PosManagementService {
     private final OrderItemRepository orderItemRepository;
     private final PancakeConfig pancakeConfig;
 
-    int orderBatchSize = BatchSize.ORDER.getSize();
-    int orderItemBatchSize = BatchSize.ORDER_ITEM.getSize();
-    int productBatchSize = BatchSize.PRODUCT.getSize();
-    int pageStartNumber = BatchSize.PAGE_NUMBER.getSize();
+    private int orderBatchSize;
+    private int orderItemBatchSize;
+    private int productBatchSize;
+    private int pageStartNumber;
+
+    @PostConstruct
+    public void init() {
+        orderBatchSize = pancakeConfig.getSync().getOrder();
+        orderItemBatchSize = pancakeConfig.getSync().getOrderItem();
+        productBatchSize = pancakeConfig.getSync().getProduct();
+        pageStartNumber = pancakeConfig.getSync().getPageStart();
+    }
+
 
     @Override
     public String getPosName() {
@@ -131,6 +145,7 @@ public class PancakeServiceImpl implements PosManagementService {
                 if (responseOpt.isEmpty()) {
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.PRODUCT_CONNECTION_FAILED, false));
                     log.error("No response from Pancake API when fetching products, posId={}", posId);
+                    saveAllProductsSync(allProducts);
                     return false;
                 }
 
@@ -138,6 +153,7 @@ public class PancakeServiceImpl implements PosManagementService {
                 if (!response.isSuccess()) {
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.PRODUCT_INVALID_CREDENTIAL, false));
                     log.error("Invalid API key or shopId when fetching products, posId={}", posId);
+                    saveAllProductsSync(allProducts);
                     return false;
                 }
 
