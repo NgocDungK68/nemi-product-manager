@@ -10,17 +10,19 @@ import com.nemi.entity.WebhookHistoryEntity;
 import com.nemi.enums.PancakeEvent;
 import com.nemi.enums.PosName;
 import com.nemi.enums.Status;
-import com.nemi.model.response.pancake.PancakeOrderResponse;
 import com.nemi.model.request.pancake.PancakeWebhookRequest;
-import com.nemi.repository.*;
+import com.nemi.model.response.pancake.PancakeOrderResponse;
+import com.nemi.repository.OrderItemRepository;
+import com.nemi.repository.OrderRepository;
+import com.nemi.repository.WebhookHistoryRepository;
 import com.nemi.service.WebhookService;
 import com.nemi.util.JsonUtils;
 import io.jsonwebtoken.lang.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.stereotype.Service;
-import org.springframework.util.ObjectUtils;
-import org.springframework.util.StringUtils;
+import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -37,13 +39,11 @@ import java.util.Optional;
 @RequiredArgsConstructor
 @Slf4j
 public class PancakeWebhookServiceImpl implements WebhookService {
+
     private final PancakeConfig pancakeConfig;
     private final ObjectMapper objectMapper;
-    private final ProductRepository productRepository;
-    private final ProductVariantRepository variantRepository;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
-    private final PancakeServiceImpl pancakeService;
     private final WebhookHistoryRepository webhookHistoryRepository;
 
     @Override
@@ -122,7 +122,7 @@ public class PancakeWebhookServiceImpl implements WebhookService {
         PancakeOrderResponse.DataItem orderData = objectMapper.convertValue(
                 webhookResponse, PancakeOrderResponse.DataItem.class
         );
-        log.info("[NhanhvnWebhookServiceImpl.handleOrderUpdate] Update OrderData: {}", orderData);
+        log.info("[PancakeWebhookServiceImpl.handleOrderUpdate] Update OrderData: {}", orderData);
 
         if (Objects.isEmpty(orderData) || Objects.isEmpty(orderData.getId())) {
             log.error("[NhanhvnWebhookServiceImpl.handleOrderUpdate] Failed to update order data: {}", orderData);
@@ -131,8 +131,8 @@ public class PancakeWebhookServiceImpl implements WebhookService {
 
         // Convert OrderEntity
         OrderEntity orderEntity = convertToOrderEntity(posId, orderData);
-        if (Objects.isEmpty(orderEntity)) {
-            log.error("[NhanhvnWebhookServiceImpl.handleOrderUpdate] Failed to convert orderData={} to OrderEntity", orderData.getId());
+        if (ObjectUtils.isEmpty(orderEntity)) {
+            log.error("[PancakeWebhookServiceImpl.handleOrderUpdate] Failed to convert orderData={} to OrderEntity", orderData.getId());
             return false;
         }
 
@@ -140,26 +140,25 @@ public class PancakeWebhookServiceImpl implements WebhookService {
         orderRepository.save(orderEntity);
 
         // if delete
-        if(webhookResponse.getStatus()==6 || webhookResponse.getStatus()==7){
+        if (webhookResponse.getStatus() == 6 || webhookResponse.getStatus() == 7) {
             return true;
         }
-        log.info("[NhanhvnWebhookServiceImpl.handleOrderUpdate] Successfully updated OrderEntity with id={} and code={}",
+        log.info("[PancakeWebhookServiceImpl.handleOrderUpdate] Successfully updated OrderEntity with id={} and code={}",
                 orderEntity.getOrderId(), orderEntity.getOrderCode());
 
         // Sync OrderItems
         List<OrderItemEntity> orderItemEntities = convertToOrderItemEntity(orderData);
-        if (orderItemEntities.isEmpty()) {
-            log.warn("[NhanhvnWebhookServiceImpl.handleOrderUpdate] Order id={} has no products", orderEntity.getOrderId());
+        if (CollectionUtils.isEmpty(orderItemEntities)) {
+            log.warn("[PancakeWebhookServiceImpl.handleOrderUpdate] Order id={} has no products", orderEntity.getOrderId());
             return false;
-        } else {
-            // Xóa items cũ để tránh dữ liệu thừa
-            orderItemRepository.deleteByOrderId(orderEntity.getOrderId());
-
-            // Save lại items mới
-            orderItemRepository.saveAll(orderItemEntities);
-            log.info("[NhanhvnWebhookServiceImpl.handleOrderUpdate] Successfully synced {} OrderItemEntities for orderId={}",
-                    orderItemEntities.size(), orderEntity.getOrderId());
         }
+        // Xóa items cũ để tránh dữ liệu thừa
+        orderItemRepository.deleteByOrderId(orderEntity.getOrderId());
+
+        // Save lại items mới
+        orderItemRepository.saveAll(orderItemEntities);
+        log.info("[PancakeWebhookServiceImpl.handleOrderUpdate] Successfully synced {} OrderItemEntities for orderId={}",
+                orderItemEntities.size(), orderEntity.getOrderId());
 
         return true;
     }
@@ -190,7 +189,7 @@ public class PancakeWebhookServiceImpl implements WebhookService {
                 .paymentMethod(paymentMethod)
                 .shippingFee(apiOrders.getShippingFee())
                 .totalPrice(apiOrders.getTotalPrice())
-                .status(status.toUpperCase())
+                .status(status)
                 .updatedBy(PosName.WEBHOOK.getValue())
                 .build();
     }
@@ -213,6 +212,8 @@ public class PancakeWebhookServiceImpl implements WebhookService {
         }
         return orderItemEntities;
     }
+
+
     /**
      * Xử lý webhook type=variations_warehouses
      * - Cập nhật tồn kho
