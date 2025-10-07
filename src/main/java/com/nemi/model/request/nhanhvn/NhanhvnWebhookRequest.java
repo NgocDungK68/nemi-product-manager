@@ -1,4 +1,4 @@
-package com.nemi.model.response.nhanhvn;
+package com.nemi.model.request.nhanhvn;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class NhanhvnWebhookResponse {
+public class NhanhvnWebhookRequest {
     private String event;
     private String businessId;
     private Object data;

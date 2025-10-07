@@ -1,29 +1,30 @@
 package com.nemi.service_impl.sapo;
 
 import com.nemi.configuration.SapoConfig;
+import com.nemi.constant.SapoConstants;
+import com.nemi.constant.WebhookConstants;
 import com.nemi.entity.*;
 import com.nemi.enums.PosName;
+import com.nemi.enums.SapoEvent;
 import com.nemi.model.response.sapo.SapoOrderResponse;
 import com.nemi.model.response.sapo.SapoProductResponse;
-import com.nemi.repository.OrderItemRepository;
-import com.nemi.repository.OrderRepository;
-import com.nemi.repository.ProductRepository;
-import com.nemi.repository.ProductVariantRepository;
+import com.nemi.repository.*;
 import com.nemi.service.WebhookService;
 import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
 import com.nemi.utils.PosUtils;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.ObjectUtils;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -36,6 +37,8 @@ public class SapoWebhookServiceImpl implements WebhookService {
     private final OrderItemRepository orderItemRepository;
     private final SapoConfig sapoConfig;
     private final ClaimUtil claimUtil;
+    private final WebhookHistoryRepository webhookHistoryRepository;
+
     @Override
     public String getPosName() {
         return PosName.SAPO.getValue();
@@ -43,78 +46,74 @@ public class SapoWebhookServiceImpl implements WebhookService {
 
     @Override
     @Transactional
-    public boolean processWebhook(String posId, HttpServletRequest request) {
+    public boolean processWebhook(String posId, Map<String, String> headers, Object body) {
+        WebhookHistoryEntity webhookHistory = WebhookHistoryEntity.builder()
+                .header(JsonUtils.toJson(headers))
+                .status(WebhookConstants.Status.FAILED)
+                .syncType(WebhookConstants.UNKNOWN)
+                .eventType(WebhookConstants.UNKNOWN)
+                .createdBy(WebhookConstants.UNKNOWN)
+                .updatedBy(WebhookConstants.UNKNOWN)
+                .build();
         try {
-            // 1. Read headers
-            Map<String, String> headers = extractHeaders(request);
-            log.info("=== Sapo Webhook received for posId: {} ===", posId);
-            log.info("Headers:");
-            headers.forEach((k, v) -> log.info("  {} = {}", k, v));
-
-            // 2. Read raw body
-            String body = PosUtils.readBody(request);
-            log.info("Payload body: {}", body);
-            String topic = request.getHeader("x-sapo-topic");
+            String topic = headers.get(SapoConstants.X_SAPO_TOPIC);
 
             SapoProductResponse.Product payloadProduct = null;
             SapoOrderResponse.Order payloadOrder = null;
 
-            // 1️⃣ Parse payload theo loại topic
+            // Parse payload theo loại topic
             if (topic.startsWith("products")) {
-                payloadProduct = JsonUtils.fromJson(body, SapoProductResponse.Product.class);
+                payloadProduct = JsonUtils.map(body, SapoProductResponse.Product.class);
                 if (payloadProduct == null) {
                     log.error("Failed to parse Sapo product webhook payload");
                     return false;
                 }
             } else if (topic.startsWith("orders")) {
-                payloadOrder = JsonUtils.fromJson(body, SapoOrderResponse.Order.class);
+                payloadOrder = JsonUtils.map(body, SapoOrderResponse.Order.class);
                 if (payloadOrder == null) {
                     log.error("Failed to parse Sapo order webhook payload");
                     return false;
                 }
             } else {
                 log.warn("Unknown webhook topic: {}", topic);
-                return true; // acknowledge unknown topics
+                return false; // acknowledge unknown topics
             }
 
             // 5. Process webhook data based on event type
+            SapoEvent event = SapoEvent.fromValue(topic);
+            if (ObjectUtils.isEmpty(event)) {
+                log.warn("Unhandled webhook event: {}", event);
+                return false;
+            }
+            webhookHistory.setSyncType(event.getSyncType());
+            webhookHistory.setEventType(event.getEventType());
 
-            return switch (topic) {
-                case "products/create" -> processProductWebhook(posId, payloadProduct);
-                case "products/delete" -> processProductDeleteWebhook(posId, payloadProduct);
-                case "products/update" -> processProductUpdateWebhook(posId, payloadProduct);
-                case "orders/create" -> processOrderCreateWebhook(posId, payloadOrder);
-                case "orders/delete" -> processOrderDeleteWebhook(posId, payloadOrder);
-                case "orders/update" -> processOrderUpdateWebhook(posId, payloadOrder);
-                default -> {
-                    log.warn("Unhandled webhook event type: {}", topic);
-                    yield true; // Return true for unhandled events to acknowledge receipt
-                }
+            boolean isSuccess = switch (event) {
+                case PRODUCT_ADD -> processProductWebhook(posId, payloadProduct);
+                case PRODUCT_DELETE -> processProductDeleteWebhook(posId, payloadProduct);
+                case PRODUCT_UPDATE -> processProductUpdateWebhook(posId, payloadProduct);
+                case ORDER_ADD -> processOrderCreateWebhook(posId, payloadOrder);
+                case ORDER_UPDATE -> false;
+                case ORDER_DELETE -> processOrderDeleteWebhook(posId, payloadOrder);
+                case ORDER_UPDATED -> processOrderUpdateWebhook(posId, payloadOrder);
             };
+
+            String webhookStatus = isSuccess ? WebhookConstants.Status.SUCCESS : WebhookConstants.Status.FAILED;
+            webhookHistory.setStatus(webhookStatus);
+            webhookHistory.setCreatedBy(WebhookConstants.WEBHOOK);
+            webhookHistory.setUpdatedBy(WebhookConstants.WEBHOOK);
+            return isSuccess;
         } catch (Exception e) {
             log.error("Failed to process Sapo webhook: {}", e.getMessage(), e);
             return false;
+        } finally {
+            webhookHistoryRepository.save(webhookHistory);
         }
-    }
-
-
-    private Map<String, String> extractHeaders(HttpServletRequest request) {
-        Map<String, String> map = new HashMap<>();
-        Enumeration<String> names = request.getHeaderNames();
-        if (names != null) {
-            while (names.hasMoreElements()) {
-                String name = names.nextElement();
-                String value = request.getHeader(name);
-                map.put(name, value);
-            }
-        }
-        return map;
     }
 
     /**
      * Process product create/update webhook
      */
-
     private boolean processProductWebhook(String posId, SapoProductResponse.Product payload) {
         try {
             // Convert and save product
@@ -154,12 +153,20 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 return false;
             }
 
-            // Delete variants first (foreign key constraint)
-            productVariantRepository.deleteByProductId(String.valueOf(productId));
-            log.info("Deleted variants for product: {}", productId);
+            // Delete variants first (foreign key constraint) - bulk delete by productId + posId
+            try {
+                productVariantRepository.deleteAllByProductIdAndPosId(String.valueOf(productId), posId);
+                log.info("Deleted variants for product: {}", productId);
+            } catch (Exception ex) {
+                log.warn("Delete variants skipped for product {} (possibly already deleted): {}", productId, ex.getMessage());
+            }
 
             // Delete product
-            productRepository.deleteById(new ProductId(String.valueOf(productId), posId));
+            try {
+                productRepository.deleteById(new ProductId(String.valueOf(productId), posId));
+            } catch (Exception ex) {
+                log.warn("Delete product skipped for product {} (possibly already deleted): {}", productId, ex.getMessage());
+            }
             log.info("Successfully processed Sapo product delete webhook for product: {}", productId);
 
             return true;
@@ -241,7 +248,8 @@ public class SapoWebhookServiceImpl implements WebhookService {
             }
 
             // Check and update modified timestamp
-            LocalDateTime newModifiedTime = parseSapoDateTime(payload.getModifiedOn());
+            LocalDateTime newModifiedTime = PosUtils.parseDateTime(payload.getModifiedOn());
+
             if (newModifiedTime != null && !newModifiedTime.equals(existingProduct.getUpdatedAt())) {
                 log.info("Updating product modified time: {} -> {}", existingProduct.getUpdatedAt(), newModifiedTime);
                 existingProduct.setUpdatedAt(newModifiedTime);
@@ -305,8 +313,8 @@ public class SapoWebhookServiceImpl implements WebhookService {
         }
 
         // Set timestamps - parse from string format
-        product.setCreatedAt(parseSapoDateTime(payload.getCreatedOn()));
-        product.setUpdatedAt(parseSapoDateTime(payload.getModifiedOn()));
+        product.setCreatedAt(PosUtils.parseDateTime(payload.getCreatedOn()));
+        product.setUpdatedAt(PosUtils.parseDateTime(payload.getModifiedOn()));
 
         return product;
     }
@@ -321,7 +329,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 .productId(String.valueOf(productId))
                 .sku(variant.getSku())
                 .barcode(variant.getBarcode())
-                .price(variant.getPrice() != null ? java.math.BigDecimal.valueOf(variant.getPrice()) : null)
+                .price(variant.getPrice() != null ? BigDecimal.valueOf(variant.getPrice()) : null)
                 .ccy("VND") // Default currency
                 .inventoryQuantity(variant.getInventoryQuantity())
                 .fulfillableQuantity(variant.getInventoryQuantity()) // Assume same as inventory
@@ -329,27 +337,6 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 .weightUnit(variant.getWeightUnit())
                 .attributes(JsonUtils.toJson(variant)) // Store full variant data as JSON
                 .build();
-    }
-
-    private LocalDateTime parseSapoDateTime(String dateTimeString) {
-        if (dateTimeString == null || dateTimeString.trim().isEmpty()) {
-            return null;
-        }
-
-        try {
-            // 1. Dùng Instant để xử lý chuỗi ISO 8601 có 'Z' (Zulu/UTC)
-            // Instant.parse() xử lý định dạng "yyyy-MM-ddTHH:mm:ssZ" hoặc có mili giây.
-            Instant instant = Instant.parse(dateTimeString.trim());
-
-            // 2. Chuyển Instant (UTC time) sang LocalDateTime (bỏ thông tin múi giờ)
-            // Sử dụng ZoneOffset.UTC để đảm bảo chuyển đổi chính xác từ UTC.
-            return LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
-
-        } catch (Exception e) {
-            // Ghi log chi tiết hơn để dễ debug
-            log.warn("[SapoServiceImpl] Failed to parse date time '{}'. Error: {}", dateTimeString, e.getMessage());
-            return null;
-        }
     }
 
     /**
@@ -474,8 +461,8 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 .totalPrice(sapoOrder.getTotalPrice())
                 .shippingFee(extractShippingFee(sapoOrder))
                 .discountAmount(extractDiscountAmount(sapoOrder))
-                .createdAt(parseSapoDateTime(sapoOrder.getCreatedOn()))
-                .updatedAt(parseSapoDateTime(sapoOrder.getCancelledOn()))
+                .createdAt(PosUtils.parseDateTime(sapoOrder.getCreatedOn()))
+                .updatedAt(PosUtils.parseDateTime(sapoOrder.getCancelledOn()))
                 .build();
     }
 
@@ -483,19 +470,21 @@ public class SapoWebhookServiceImpl implements WebhookService {
      * Convert SapoLineItem to OrderItemEntity
      */
     private OrderItemEntity convertToOrderItemEntity(SapoOrderResponse.LineItem sapoLineItem, String orderId) {
-        BigDecimal totalPrice = sapoLineItem.getPrice().multiply(BigDecimal.valueOf(sapoLineItem.getQuantity()));
+        BigDecimal price = sapoLineItem.getPrice() != null ? sapoLineItem.getPrice() : BigDecimal.ZERO;
+        int quantity = sapoLineItem.getQuantity() != null ? sapoLineItem.getQuantity() : 0;
+        BigDecimal totalPrice = price.multiply(BigDecimal.valueOf(quantity));
 
         return OrderItemEntity.builder()
                 .orderId(orderId)
+                .orderItemId(sapoLineItem.getId() != null ? String.valueOf(sapoLineItem.getId()) : UUID.randomUUID().toString())
                 .sku(sapoLineItem.getSku())
-                .productName(sapoLineItem.getTitle())
-                .variantName(sapoLineItem.getVariantTitle())
-                .quantity(sapoLineItem.getQuantity())
-                .price(sapoLineItem.getPrice())
+                .productName(sapoLineItem.getTitle() != null ? sapoLineItem.getTitle() : null)
+                .variantName(sapoLineItem.getVariantTitle() != null ? sapoLineItem.getVariantTitle() : null)
+                .quantity(quantity)
+                .price(price)
                 .totalPrice(totalPrice)
-                .fulfillableQuantity(sapoLineItem.getCurrentQuantity())
+                .fulfillableQuantity(sapoLineItem.getCurrentQuantity() != null ? sapoLineItem.getCurrentQuantity() : 0)
                 .createdAt(LocalDateTime.now())
-                .createdBy(claimUtil.getUserName())
                 .build();
     }
 

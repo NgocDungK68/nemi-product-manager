@@ -1,15 +1,15 @@
-package com.nemi.model.response.pancake;
+package com.nemi.model.request.pancake;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.nemi.model.response.pancake.PancakeOrderResponse;
 import lombok.Data;
 
 import java.util.List;
-import java.util.Map;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Data
-public class PancakeWebhookResponse {
+public class PancakeWebhookRequest {
 
     @JsonProperty("type")
     private String type;

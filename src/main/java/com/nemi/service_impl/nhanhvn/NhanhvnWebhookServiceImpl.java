@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.client.NhanhvnClient;
 import com.nemi.configuration.NhanhvnConfig;
+import com.nemi.constant.WebhookConstants;
 import com.nemi.entity.*;
 import com.nemi.enums.NhanhvnEvent;
 import com.nemi.enums.PosName;
@@ -13,12 +14,10 @@ import com.nemi.exception.pojo.AlertMessages;
 import com.nemi.model.request.nhanhvn.NhanhvnRequest;
 import com.nemi.model.response.nhanhvn.NhanhvnOrderResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
-import com.nemi.model.response.nhanhvn.NhanhvnWebhookResponse;
+import com.nemi.model.request.nhanhvn.NhanhvnWebhookRequest;
 import com.nemi.repository.*;
 import com.nemi.service.WebhookService;
 import com.nemi.util.JsonUtils;
-import com.nemi.utils.PosUtils;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -42,6 +41,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
     private final NhanhvnClient nhanhvnClient;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
+    private final WebhookHistoryRepository webhookHistoryRepository;
 
     @Override
     public String getPosName() {
@@ -49,39 +49,55 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
     }
 
     @Override
-    public boolean processWebhook(String posId, HttpServletRequest request) {
+    public boolean processWebhook(String posId, Map<String, String> headers, Object body) {
+        WebhookHistoryEntity webhookHistory = WebhookHistoryEntity.builder()
+                .header(JsonUtils.toJson(headers))
+                .syncType(WebhookConstants.UNKNOWN)
+                .eventType(WebhookConstants.UNKNOWN)
+                .status(WebhookConstants.Status.FAILED)
+                .createdBy(WebhookConstants.UNKNOWN)
+                .updatedBy(WebhookConstants.UNKNOWN)
+                .build();
         try {
-            String verifyToken = request.getHeader(HttpHeaders.AUTHORIZATION);
+            String verifyToken = headers.get(HttpHeaders.AUTHORIZATION);
             if (ObjectUtils.isEmpty(verifyToken) || !verifyToken.equals(nhanhvnConfig.getVerifyToken())) {
                 log.error("[NhanhvnWebhookServiceImpl.processWebhook] Invalid verify token: {}", verifyToken);
                 return false;
             }
 
-            String body = PosUtils.readBody(request);
-            log.info("[NhanhvnWebhookServiceImpl.processWebhook] Body: {}", body);
-
-            NhanhvnWebhookResponse webhookResponse = JsonUtils.fromJson(body, NhanhvnWebhookResponse.class);
-            log.info("[NhanhvnWebhookServiceImpl.processWebhook] Webhook response convert from Body: {}", webhookResponse);
-            if (ObjectUtils.isEmpty(webhookResponse) || ObjectUtils.isEmpty(webhookResponse.getEvent())) {
+            NhanhvnWebhookRequest webhookRequest = JsonUtils.map(body, NhanhvnWebhookRequest.class);
+            webhookHistory.setBody(JsonUtils.toJson(webhookRequest));
+            log.info("[NhanhvnWebhookServiceImpl.processWebhook] Webhook response convert from Body: {}", webhookRequest);
+            if (ObjectUtils.isEmpty(webhookRequest) || ObjectUtils.isEmpty(webhookRequest.getEvent())) {
                 log.error("[NhanhvnWebhookServiceImpl.processWebhook] Invalid webhook payload: {}", body);
                 return false;
             }
 
-            return handleEvent(posId, webhookResponse);
+            boolean isSuccess = handleEvent(posId, webhookRequest, webhookHistory);
+            String webhookStatus = isSuccess ? WebhookConstants.Status.SUCCESS : WebhookConstants.Status.FAILED;
+            webhookHistory.setStatus(webhookStatus);
+            webhookHistory.setCreatedBy(WebhookConstants.WEBHOOK);
+            webhookHistory.setUpdatedBy(WebhookConstants.WEBHOOK);
+            return isSuccess;
         } catch (Exception e) {
             log.error("[NhanhvnWebhookServiceImpl.processWebhook] Process webhook failed: {}", e.getMessage(), e);
             return false;
+        } finally {
+            webhookHistoryRepository.save(webhookHistory);
         }
     }
 
-    private boolean handleEvent(String posId, NhanhvnWebhookResponse webhookResponse) {
-        NhanhvnEvent event = NhanhvnEvent.fromValue(webhookResponse.getEvent());
-        Object data = webhookResponse.getData();
+    private boolean handleEvent(String posId, NhanhvnWebhookRequest webhookRequest, WebhookHistoryEntity webhookHistory) {
+        NhanhvnEvent event = NhanhvnEvent.fromValue(webhookRequest.getEvent());
+        Object data = webhookRequest.getData();
 
         if (ObjectUtils.isEmpty(event)) {
-            log.warn("[NhanhvnWebhookServiceImpl.handleEvent] Unhandled webhook event: {}", webhookResponse.getEvent());
+            log.warn("[NhanhvnWebhookServiceImpl.handleEvent] Unhandled webhook event: {}", webhookRequest.getEvent());
             return false;
         }
+
+        webhookHistory.setSyncType(event.getSyncType());
+        webhookHistory.setEventType(event.getEventType());
 
         return switch (event) {
             case WEBHOOKS_ENABLED -> handleWebhooksEnabled(posId, data);

@@ -253,17 +253,17 @@ public class PancakeServiceImpl implements PosManagementService {
     public OrderEntity convertToOrderEntity(String posId, PancakeOrderResponse.DataItem apiOrders) {
         String status = Optional.ofNullable(apiOrders.getStatus())
                 .map(code -> pancakeConfig.getOrder().getStatus().getMapping()
-                        .getOrDefault(code, "unknown"))
+                        .getOrDefault(code, Status.UNKNOWN.getValue()))
                 .orElse(apiOrders.getStatusName());
 
         String paymentMethod = Optional.ofNullable(apiOrders.getPaymentPurchaseHistories())
                 .filter(histories -> !histories.isEmpty())
                 .map(histories -> histories.get(0).getType())
-                .orElse("unknown");
+                .orElse(Status.UNKNOWN.getValue());
 
         String orderCode = Optional.ofNullable(apiOrders.getPartner())
                 .map(PancakeOrderResponse.Partner::getExtendCode)
-                .orElse("unknown");
+                .orElse(Status.UNKNOWN.getValue());
 
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String createdBy = (auth != null && auth.isAuthenticated()) ? claimUtil.getUserName() : "SYSTEM";
@@ -279,7 +279,7 @@ public class PancakeServiceImpl implements PosManagementService {
                 .paymentMethod(paymentMethod)
                 .shippingFee(apiOrders.getShippingFee())
                 .totalPrice(apiOrders.getTotalPrice())
-                .status(status.toUpperCase())
+                .status(status)
                 .createdBy(createdBy)
                 .build();
     }
