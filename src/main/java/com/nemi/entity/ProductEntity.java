@@ -12,7 +12,7 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor
 @Entity
 @SuperBuilder
-@Table(name = "products", schema = "product_manager")
+    @Table(name = "products", schema = "product_manager")
 @IdClass(ProductId.class)
 public class ProductEntity extends BaseEntity {
     @Id

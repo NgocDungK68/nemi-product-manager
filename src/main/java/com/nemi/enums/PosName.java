@@ -3,7 +3,8 @@ package com.nemi.enums;
 public enum PosName {
     NHANHVN("nhanhvn"),
     SAPO("sapo"),
-    PANCAKE("pancake");
+    PANCAKE("pancake"),
+    WEBHOOK("webhook");
 
     private final String value;
 

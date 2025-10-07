@@ -1,6 +1,6 @@
 package com.nemi.enums;
 
-public enum OrderStatus {
+public enum Status {
     NEW("new"),
     PROCESSING("processing"),
     READY_TO_SHIP("ready_to_ship"),
@@ -8,11 +8,13 @@ public enum OrderStatus {
     DELIVERED("delivered"),
     CANCELLED("cancelled"),
     FAILED("failed"),
-    RETURNED("returned");
+    RETURNED("returned"),
+    UNKNOWN("unknown");
+
 
     private final String value;
 
-    OrderStatus(String value) {
+    Status(String value) {
         this.value = value;
     }
 
