@@ -8,11 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -27,6 +23,7 @@ import java.util.Map;
 public class WebhookController {
 
     private final WebhookFactory webhookFactory;
+    private final HttpServletRequest httpServletRequest;
 
     /**
      * Unified webhook endpoint for all webhook types
@@ -36,17 +33,15 @@ public class WebhookController {
      * - POST /webhook/sapo -> webhookType = "sapo"
      */
     @PostMapping("/{posName}/{posId}")
-    public ResponseEntity<String> receiveWebhook(
+    public void receiveWebhook(
             @PathVariable String posName,
             @PathVariable String posId,
-            HttpServletRequest request) {
+            @RequestBody Object body) {
 
         log.info("=== UNIFIED WEBHOOK RECEIVED ===");
-        log.info("Webhook type: {}, PosId: {}, Request URI: {}, Request method: {}", posName, posId, request.getRequestURI(), request.getMethod());
+        log.info("Webhook type: {}, PosId: {}", posName, posId);
 
-        Map<String, String> headers = PosUtils.extractHeaders(request);
-        String body = PosUtils.readBody(request);
-
+        Map<String, String> headers = PosUtils.extractHeaders(httpServletRequest);
         log.debug("Webhook headers:");
         headers.forEach((k, v) -> log.debug("  {} = {}", k, v));
         log.debug("Webhook body: {}", body);
@@ -62,8 +57,6 @@ public class WebhookController {
         log.info("Webhook processed by {} with result: {}",
                 webhookService.getClass().getSimpleName(),
                 webhookStatus);
-
-        return ResponseEntity.ok(webhookStatus);
     }
 
     @PostMapping("/pancake/test")

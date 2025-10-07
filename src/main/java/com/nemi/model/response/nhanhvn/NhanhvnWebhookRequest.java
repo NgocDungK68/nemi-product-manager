@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class NhanhvnWebhookResponse {
+public class NhanhvnWebhookRequest {
     private String event;
     private String businessId;
     private Object data;
