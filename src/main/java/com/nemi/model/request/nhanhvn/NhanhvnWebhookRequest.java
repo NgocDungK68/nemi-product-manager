@@ -1,4 +1,4 @@
-package com.nemi.model.response.nhanhvn;
+package com.nemi.model.request.nhanhvn;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;

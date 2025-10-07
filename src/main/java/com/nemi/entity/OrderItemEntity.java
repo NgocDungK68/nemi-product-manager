@@ -25,7 +25,7 @@ public class OrderItemEntity extends BaseEntity {
     private String orderItemId;   // ID của order_item (primary key)
 
     @JsonProperty("order_id")
-    private String  orderId;       // FK tới Order
+    private String orderId;       // FK tới Order
 
     @JsonProperty("sku")
     private String sku;

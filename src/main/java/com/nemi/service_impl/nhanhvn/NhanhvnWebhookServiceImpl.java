@@ -14,7 +14,7 @@ import com.nemi.exception.pojo.AlertMessages;
 import com.nemi.model.request.nhanhvn.NhanhvnRequest;
 import com.nemi.model.response.nhanhvn.NhanhvnOrderResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
-import com.nemi.model.response.nhanhvn.NhanhvnWebhookRequest;
+import com.nemi.model.request.nhanhvn.NhanhvnWebhookRequest;
 import com.nemi.repository.*;
 import com.nemi.service.WebhookService;
 import com.nemi.util.JsonUtils;
@@ -52,6 +52,8 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
     public boolean processWebhook(String posId, Map<String, String> headers, Object body) {
         WebhookHistoryEntity webhookHistory = WebhookHistoryEntity.builder()
                 .header(JsonUtils.toJson(headers))
+                .syncType(WebhookConstants.UNKNOWN)
+                .eventType(WebhookConstants.UNKNOWN)
                 .status(WebhookConstants.Status.FAILED)
                 .createdBy(WebhookConstants.UNKNOWN)
                 .updatedBy(WebhookConstants.UNKNOWN)
@@ -75,7 +77,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
             String webhookStatus = isSuccess ? WebhookConstants.Status.SUCCESS : WebhookConstants.Status.FAILED;
             webhookHistory.setStatus(webhookStatus);
             webhookHistory.setCreatedBy(WebhookConstants.WEBHOOK);
-
+            webhookHistory.setUpdatedBy(WebhookConstants.WEBHOOK);
             return isSuccess;
         } catch (Exception e) {
             log.error("[NhanhvnWebhookServiceImpl.processWebhook] Process webhook failed: {}", e.getMessage(), e);
@@ -85,14 +87,12 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
         }
     }
 
-    private boolean handleEvent(String posId, NhanhvnWebhookRequest webhookResponse, WebhookHistoryEntity webhookHistory) {
-        NhanhvnEvent event = NhanhvnEvent.fromValue(webhookResponse.getEvent());
-        Object data = webhookResponse.getData();
+    private boolean handleEvent(String posId, NhanhvnWebhookRequest webhookRequest, WebhookHistoryEntity webhookHistory) {
+        NhanhvnEvent event = NhanhvnEvent.fromValue(webhookRequest.getEvent());
+        Object data = webhookRequest.getData();
 
         if (ObjectUtils.isEmpty(event)) {
-            log.warn("[NhanhvnWebhookServiceImpl.handleEvent] Unhandled webhook event: {}", webhookResponse.getEvent());
-            webhookHistory.setSyncType(WebhookConstants.UNKNOWN);
-            webhookHistory.setEventType(WebhookConstants.UNKNOWN);
+            log.warn("[NhanhvnWebhookServiceImpl.handleEvent] Unhandled webhook event: {}", webhookRequest.getEvent());
             return false;
         }
 
