@@ -18,6 +18,7 @@ public final class WebhookConstants {
     public static final class EventType {
         public static final String ADD = "ADD";
         public static final String UPDATE = "UPDATE";
+        public static final String UPDATED = "UPDATED";
         public static final String DELETE = "DELETE";
         public static final String ENABLED = "ENABLED";
         public static final String UNINSTALLED = "UNINSTALLED";

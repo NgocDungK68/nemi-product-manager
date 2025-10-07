@@ -22,6 +22,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -81,8 +82,9 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 case PRODUCT_DELETE -> processProductDeleteWebhook(posId, payloadProduct);
                 case PRODUCT_UPDATE -> processProductUpdateWebhook(posId, payloadProduct);
                 case ORDER_ADD -> processOrderCreateWebhook(posId, payloadOrder);
+                case ORDER_UPDATE -> false;
                 case ORDER_DELETE -> processOrderDeleteWebhook(posId, payloadOrder);
-                case ORDER_UPDATE -> processOrderUpdateWebhook(posId, payloadOrder);
+                case ORDER_UPDATED -> processOrderUpdateWebhook(posId, payloadOrder);
             };
         } catch (Exception e) {
             log.error("Failed to process Sapo webhook: {}", e.getMessage(), e);
@@ -310,7 +312,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 .productId(String.valueOf(productId))
                 .sku(variant.getSku())
                 .barcode(variant.getBarcode())
-                .price(variant.getPrice() != null ? java.math.BigDecimal.valueOf(variant.getPrice()) : null)
+                .price(variant.getPrice() != null ? BigDecimal.valueOf(variant.getPrice()) : null)
                 .ccy("VND") // Default currency
                 .inventoryQuantity(variant.getInventoryQuantity())
                 .fulfillableQuantity(variant.getInventoryQuantity()) // Assume same as inventory
@@ -457,7 +459,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
 
         return OrderItemEntity.builder()
                 .orderId(orderId)
-                .orderItemId(sapoLineItem.getId() != null ? String.valueOf(sapoLineItem.getId()) : java.util.UUID.randomUUID().toString())
+                .orderItemId(sapoLineItem.getId() != null ? String.valueOf(sapoLineItem.getId()) : UUID.randomUUID().toString())
                 .sku(sapoLineItem.getSku())
                 .productName(sapoLineItem.getTitle() != null ? sapoLineItem.getTitle() : null)
                 .variantName(sapoLineItem.getVariantTitle() != null ? sapoLineItem.getVariantTitle() : null)
