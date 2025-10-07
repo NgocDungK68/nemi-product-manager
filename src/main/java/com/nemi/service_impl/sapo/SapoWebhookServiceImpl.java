@@ -154,12 +154,20 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 return false;
             }
 
-            // Delete variants first (foreign key constraint)
-            productVariantRepository.deleteByProductId(String.valueOf(productId));
-            log.info("Deleted variants for product: {}", productId);
+            // Delete variants first (foreign key constraint) - bulk delete by productId + posId
+            try {
+                productVariantRepository.deleteAllByProductIdAndPosId(String.valueOf(productId), posId);
+                log.info("Deleted variants for product: {}", productId);
+            } catch (Exception ex) {
+                log.warn("Delete variants skipped for product {} (possibly already deleted): {}", productId, ex.getMessage());
+            }
 
             // Delete product
-            productRepository.deleteById(new ProductId(String.valueOf(productId), posId));
+            try {
+                productRepository.deleteById(new ProductId(String.valueOf(productId), posId));
+            } catch (Exception ex) {
+                log.warn("Delete product skipped for product {} (possibly already deleted): {}", productId, ex.getMessage());
+            }
             log.info("Successfully processed Sapo product delete webhook for product: {}", productId);
 
             return true;
