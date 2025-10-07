@@ -6,30 +6,26 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Getter
-public enum PancakEvent {
-
+public enum PancakeEvent {
     INVENTORY_CHANGE("inventoryChange"),
     ORDER_ADD("create"),
     ORDER_UPDATE("update"),
     ORDER_DELETE("delete");
-    private static final Map<String, PancakEvent> CONSTANTS = new HashMap<>();
+    private static final Map<String, PancakeEvent> CONSTANTS = new HashMap<>();
 
     private final String value;
 
-    PancakEvent(String value) {
+    PancakeEvent(String value) {
         this.value = value;
-    }
-    public String getValue() {
-        return value;
     }
 
     static {
-        for (PancakEvent e : PancakEvent.values()) {
+        for (PancakeEvent e : PancakeEvent.values()) {
             CONSTANTS.put(e.value, e);
         }
     }
 
-    public static PancakEvent fromValue(String value) {
+    public static PancakeEvent fromValue(String value) {
         return CONSTANTS.get(value);
     }
 }

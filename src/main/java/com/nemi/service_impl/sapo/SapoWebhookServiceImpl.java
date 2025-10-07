@@ -13,17 +13,16 @@ import com.nemi.service.WebhookService;
 import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
 import com.nemi.utils.PosUtils;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -43,18 +42,9 @@ public class SapoWebhookServiceImpl implements WebhookService {
 
     @Override
     @Transactional
-    public boolean processWebhook(String posId, HttpServletRequest request) {
+    public boolean processWebhook(String posId, Map<String, String> headers, String body) {
         try {
-            // 1. Read headers
-            Map<String, String> headers = extractHeaders(request);
-            log.info("=== Sapo Webhook received for posId: {} ===", posId);
-            log.info("Headers:");
-            headers.forEach((k, v) -> log.info("  {} = {}", k, v));
-
-            // 2. Read raw body
-            String body = PosUtils.readBody(request);
-            log.info("Payload body: {}", body);
-            String topic = request.getHeader("x-sapo-topic");
+            String topic = headers.get("x-sapo-topic");
 
             SapoProductResponse.Product payloadProduct = null;
             SapoOrderResponse.Order payloadOrder = null;
@@ -97,24 +87,9 @@ public class SapoWebhookServiceImpl implements WebhookService {
         }
     }
 
-
-    private Map<String, String> extractHeaders(HttpServletRequest request) {
-        Map<String, String> map = new HashMap<>();
-        Enumeration<String> names = request.getHeaderNames();
-        if (names != null) {
-            while (names.hasMoreElements()) {
-                String name = names.nextElement();
-                String value = request.getHeader(name);
-                map.put(name, value);
-            }
-        }
-        return map;
-    }
-
     /**
      * Process product create/update webhook
      */
-
     private boolean processProductWebhook(String posId, SapoProductResponse.Product payload) {
         try {
             // Convert and save product
@@ -249,7 +224,8 @@ public class SapoWebhookServiceImpl implements WebhookService {
             }
 
             // Check and update modified timestamp
-            LocalDateTime newModifiedTime = parseSapoDateTime(payload.getModifiedOn());
+            LocalDateTime newModifiedTime = PosUtils.parseDateTime(payload.getModifiedOn());
+
             if (newModifiedTime != null && !newModifiedTime.equals(existingProduct.getUpdatedAt())) {
                 log.info("Updating product modified time: {} -> {}", existingProduct.getUpdatedAt(), newModifiedTime);
                 existingProduct.setUpdatedAt(newModifiedTime);
@@ -313,8 +289,8 @@ public class SapoWebhookServiceImpl implements WebhookService {
         }
 
         // Set timestamps - parse from string format
-        product.setCreatedAt(parseSapoDateTime(payload.getCreatedOn()));
-        product.setUpdatedAt(parseSapoDateTime(payload.getModifiedOn()));
+        product.setCreatedAt(PosUtils.parseDateTime(payload.getCreatedOn()));
+        product.setUpdatedAt(PosUtils.parseDateTime(payload.getModifiedOn()));
 
         return product;
     }
@@ -337,27 +313,6 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 .weightUnit(variant.getWeightUnit())
                 .attributes(JsonUtils.toJson(variant)) // Store full variant data as JSON
                 .build();
-    }
-
-    private LocalDateTime parseSapoDateTime(String dateTimeString) {
-        if (dateTimeString == null || dateTimeString.trim().isEmpty()) {
-            return null;
-        }
-
-        try {
-            // 1. Dùng Instant để xử lý chuỗi ISO 8601 có 'Z' (Zulu/UTC)
-            // Instant.parse() xử lý định dạng "yyyy-MM-ddTHH:mm:ssZ" hoặc có mili giây.
-            Instant instant = Instant.parse(dateTimeString.trim());
-
-            // 2. Chuyển Instant (UTC time) sang LocalDateTime (bỏ thông tin múi giờ)
-            // Sử dụng ZoneOffset.UTC để đảm bảo chuyển đổi chính xác từ UTC.
-            return LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
-
-        } catch (Exception e) {
-            // Ghi log chi tiết hơn để dễ debug
-            log.warn("[SapoServiceImpl] Failed to parse date time '{}'. Error: {}", dateTimeString, e.getMessage());
-            return null;
-        }
     }
 
     /**
@@ -482,8 +437,8 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 .totalPrice(sapoOrder.getTotalPrice())
                 .shippingFee(extractShippingFee(sapoOrder))
                 .discountAmount(extractDiscountAmount(sapoOrder))
-                .createdAt(parseSapoDateTime(sapoOrder.getCreatedOn()))
-                .updatedAt(parseSapoDateTime(sapoOrder.getCancelledOn()))
+                .createdAt(PosUtils.parseDateTime(sapoOrder.getCreatedOn()))
+                .updatedAt(PosUtils.parseDateTime(sapoOrder.getCancelledOn()))
                 .build();
     }
 

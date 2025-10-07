@@ -1,5 +1,8 @@
 package com.nemi.enums;
 
+import lombok.Getter;
+
+@Getter
 public enum SyncErrorMessage {
     MISSING_CONFIG("Missing required configuration for POS"),
     CONNECTION_FAILED("Failed to connect to POS"),
@@ -21,9 +24,5 @@ public enum SyncErrorMessage {
 
     SyncErrorMessage(String message) {
         this.message = message;
-    }
-
-    public String getMessage() {
-        return message;
     }
 }
