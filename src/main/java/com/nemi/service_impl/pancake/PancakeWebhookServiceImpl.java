@@ -2,23 +2,25 @@ package com.nemi.service_impl.pancake;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.configuration.PancakeConfig;
+import com.nemi.constant.PancakeConstatns;
+import com.nemi.constant.WebhookConstants;
 import com.nemi.entity.OrderEntity;
 import com.nemi.entity.OrderItemEntity;
+import com.nemi.entity.WebhookHistoryEntity;
 import com.nemi.enums.PancakeEvent;
 import com.nemi.enums.PosName;
 import com.nemi.enums.Status;
 import com.nemi.model.response.pancake.PancakeOrderResponse;
-import com.nemi.model.response.pancake.PancakeWebhookResponse;
-import com.nemi.repository.OrderItemRepository;
-import com.nemi.repository.OrderRepository;
-import com.nemi.repository.ProductRepository;
-import com.nemi.repository.ProductVariantRepository;
+import com.nemi.model.request.pancake.PancakeWebhookRequest;
+import com.nemi.repository.*;
 import com.nemi.service.WebhookService;
 import com.nemi.util.JsonUtils;
 import io.jsonwebtoken.lang.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.util.ObjectUtils;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -42,6 +44,7 @@ public class PancakeWebhookServiceImpl implements WebhookService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final PancakeServiceImpl pancakeService;
+    private final WebhookHistoryRepository webhookHistoryRepository;
 
     @Override
     public String getPosName() {
@@ -50,39 +53,59 @@ public class PancakeWebhookServiceImpl implements WebhookService {
 
     @Override
     public boolean processWebhook(String posId, Map<String, String> headers, Object body) {
+        WebhookHistoryEntity webhookHistory = WebhookHistoryEntity.builder()
+                .header(JsonUtils.toJson(headers))
+                .syncType(WebhookConstants.UNKNOWN)
+                .eventType(WebhookConstants.UNKNOWN)
+                .status(WebhookConstants.Status.FAILED)
+                .createdBy(WebhookConstants.UNKNOWN)
+                .updatedBy(WebhookConstants.UNKNOWN)
+                .build();
         try {
             // 1. Xác thực header x-api-key
-            String apiKey = headers.get("x-api-key");
+            String apiKey = headers.get(PancakeConstatns.X_API_KEY);
             if (Objects.isEmpty(apiKey) || !apiKey.equals(pancakeConfig.getXApiKey())) { //sau nay de thg user nhap rong connect post- regiset webhook gi do...
                 log.error("[PancakeWebhookServiceImpl.processWebhook] Invalid x-api-key: {}", apiKey);
                 return false;
             }
 
             // 2. Parse JSON về model
-            PancakeWebhookResponse webhookResponse = JsonUtils.map(body, PancakeWebhookResponse.class);
-            if (Objects.isEmpty(webhookResponse) || Objects.isEmpty(webhookResponse.getEventType())) {
+            PancakeWebhookRequest webhookRequest = JsonUtils.map(body, PancakeWebhookRequest.class);
+            if (Objects.isEmpty(webhookRequest) || Objects.isEmpty(webhookRequest.getEventType())) {
                 log.error("[PancakeWebhookServiceImpl.processWebhook] Invalid webhook payload: {}", body);
                 return false;
             }
 
-            log.info("[PancakeWebhookServiceImpl.processWebhook] Parsed webhook: {}", webhookResponse.getType());
+            log.info("[PancakeWebhookServiceImpl.processWebhook] Parsed webhook: {}", webhookRequest.getType());
 
             // 3. Xử lý từng loại webhook
-            return handleEvent(posId, webhookResponse);
-
+            boolean isSuccess = handleEvent(posId, webhookRequest, webhookHistory);
+            String webhookStatus = isSuccess ? WebhookConstants.Status.SUCCESS : WebhookConstants.Status.FAILED;
+            webhookHistory.setStatus(webhookStatus);
+            webhookHistory.setCreatedBy(WebhookConstants.WEBHOOK);
+            webhookHistory.setUpdatedBy(WebhookConstants.WEBHOOK);
+            return isSuccess;
         } catch (Exception e) {
             log.error("[PancakeWebhookServiceImpl.processWebhook] Process webhook failed: {}", e.getMessage(), e);
             return false;
+        } finally {
+            webhookHistoryRepository.save(webhookHistory);
         }
     }
 
-    private boolean handleEvent(String posId, PancakeWebhookResponse response) {
-        PancakeEvent event = PancakeEvent.fromValue(response.getEventType());
+    private boolean handleEvent(String posId, PancakeWebhookRequest request, WebhookHistoryEntity webhookHistory) {
+        PancakeEvent event = PancakeEvent.fromValue(request.getEventType());
+        if (ObjectUtils.isEmpty(event.getEventType())) {
+            log.warn("[PancakeWebhookServiceImpl.handleEvent] Unhandled webhook event: {}", request.getEventType());
+            return false;
+        }
+        webhookHistory.setSyncType(event.getSyncType());
+        webhookHistory.setEventType(event.getEventType());
 
         return switch (event) {
-            case ORDER_ADD -> handleOrderWebhook(posId, response);
-            case ORDER_UPDATE -> handleOrderWebhook(posId, response);
-//            case ORDER_DELETE -> handleOrderWebhook(posId, response); luc nao cx update
+            case ORDER_ADD -> handleOrderWebhook(posId, request);
+            case ORDER_UPDATE -> handleOrderWebhook(posId, request);
+//            case ORDER_DELETE -> handleOrderWebhook(posId, request); luc nao cx update
             default -> {
                 log.warn("[PancakeWebhookServiceImpl.handleEvent] Unsupported webhook type: {}", event);
                 yield false;
@@ -95,7 +118,7 @@ public class PancakeWebhookServiceImpl implements WebhookService {
      * - Khi status đổi (add/update/delete)
      * - Có thể gồm nhiều history/status_history
      */
-    private boolean handleOrderWebhook(String posId, PancakeWebhookResponse webhookResponse) {
+    private boolean handleOrderWebhook(String posId, PancakeWebhookRequest webhookResponse) {
         PancakeOrderResponse.DataItem orderData = objectMapper.convertValue(
                 webhookResponse, PancakeOrderResponse.DataItem.class
         );

@@ -42,5 +42,4 @@ public class ProductEntity extends BaseEntity {
 
     @Column(name = "images", columnDefinition = "TEXT")
     private String images;
-
 }

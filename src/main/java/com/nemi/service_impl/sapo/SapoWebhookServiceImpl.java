@@ -1,6 +1,7 @@
 package com.nemi.service_impl.sapo;
 
 import com.nemi.configuration.SapoConfig;
+import com.nemi.constant.SapoConstants;
 import com.nemi.constant.WebhookConstants;
 import com.nemi.entity.*;
 import com.nemi.enums.NhanhvnEvent;
@@ -17,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.ObjectUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -48,16 +50,18 @@ public class SapoWebhookServiceImpl implements WebhookService {
         WebhookHistoryEntity webhookHistory = WebhookHistoryEntity.builder()
                 .header(JsonUtils.toJson(headers))
                 .status(WebhookConstants.Status.FAILED)
+                .syncType(WebhookConstants.UNKNOWN)
+                .eventType(WebhookConstants.UNKNOWN)
                 .createdBy(WebhookConstants.UNKNOWN)
                 .updatedBy(WebhookConstants.UNKNOWN)
                 .build();
         try {
-            String topic = headers.get("x-sapo-topic");
+            String topic = headers.get(SapoConstants.X_SAPO_TOPIC);
 
             SapoProductResponse.Product payloadProduct = null;
             SapoOrderResponse.Order payloadOrder = null;
 
-            // 1️⃣ Parse payload theo loại topic
+            // Parse payload theo loại topic
             if (topic.startsWith("products")) {
                 payloadProduct = JsonUtils.map(body, SapoProductResponse.Product.class);
                 if (payloadProduct == null) {
@@ -72,12 +76,19 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 }
             } else {
                 log.warn("Unknown webhook topic: {}", topic);
-                return true; // acknowledge unknown topics
+                return false; // acknowledge unknown topics
             }
 
             // 5. Process webhook data based on event type
             SapoEvent event = SapoEvent.fromValue(topic);
-            return switch (event) {
+            if (ObjectUtils.isEmpty(event)) {
+                log.warn("Unhandled webhook event: {}", event);
+                return false;
+            }
+            webhookHistory.setSyncType(event.getSyncType());
+            webhookHistory.setEventType(event.getEventType());
+
+            boolean isSuccess = switch (event) {
                 case PRODUCT_ADD -> processProductWebhook(posId, payloadProduct);
                 case PRODUCT_DELETE -> processProductDeleteWebhook(posId, payloadProduct);
                 case PRODUCT_UPDATE -> processProductUpdateWebhook(posId, payloadProduct);
@@ -85,6 +96,12 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 case ORDER_DELETE -> processOrderDeleteWebhook(posId, payloadOrder);
                 case ORDER_UPDATE -> processOrderUpdateWebhook(posId, payloadOrder);
             };
+
+            String webhookStatus = isSuccess ? WebhookConstants.Status.SUCCESS : WebhookConstants.Status.FAILED;
+            webhookHistory.setStatus(webhookStatus);
+            webhookHistory.setCreatedBy(WebhookConstants.WEBHOOK);
+            webhookHistory.setUpdatedBy(WebhookConstants.WEBHOOK);
+            return isSuccess;
         } catch (Exception e) {
             log.error("Failed to process Sapo webhook: {}", e.getMessage(), e);
             return false;
