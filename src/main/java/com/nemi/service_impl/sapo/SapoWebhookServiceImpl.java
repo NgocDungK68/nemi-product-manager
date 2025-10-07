@@ -1,5 +1,6 @@
 package com.nemi.service_impl.sapo;
 
+import com.nemi.configuration.SapoConfig;
 import com.nemi.entity.*;
 import com.nemi.enums.PosName;
 import com.nemi.model.response.sapo.SapoOrderResponse;
@@ -9,6 +10,7 @@ import com.nemi.repository.OrderRepository;
 import com.nemi.repository.ProductRepository;
 import com.nemi.repository.ProductVariantRepository;
 import com.nemi.service.WebhookService;
+import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
 import com.nemi.utils.PosUtils;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +33,8 @@ public class SapoWebhookServiceImpl implements WebhookService {
     private final ProductVariantRepository productVariantRepository;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
+    private final SapoConfig sapoConfig;
+    private final ClaimUtil claimUtil;
     @Override
     public String getPosName() {
         return PosName.SAPO.getValue();
@@ -40,35 +44,45 @@ public class SapoWebhookServiceImpl implements WebhookService {
     @Transactional
     public boolean processWebhook(String posId, Map<String, String> headers, String body) {
         try {
-            if (!body.trim().isEmpty()) {
-                SapoProductResponse.Product payloadProduct = JsonUtils.fromJson(body, SapoProductResponse.Product.class);
-                SapoOrderResponse.Order payloadOrder = JsonUtils.fromJson(body, SapoOrderResponse.Order.class);
-                if (payloadProduct == null || payloadOrder == null) {
-                    log.error("Failed to parse webhook payload ");
+            String topic = headers.get("x-sapo-topic");
+
+            SapoProductResponse.Product payloadProduct = null;
+            SapoOrderResponse.Order payloadOrder = null;
+
+            // 1️⃣ Parse payload theo loại topic
+            if (topic.startsWith("products")) {
+                payloadProduct = JsonUtils.fromJson(body, SapoProductResponse.Product.class);
+                if (payloadProduct == null) {
+                    log.error("Failed to parse Sapo product webhook payload");
                     return false;
                 }
-
-                // 4. Process webhook data based on event type
-                String topic = headers.get("x-sapo-topic");
-                return switch (topic) {
-                    case "products/create" -> processProductWebhook(posId, payloadProduct);
-                    case "products/delete" -> processProductDeleteWebhook(posId, payloadProduct);
-                    case "products/update" -> processProductUpdateWebhook(posId, payloadProduct);
-                    case "orders/create" -> processOrderCreateWebhook(posId, payloadOrder);
-                    case "orders/delete" -> processOrderDeleteWebhook(posId, payloadOrder);
-                    case "orders/update" -> processOrderUpdateWebhook(posId, payloadOrder);
-                    default -> {
-                        log.warn("Unhandled webhook event type: {}", topic);
-                        yield true; // Return true for unhandled events to acknowledge receipt
-                    }
-                };
+            } else if (topic.startsWith("orders")) {
+                payloadOrder = JsonUtils.fromJson(body, SapoOrderResponse.Order.class);
+                if (payloadOrder == null) {
+                    log.error("Failed to parse Sapo order webhook payload");
+                    return false;
+                }
             } else {
-                log.warn("Empty webhook body received");
-                return false;
+                log.warn("Unknown webhook topic: {}", topic);
+                return true; // acknowledge unknown topics
             }
 
+            // 5. Process webhook data based on event type
+
+            return switch (topic) {
+                case "products/create" -> processProductWebhook(posId, payloadProduct);
+                case "products/delete" -> processProductDeleteWebhook(posId, payloadProduct);
+                case "products/update" -> processProductUpdateWebhook(posId, payloadProduct);
+                case "orders/create" -> processOrderCreateWebhook(posId, payloadOrder);
+                case "orders/delete" -> processOrderDeleteWebhook(posId, payloadOrder);
+                case "orders/update" -> processOrderUpdateWebhook(posId, payloadOrder);
+                default -> {
+                    log.warn("Unhandled webhook event type: {}", topic);
+                    yield true; // Return true for unhandled events to acknowledge receipt
+                }
+            };
         } catch (Exception e) {
-            log.error("Process webhook failed: {}", e.getMessage(), e);
+            log.error("Failed to process Sapo webhook: {}", e.getMessage(), e);
             return false;
         }
     }
@@ -76,7 +90,6 @@ public class SapoWebhookServiceImpl implements WebhookService {
     /**
      * Process product create/update webhook
      */
-
     private boolean processProductWebhook(String posId, SapoProductResponse.Product payload) {
         try {
             // Convert and save product
@@ -88,7 +101,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
             // Process variants if any
             if (payload.getVariants() != null && !payload.getVariants().isEmpty()) {
                 for (SapoProductResponse.Variant variant : payload.getVariants()) {
-                    ProductVariantEntity variantEntity = convertToVariantEntity(variant, payload.getId());
+                    ProductVariantEntity variantEntity = convertToVariantEntity(posId, variant, payload.getId());
                     productVariantRepository.save(variantEntity);
                     log.info("Successfully saved variant: {} for product: {}",
                             variantEntity.getVariantId(), product.getProductId());
@@ -222,11 +235,11 @@ public class SapoWebhookServiceImpl implements WebhookService {
             // Update variants if any
             if (payload.getVariants() != null && !payload.getVariants().isEmpty()) {
                 // Delete existing variants first
-                productVariantRepository.deleteByProductId(String.valueOf(productId));
+                productVariantRepository.deleteAllByProductIdAndPosId(String.valueOf(productId), posId);
 
                 // Save new variants
                 for (SapoProductResponse.Variant variant : payload.getVariants()) {
-                    ProductVariantEntity variantEntity = convertToVariantEntity(variant, productId);
+                    ProductVariantEntity variantEntity = convertToVariantEntity(posId, variant, productId);
                     productVariantRepository.save(variantEntity);
                     log.info("Updated variant: {} for product: {}", variantEntity.getVariantId(), productId);
                 }
@@ -254,7 +267,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
         product.setCode(null);
         product.setName(payload.getName());
         product.setDescription(payload.getContent()); // Using content as description
-        product.setStatus(payload.getStatus());
+        product.setStatus(payload.getStatus().toUpperCase());
         product.setPosId(posId);
         product.setCategory(payload.getProductType());
         product.setBrand(payload.getVendor());
@@ -277,9 +290,10 @@ public class SapoWebhookServiceImpl implements WebhookService {
     /**
      * Convert Sapo variant to ProductVariantEntity
      */
-    private ProductVariantEntity convertToVariantEntity(SapoProductResponse.Variant variant, Long productId) {
+    private ProductVariantEntity convertToVariantEntity(String posId, SapoProductResponse.Variant variant, Long productId) {
         return ProductVariantEntity.builder()
                 .variantId(String.valueOf(variant.getId()))
+                .posId(posId)
                 .productId(String.valueOf(productId))
                 .sku(variant.getSku())
                 .barcode(variant.getBarcode())
@@ -393,29 +407,30 @@ public class SapoWebhookServiceImpl implements WebhookService {
      * Convert SapoOrder to OrderEntity
      */
     private OrderEntity convertToOrderEntity(String posId, SapoOrderResponse.Order sapoOrder) {
-        SapoOrderResponse.OriginAddress billing = sapoOrder.getFulfillments() != null && !sapoOrder.getFulfillments().isEmpty()
-                ? sapoOrder.getFulfillments().get(0).getOriginAddress()
-                : null;
+        SapoOrderResponse.OriginAddress originAddress = extractOriginAddress(sapoOrder);
 
+        Map<String, String> mapping = sapoConfig.getOrder().getStatus().getMapping();
+        String status = mapping.getOrDefault(sapoOrder.getStatus(), "unknown");
 
-        // Debug logging to understand the issue
-        log.info("Converting SapoOrder to OrderEntity - ID: {}, Name: {}", sapoOrder.getId(), sapoOrder.getName());
+        log.info("Converting SapoOrder to OrderEntity - ID: {}, Name: {}",
+                sapoOrder.getId(), sapoOrder.getName());
 
         return OrderEntity.builder()
                 .orderId(sapoOrder.getId() != null ? sapoOrder.getId().toString() : "UNKNOWN")
                 .orderCode(sapoOrder.getName())
                 .posId(posId)
-                .customerName(billing != null ? billing.getName() : null)
-                .customerPhone(billing != null ? billing.getPhone() : null)
+                .customerName(extractOriginAddressName(originAddress))
+                .customerPhone(extractOriginAddressPhone(originAddress))
                 .customerEmail(sapoOrder.getEmail())
-                .shippingAddress(billing !=null ? billing.getAddress1() : null)
-                .status(null)
-                .paymentMethod(sapoOrder.getPaymentGatewayNames() != null && !sapoOrder.getPaymentGatewayNames().isEmpty()
-                        ? String.join(", ", sapoOrder.getPaymentGatewayNames()) : null)
-                .shippingMethod(sapoOrder.getShippingLines() != null ? sapoOrder.getShippingLines().getTitle() : null)
+                .shippingAddress(extractOriginAddressAddress(originAddress))
+                .status(status.toUpperCase())
+                .paymentMethod(extractPaymentMethods(sapoOrder))
+                .shippingMethod(extractShippingMethod(sapoOrder))
                 .totalPrice(sapoOrder.getTotalPrice())
-                .shippingFee(sapoOrder.getShippingLines() != null && sapoOrder.getShippingLines().getPrice() != null ? sapoOrder.getShippingLines().getPrice() : null)
-                .discountAmount(sapoOrder.getTotalDiscounts() != null ? sapoOrder.getTotalDiscounts().doubleValue() : 0.0)
+                .shippingFee(extractShippingFee(sapoOrder))
+                .discountAmount(extractDiscountAmount(sapoOrder))
+                .createdAt(PosUtils.parseDateTime(sapoOrder.getCreatedOn()))
+                .updatedAt(PosUtils.parseDateTime(sapoOrder.getCancelledOn()))
                 .build();
     }
 
@@ -423,20 +438,81 @@ public class SapoWebhookServiceImpl implements WebhookService {
      * Convert SapoLineItem to OrderItemEntity
      */
     private OrderItemEntity convertToOrderItemEntity(SapoOrderResponse.LineItem sapoLineItem, String orderId) {
-        BigDecimal totalPrice = sapoLineItem.getPrice().multiply(BigDecimal.valueOf(sapoLineItem.getQuantity()));
+        BigDecimal price = sapoLineItem.getPrice() != null ? sapoLineItem.getPrice() : BigDecimal.ZERO;
+        int quantity = sapoLineItem.getQuantity() != null ? sapoLineItem.getQuantity() : 0;
+        BigDecimal totalPrice = price.multiply(BigDecimal.valueOf(quantity));
 
         return OrderItemEntity.builder()
                 .orderId(orderId)
                 .sku(sapoLineItem.getSku())
-                .productName(sapoLineItem.getTitle())
-                .variantName(sapoLineItem.getVariantTitle())
-                .quantity(sapoLineItem.getQuantity())
-                .price(sapoLineItem.getPrice())
+                .productName(sapoLineItem.getTitle() != null ? sapoLineItem.getTitle() : null)
+                .variantName(sapoLineItem.getVariantTitle() != null ? sapoLineItem.getVariantTitle() : null)
+                .quantity(quantity)
+                .price(price)
                 .totalPrice(totalPrice)
-                .fulfillableQuantity(sapoLineItem.getCurrentQuantity())
+                .fulfillableQuantity(sapoLineItem.getCurrentQuantity() != null ? sapoLineItem.getCurrentQuantity() : 0)
                 .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
+                .createdBy(claimUtil.getUserName() != null ? claimUtil.getUserName() : "system")
                 .build();
+    }
+
+    // Extract origin address from fulfillments
+    private SapoOrderResponse.OriginAddress extractOriginAddress(SapoOrderResponse.Order sapoOrder) {
+        return Optional.ofNullable(sapoOrder.getFulfillments())
+                .filter(fulfillments -> !fulfillments.isEmpty())
+                .map(fulfillments -> fulfillments.get(0).getOriginAddress())
+                .orElse(null);
+    }
+
+    // Extract fields from OriginAddress
+    private String extractOriginAddressName(SapoOrderResponse.OriginAddress originAddress) {
+        return Optional.ofNullable(originAddress)
+                .map(SapoOrderResponse.OriginAddress::getName)
+                .orElse(null);
+    }
+
+    private String extractOriginAddressPhone(SapoOrderResponse.OriginAddress originAddress) {
+        return Optional.ofNullable(originAddress)
+                .map(SapoOrderResponse.OriginAddress::getPhone)
+                .orElse(null);
+    }
+
+    private String extractOriginAddressAddress(SapoOrderResponse.OriginAddress originAddress) {
+        return Optional.ofNullable(originAddress)
+                .map(SapoOrderResponse.OriginAddress::getAddress1)
+                .orElse(null);
+    }
+
+    // Extract payment methods
+    private String extractPaymentMethods(SapoOrderResponse.Order sapoOrder) {
+        return Optional.ofNullable(sapoOrder.getPaymentGatewayNames())
+                .filter(methods -> !methods.isEmpty())
+                .map(methods -> String.join(", ", methods))
+                .orElse(null);
+    }
+
+    // Extract shipping method
+    private String extractShippingMethod(SapoOrderResponse.Order sapoOrder) {
+        return Optional.ofNullable(sapoOrder.getShippingLines())
+                .filter(lines -> !lines.isEmpty())
+                .map(lines -> lines.get(0).getTitle())
+                .orElse(null);
+    }
+
+    // Extract shipping fee
+    private BigDecimal extractShippingFee(SapoOrderResponse.Order sapoOrder) {
+        return Optional.ofNullable(sapoOrder.getShippingLines())
+                .filter(lines -> !lines.isEmpty())
+                .map(lines -> lines.get(0))
+                .map(SapoOrderResponse.ShippingLine::getPrice)
+                .orElse(null);
+    }
+
+    // Extract discount amount
+    private Double extractDiscountAmount(SapoOrderResponse.Order sapoOrder) {
+        return Optional.ofNullable(sapoOrder.getTotalDiscounts())
+                .map(BigDecimal::doubleValue)
+                .orElse(0.0);
     }
 
     // Helper methods for extracting data from SapoOrder
