@@ -5,17 +5,18 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
 
 import java.math.BigDecimal;
 
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-@Builder
+@SuperBuilder
 @Entity
 @Table(name = "product_variant", schema = "product_manager")
 @IdClass(VariantId.class)
-public class ProductVariantEntity {
+public class ProductVariantEntity extends BaseEntity {
     @Id
     @Column(name = "variant_id")
     private String variantId;
