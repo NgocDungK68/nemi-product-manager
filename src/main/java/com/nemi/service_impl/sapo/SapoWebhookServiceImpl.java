@@ -259,7 +259,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
             // Update variants if any
             if (payload.getVariants() != null && !payload.getVariants().isEmpty()) {
                 // Delete existing variants first
-                productVariantRepository.deleteByProductId(String.valueOf(productId));
+                productVariantRepository.deleteAllByProductIdAndPosId(String.valueOf(productId), posId);
 
                 // Save new variants
                 for (SapoProductResponse.Variant variant : payload.getVariants()) {
