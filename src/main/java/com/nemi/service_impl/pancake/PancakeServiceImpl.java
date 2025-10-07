@@ -9,7 +9,7 @@ import com.nemi.entity.OrderItemEntity;
 import com.nemi.entity.PosEntity;
 import com.nemi.entity.ProductEntity;
 import com.nemi.entity.SyncHistoryEntity;
-import com.nemi.enums.OrderStatus;
+import com.nemi.enums.Status;
 import com.nemi.enums.PosName;
 import com.nemi.enums.PosStatus;
 import com.nemi.enums.SyncErrorMessage;
@@ -32,6 +32,8 @@ import com.nemi.util.JsonUtils;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -223,9 +225,9 @@ public class PancakeServiceImpl implements PosManagementService {
         product.setName(apiProducts.getProduct().getName());
         product.setProductId(apiProducts.getId());
         if (apiProducts.getIsLocked()) {
-            product.setStatus(OrderStatus.CANCELLED.getValue());
+            product.setStatus(Status.CANCELLED.getValue());
         } else {
-            product.setStatus(OrderStatus.PROCESSING.getValue());
+            product.setStatus(Status.PROCESSING.getValue());
         }
         return product;
     }
@@ -260,10 +262,12 @@ public class PancakeServiceImpl implements PosManagementService {
                 .orElse("unknown");
 
         String orderCode = Optional.ofNullable(apiOrders.getPartner())
-                .map(PancakeOrderResponse.Partner::getExtendUpdate)
-                .filter(list -> !list.isEmpty())
-                .map(list -> list.get(0).getTrackingId())
+                .map(PancakeOrderResponse.Partner::getExtendCode)
                 .orElse("unknown");
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String createdBy = (auth != null && auth.isAuthenticated()) ? claimUtil.getUserName() : "SYSTEM";
+
 
         return OrderEntity.builder()
                 .posId(posId)
@@ -276,7 +280,7 @@ public class PancakeServiceImpl implements PosManagementService {
                 .shippingFee(apiOrders.getShippingFee())
                 .totalPrice(apiOrders.getTotalPrice())
                 .status(status.toUpperCase())
-                .createdBy(claimUtil.getUserName())
+                .createdBy(createdBy)
                 .build();
     }
 

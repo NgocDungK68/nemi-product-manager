@@ -71,6 +71,7 @@ pancake:
   api-key: 10b76cf31be245848c8361287cee2adf
   shop-id: 1720119150
   timeout: 30000
+  x-api-key: elqsF9ERiFWGacWQO9Gg5XC4kXojot
   retry:
     max-attempts: 3
     backoff-delay: 2000
@@ -90,7 +91,9 @@ pancake:
         16: "delivered"      # Đã thu tiền
         4: "returned"       # Đang hoàn
         15: "returned"       # Hoàn một phần (⚠️ partial return – note riêng nếu cần)
-        5: "returned"       # Đã hoàn
+        5: "returned" # Đã hoàn
+        6: "cancelled"      # Đã hủy
+        7: "cancelled"      # da xoa
   sync:
     order: 100
     order-item: 200
