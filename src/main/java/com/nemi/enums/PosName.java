@@ -1,5 +1,8 @@
 package com.nemi.enums;
 
+import lombok.Getter;
+
+@Getter
 public enum PosName {
     NHANHVN("nhanhvn"),
     SAPO("sapo"),
@@ -10,10 +13,6 @@ public enum PosName {
 
     PosName(String value) {
         this.value = value;
-    }
-
-    public String getValue() {
-        return value;
     }
 
     public String getKey() {

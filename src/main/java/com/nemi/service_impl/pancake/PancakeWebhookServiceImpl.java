@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.configuration.PancakeConfig;
 import com.nemi.entity.OrderEntity;
 import com.nemi.entity.OrderItemEntity;
-import com.nemi.enums.PancakEvent;
+import com.nemi.enums.PancakeEvent;
 import com.nemi.enums.PosName;
 import com.nemi.enums.Status;
 import com.nemi.model.response.pancake.PancakeOrderResponse;
@@ -78,7 +78,7 @@ public class PancakeWebhookServiceImpl implements WebhookService {
     }
 
     private boolean handleEvent(String posId, PancakeWebhookResponse response) {
-        PancakEvent event = PancakEvent.fromValue(response.getEventType());
+        PancakeEvent event = PancakeEvent.fromValue(response.getEventType());
 
         return switch (event) {
             case ORDER_ADD -> handleOrderWebhook(posId, response);
