@@ -99,11 +99,32 @@ pancake:
     order-item: 200
     product: 100
     page-start: 1
+
 sapo:
   client-id: 50f184d93c834ebaa764cc17c25e31fa
   client-secret: 50ce6b4d47a04ca18aa6f972b698779a
   access-token: 59d0c4eea0fc497e81733f693d3e4641
   url: https://nemi-test.mysapo.net/
+  url-register-webhook: https://nemi-dev-02.ecombase.net/nemi-product-manager/webhook/v1/sapo/
+  # API Paths
+  path-oauth-access-token: /admin/oauth/access_token
+  path-products: /admin/products.json
+  path-webhooks: /admin/webhooks.json
+  webhook:
+    topic:
+      - orders/create
+      - orders/delete
+      - orders/update              # Fixed: was 'orders/updated'
+      - orders/paid                # Khi đơn hàng được thanh toán thành công
+      - orders/cancelled           # Khi đơn hàng bị hủy
+      - orders/fulfilled           # Khi đơn hàng đã được giao (hoàn tất)
+      - orders/partially_fulfilled # Khi đơn hàng được giao một phần
+
+      # Product events
+      - products/create
+      - products/update
+      - products/delete
+
   order:
     status:
       mapping:

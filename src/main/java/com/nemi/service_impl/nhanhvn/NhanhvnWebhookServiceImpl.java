@@ -17,14 +17,14 @@ import com.nemi.model.response.nhanhvn.NhanhvnWebhookResponse;
 import com.nemi.repository.*;
 import com.nemi.service.WebhookService;
 import com.nemi.util.JsonUtils;
+import com.nemi.utils.PosUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
+import org.springframework.util.ObjectUtils;
 
-import java.io.BufferedReader;
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -52,17 +52,17 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
     public boolean processWebhook(String posId, HttpServletRequest request) {
         try {
             String verifyToken = request.getHeader(HttpHeaders.AUTHORIZATION);
-            if (verifyToken == null || verifyToken.isEmpty() || !verifyToken.equals(nhanhvnConfig.getVerifyToken())) {
+            if (ObjectUtils.isEmpty(verifyToken) || !verifyToken.equals(nhanhvnConfig.getVerifyToken())) {
                 log.error("[NhanhvnWebhookServiceImpl.processWebhook] Invalid verify token: {}", verifyToken);
                 return false;
             }
 
-            String body = readBody(request);
+            String body = PosUtils.readBody(request);
             log.info("[NhanhvnWebhookServiceImpl.processWebhook] Body: {}", body);
 
             NhanhvnWebhookResponse webhookResponse = JsonUtils.fromJson(body, NhanhvnWebhookResponse.class);
             log.info("[NhanhvnWebhookServiceImpl.processWebhook] Webhook response convert from Body: {}", webhookResponse);
-            if (webhookResponse == null || webhookResponse.getEvent() == null) {
+            if (ObjectUtils.isEmpty(webhookResponse) || ObjectUtils.isEmpty(webhookResponse.getEvent())) {
                 log.error("[NhanhvnWebhookServiceImpl.processWebhook] Invalid webhook payload: {}", body);
                 return false;
             }
@@ -78,7 +78,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
         NhanhvnEvent event = NhanhvnEvent.fromValue(webhookResponse.getEvent());
         Object data = webhookResponse.getData();
 
-        if (event == null) {
+        if (ObjectUtils.isEmpty(event)) {
             log.warn("[NhanhvnWebhookServiceImpl.handleEvent] Unhandled webhook event: {}", webhookResponse.getEvent());
             return false;
         }
@@ -112,18 +112,20 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
         );
         log.info("[NhanhvnWebhookServiceImpl.handleProductAdd] Add ProductData: {}", newVariant);
 
-        if (newVariant == null) {
+        if (ObjectUtils.isEmpty(newVariant)) {
             log.error("[NhanhvnWebhookServiceImpl.handleProductAdd] Failed to add product data: {}", data);
             return false;
         }
 
         // Kiểm tra xem data có phải sản phẩm con không
         if (newVariant.getParentId() != -1) {
-            Optional<ProductVariantEntity> parentOfVariantEntity = variantRepository.findById(String.valueOf(newVariant.getParentId()));
+            VariantId variantId = new VariantId(String.valueOf(newVariant.getParentId()), posId);
+            Optional<ProductVariantEntity> parentOfVariantEntity = variantRepository.findById(variantId);
+
             if (parentOfVariantEntity.isPresent()) {
                 // logic chuyển variant lên bảng products
                 NhanhvnProductResponse.ProductData parentOfVariant = getProductById(posId, parentOfVariantEntity.get().getVariantId());
-                if (parentOfVariant == null) {
+                if (ObjectUtils.isEmpty(parentOfVariant)) {
                     log.warn("[NhanhvnWebhookServiceImpl.handleProductAdd] Failed to find parent product with id={} of new variant with id={}", newVariant.getParentId(), newVariant.getId());
                     return false;
                 }
@@ -132,12 +134,12 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
                 productRepository.save(parentEntity);
                 log.info("[NhanhvnWebhookServiceImpl.handleProductAdd] Converted variant with id={} to product", parentEntity.getProductId());
 
-                variantRepository.deleteById(String.valueOf(newVariant.getParentId()));
+                variantRepository.deleteById(variantId);
                 log.info("[NhanhvnWebhookServiceImpl.handleProductAdd] Deleted variant with id={} because it is now a parent product", newVariant.getParentId());
             }
         }
 
-        ProductVariantEntity variantEntity = nhanhvnService.convertToVariantEntity(newVariant);
+        ProductVariantEntity variantEntity = nhanhvnService.convertToVariantEntity(posId, newVariant);
         variantRepository.save(variantEntity);
         log.info("[NhanhvnWebhookServiceImpl.handleProductAdd] Successfully add 1 variant with id={}", variantEntity.getVariantId());
 
@@ -153,7 +155,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
         );
         log.info("[NhanhvnWebhookServiceImpl.handleProductUpdate] Update ProductData: {}", productData);
 
-        if (productData == null) {
+        if (ObjectUtils.isEmpty(productData)) {
             log.error("[NhanhvnWebhookServiceImpl.handleProductUpdate] Failed to update product data: {}", data);
             return false;
         }
@@ -195,11 +197,11 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
         } else {  // Trường hợp call về body sản phẩm con
             // Kiểm tra xem sản phẩm cha của productData có đang thuộc bảng product_variant không
             Optional<ProductVariantEntity> parentOfVariantEntity =
-                    variantRepository.findById(String.valueOf(productData.getParentId()));
+                    variantRepository.findById(new VariantId(String.valueOf(productData.getParentId()), posId));
             if (parentOfVariantEntity.isPresent()) {
                 // thêm sản phẩm cha vào bảng products
                 NhanhvnProductResponse.ProductData parentProduct = getProductById(posId, String.valueOf(productData.getParentId()));
-                if (parentProduct == null || parentProduct.getParentId() != -2) {
+                if (ObjectUtils.isEmpty(parentProduct) || parentProduct.getParentId() != -2) {
                     log.warn("[NhanhvnWebhookServiceImpl.handleProductUpdate] Failed to find parent product with id={}", productData.getParentId());
                     return false;
                 }
@@ -208,13 +210,14 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
                 log.info("[NhanhvnWebhookServiceImpl.handleProductUpdate] Converted variant with id={} to product", parentProductEntity.getProductId());
 
                 // Xóa sản phẩm lúc này là cha ở bảng variant_product
-                variantRepository.deleteById(String.valueOf(parentOfVariantEntity.get().getVariantId()));
+                variantRepository.deleteById(new VariantId(String.valueOf(parentOfVariantEntity.get().getVariantId()), posId));
+
                 log.info("[NhanhvnWebhookServiceImpl.handleProductUpdate] Deleted variant with id={} because it is now a parent product", parentOfVariantEntity.get().getVariantId());
             }
         }
 
         // Cập nhật sản phẩm con hoặc sản phẩm độc lập vào product_variant
-        ProductVariantEntity variantEntity = nhanhvnService.convertToVariantEntity(productData);
+        ProductVariantEntity variantEntity = nhanhvnService.convertToVariantEntity(posId, productData);
         variantRepository.save(variantEntity);
         log.info("[NhanhvnWebhookServiceImpl.handleProductUpdate] Successfully update 1 product variant with id={}", variantEntity.getVariantId());
 
@@ -233,8 +236,8 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
         }
 
         String id = ids.get(0);
-
-        Optional<ProductVariantEntity> variantEntity = variantRepository.findById(id);
+        VariantId variantId = new VariantId(id, posId);
+        Optional<ProductVariantEntity> variantEntity = variantRepository.findById(variantId);
         if (variantEntity.isEmpty()) {
             log.warn("[NhanhvnWebhookServiceImpl.handleProductDelete] Failed to find variant with id={}", id);
             return false;
@@ -254,7 +257,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
 
             // Kiểm tra xem sản phẩm cha có còn sản phẩm con không
             NhanhvnProductResponse.ProductData parentProduct = getProductById(posId, parentId);
-            if (parentProduct == null) {
+            if (ObjectUtils.isEmpty(parentProduct)) {
                 log.warn("[NhanhvnWebhookServiceImpl.handleProductDelete] Failed to find parent product with id={}", parentId);
                 return false;
             }
@@ -263,7 +266,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
                 productRepository.deleteById(new ProductId(parentId, posId));
                 log.info("[NhanhvnWebhookServiceImpl.handleProductDelete] Deleted product with id={} because it is now a variant", parentId);
 
-                ProductVariantEntity variant = nhanhvnService.convertToVariantEntity(parentProduct);
+                ProductVariantEntity variant = nhanhvnService.convertToVariantEntity(posId, parentProduct);
                 variantRepository.save(variant);
                 log.info("[NhanhvnWebhookServiceImpl.handleProductDelete] Converted product with id={} to variant", variant.getVariantId());
             }
@@ -271,7 +274,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
             log.info("[NhanhvnWebhookServiceImpl.handleProductDelete] Parent of variant with id={} is still parent product", variantEntity.get().getVariantId());
         }
 
-        variantRepository.deleteById(id);
+        variantRepository.deleteById(variantId);
         log.info("[NhanhvnWebhookServiceImpl.handleProductDelete] Deleted variant with id={} from posId={}", id, posId);
         return true;
     }
@@ -282,14 +285,14 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
         );
         log.info("[NhanhvnWebhookServiceImpl.handleOrderAdd] Add OrderData: {}", orderData);
 
-        if (orderData == null || orderData.getInfo() == null) {
+        if (ObjectUtils.isEmpty(orderData) || ObjectUtils.isEmpty(orderData.getInfo())) {
             log.error("Failed to add order data: {}", data);
             return false;
         }
 
         // Convert OrderEntity
         OrderEntity orderEntity = nhanhvnService.convertToOrderEntity(posId, orderData);
-        if (orderEntity == null) {
+        if (ObjectUtils.isEmpty(orderEntity)) {
             log.error("[NhanhvnWebhookServiceImpl.handleOrderAdd] Failed to convert orderData={} to OrderEntity", orderData.getInfo().getId());
             return false;
         }
@@ -318,14 +321,14 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
         );
         log.info("[NhanhvnWebhookServiceImpl.handleOrderUpdate] Update OrderData: {}", orderData);
 
-        if (orderData == null || orderData.getInfo() == null) {
+        if (ObjectUtils.isEmpty(orderData) || ObjectUtils.isEmpty(orderData.getInfo())) {
             log.error("[NhanhvnWebhookServiceImpl.handleOrderUpdate] Failed to update order data: {}", data);
             return false;
         }
 
         // Convert OrderEntity
         OrderEntity orderEntity = nhanhvnService.convertToOrderEntity(posId, orderData);
-        if (orderEntity == null) {
+        if (ObjectUtils.isEmpty(orderEntity)) {
             log.error("[NhanhvnWebhookServiceImpl.handleOrderUpdate] Failed to convert orderData={} to OrderEntity", orderData.getInfo().getId());
             return false;
         }
@@ -383,19 +386,6 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
         return true;
     }
 
-    private String readBody(HttpServletRequest request) {
-        StringBuilder sb = new StringBuilder();
-        try (BufferedReader reader = request.getReader()) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line);
-            }
-        } catch (IOException e) {
-            log.error("Error reading request body", e);
-        }
-        return sb.toString();
-    }
-
     private NhanhvnProductResponse.ProductData getProductById(String posId, String id) {
         try {
             // 1. Lấy posEntity từ DB
@@ -406,7 +396,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
             request.setFilters(Map.of("ids", id));
             Optional<NhanhvnProductResponse> responseOpt = nhanhvnClient.getProducts(request);
 
-            if (responseOpt.isPresent() && responseOpt.get().getData() != null && !responseOpt.get().getData().isEmpty()) {
+            if (responseOpt.isPresent() && !ObjectUtils.isEmpty(responseOpt.get().getData())) {
                 return responseOpt.get().getData().get(0);
             }
 

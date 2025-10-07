@@ -37,4 +37,16 @@ public class SapoConfig {
     }
     private String baseUrl;
     private String storeName;
+    private Webhook webhook;
+    private String urlRegisterWebhook;
+    
+    // API Paths
+    private String pathOauthAccessToken;
+    private String pathProducts;
+    private String pathWebhooks;
+
+    @Data
+    public static class Webhook {
+        private java.util.List<String> topic;
+    }
 }

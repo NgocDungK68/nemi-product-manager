@@ -1,14 +1,17 @@
 package com.nemi.client;
 
+import com.nemi.configuration.SapoConfig;
 import com.nemi.constant.SapoConstants;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
 import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.request.sapo.SapoRequest;
+import com.nemi.model.request.sapo.SapoWebhookRequest;
 import com.nemi.model.response.sapo.SapoAccessTokenResponse;
 import com.nemi.model.response.sapo.SapoOrderResponse;
 import com.nemi.model.response.sapo.SapoProductResponse;
+import com.nemi.model.response.sapo.SapoWebhookResponse;
 import com.nemi.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +20,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @RequiredArgsConstructor
@@ -24,13 +30,14 @@ import java.util.Optional;
 @Service
 public class SapoClient {
     private final RestTemplate restTemplate;
+    private final SapoConfig sapoConfig;
 
     public SapoAccessTokenResponse getAccessToken(PosConnectionRequest posConnectionRequest) {
         try {
             // Build full URL dynamically because each merchant has different storeName
             String baseUrl = "https://" + posConnectionRequest.getStoreName() + ".mysapo.net";
             String url = UriComponentsBuilder.fromHttpUrl(baseUrl)
-                    .path(SapoConstants.PATH_OAUTH_ACCESS_TOKEN)
+                    .path(sapoConfig.getPathOauthAccessToken())
                     .queryParam(SapoConstants.CLIENT_ID, posConnectionRequest.getClientId())
                     .queryParam(SapoConstants.CLIENT_SECRET, posConnectionRequest.getClientSecret())
                     .queryParam(SapoConstants.CODE, posConnectionRequest.getCode())
@@ -71,7 +78,7 @@ public class SapoClient {
         try {
             String baseUrl = "https://" + request.getStoreName() + ".mysapo.net";
             String url = UriComponentsBuilder.fromHttpUrl(baseUrl)
-                    .path(SapoConstants.PATH_PRODUCTS)
+                    .path(sapoConfig.getPathProducts())
                     .toUriString();
             
             log.debug("[SapoClient.getProducts] Calling URL: {}", url);
@@ -144,6 +151,121 @@ public class SapoClient {
         } catch (Exception e) {
             log.error("[SapoClient.getProducts] Failed: {}", e.getMessage(), e);
             return Optional.empty();
+        }
+    }
+
+    /**
+     * Register webhooks for a POS with automatic webhook URL generation
+     * @param storeName The store name
+     * @param accessToken The access token
+     * @param posId The POS ID for webhook URL
+     * @return List of registered webhook responses
+     */
+    public List<SapoWebhookResponse> registerWebhook(String storeName, String accessToken, String posId) {
+        // Build webhook URL automatically
+        String webhookUrl = sapoConfig.getUrlRegisterWebhook() + posId;
+
+        SapoWebhookRequest webhookRequest = SapoWebhookRequest.builder()
+                .storeName(storeName)
+                .accessToken(accessToken)
+                .address(webhookUrl)
+                .format("json")
+                .build();
+
+        return registerWebhook(webhookRequest);
+    }
+
+    /**
+     * Register webhooks for all configured topics
+     * @param webhookRequest The webhook registration request
+     * @return List of registered webhook responses
+     */
+    public List<SapoWebhookResponse> registerWebhook(SapoWebhookRequest webhookRequest) {
+        log.info("[SapoClient.registerWebhook] Starting webhook registration for store: {}", webhookRequest.getStoreName());
+
+        // Get topics from configuration
+        List<String> topics = sapoConfig.getWebhook().getTopic();
+        if (topics == null || topics.isEmpty()) {
+            log.warn("[SapoClient.registerWebhook] No webhook topics configured");
+            return List.of();
+        }
+
+        log.info("[SapoClient.registerWebhook] Found {} topics to register: {}", topics.size(), topics);
+
+        List<SapoWebhookResponse> responses = new java.util.ArrayList<>();
+
+        // Register webhook for each topic
+        for (String topic : topics) {
+            try {
+                log.debug("[SapoClient.registerWebhook] Registering webhook for topic: {}", topic);
+
+                SapoWebhookResponse response = registerSingleWebhook(webhookRequest, topic);
+                if (response != null) {
+                    responses.add(response);
+                    log.info("[SapoClient.registerWebhook] Successfully registered webhook for topic: {} with ID: {}",
+                            topic, response.getWebhook().getId());
+                } else {
+                    log.error("[SapoClient.registerWebhook] Failed to register webhook for topic: {}", topic);
+                }
+
+            } catch (Exception e) {
+                log.error("[SapoClient.registerWebhook] Error registering webhook for topic {}: {}", topic, e.getMessage(), e);
+            }
+        }
+
+        log.info("[SapoClient.registerWebhook] Completed webhook registration. Successfully registered {}/{} webhooks",
+                responses.size(), topics.size());
+
+        return responses;
+    }
+
+    /**
+     * Register a single webhook for a specific topic
+     */
+    private SapoWebhookResponse registerSingleWebhook(SapoWebhookRequest webhookRequest, String topic) {
+        try {
+            String baseUrl = "https://" + webhookRequest.getStoreName() + ".mysapo.net";
+            String url = UriComponentsBuilder.fromHttpUrl(baseUrl)
+                    .path(sapoConfig.getPathWebhooks())
+                    .toUriString();
+
+            log.debug("[SapoClient.registerSingleWebhook] Calling URL: {} for topic: {}", url, topic);
+
+            // Build request body
+            Map<String, Object> webhookData = new HashMap<>();
+            webhookData.put("topic", topic);
+            webhookData.put("address", webhookRequest.getAddress());
+            webhookData.put("format", webhookRequest.getFormat() != null ? webhookRequest.getFormat() : "json");
+
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("webhook", webhookData);
+
+            // Set headers
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set(SapoConstants.X_SAPO_ACCESS_TOKEN, webhookRequest.getAccessToken());
+
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+            log.debug("[SapoClient.registerSingleWebhook] Request body: {}", JsonUtils.toJson(requestBody));
+
+            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+            String jsonResp = resp.getBody();
+            log.debug("[SapoClient.registerSingleWebhook] Response: {}", resp);
+
+            if (!resp.getStatusCode().is2xxSuccessful() || jsonResp == null || jsonResp.isBlank()) {
+                log.error("[SapoClient.registerSingleWebhook] Failed to register webhook for topic {}, status: {}",
+                        topic, resp.getStatusCode());
+                return null;
+            }
+
+            SapoWebhookResponse webhookResponse = JsonUtils.fromJson(jsonResp, SapoWebhookResponse.class);
+            assert webhookResponse != null;
+
+            return webhookResponse;
+
+        } catch (Exception e) {
+            log.error("[SapoClient.registerSingleWebhook] Failed to register webhook for topic {}: {}", topic, e.getMessage(), e);
+            return null;
         }
     }
 }

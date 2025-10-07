@@ -26,6 +26,7 @@ import com.nemi.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.util.ObjectUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -64,7 +65,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
             NhanhvnAccessTokenResponse tokenResponse = nhanhvnClient.getAccessToken(posConnectionRequest);
 
-            if (tokenResponse.getData() == null || tokenResponse.getData().getAccessToken() == null) {
+            if (ObjectUtils.isEmpty(tokenResponse.getData()) || ObjectUtils.isEmpty(tokenResponse.getData().getAccessToken())) {
                 log.error("[NhanhvnServiceImpl.connectPos] Nhanhvn response is null, stop persist to db {}", tokenResponse);
                 throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
             }
@@ -129,7 +130,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
                 NhanhvnProductResponse response = responseOpt.get();
 
-                if (response.getData() == null || response.getData().isEmpty()) {
+                if (ObjectUtils.isEmpty(response.getData())) {
                     if (response.getCode() == 1) {
                         break;
                     }
@@ -144,12 +145,12 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 log.info("[NhanhvnServiceImpl.syncProduct] Fetched {} products, total so far: {}", pageProducts.size(), allProducts.size());
 
                 // variant
-                List<ProductVariantEntity> pageVariants = convertToVariantEntities(response.getData());
+                List<ProductVariantEntity> pageVariants = convertToVariantEntities(posId, response.getData());
                 allVariants.addAll(pageVariants);
                 log.info("[NhanhvnServiceImpl.syncProduct] Fetched {} variants, total so far: {}", pageVariants.size(), allVariants.size());
 
                 // xử lý next
-                if (response.getPaginator() != null && response.getPaginator().getNext() != null) {
+                if (!ObjectUtils.isEmpty(response.getPaginator()) && !ObjectUtils.isEmpty(response.getPaginator().getNext())) {
                     paginator.setNext(response.getPaginator().getNext());
                 } else {
                     break; // hết data
@@ -251,17 +252,18 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 .build();
     }
 
-    private List<ProductVariantEntity> convertToVariantEntities(List<NhanhvnProductResponse.ProductData> apiProducts) {
+    private List<ProductVariantEntity> convertToVariantEntities(String posId, List<NhanhvnProductResponse.ProductData> apiProducts) {
         return apiProducts.stream()
-                .map(this::convertToVariantEntity)
+                .map(apiProduct -> convertToVariantEntity(posId, apiProduct))
                 .filter(Objects::nonNull)
                 .toList();
     }
 
-    public ProductVariantEntity convertToVariantEntity(NhanhvnProductResponse.ProductData apiProduct) {
+    public ProductVariantEntity convertToVariantEntity(String posId, NhanhvnProductResponse.ProductData apiProduct) {
         if (apiProduct.getParentId() == -2) return null;
         return ProductVariantEntity.builder()
                 .variantId(String.valueOf(apiProduct.getId()))
+                .posId(posId)
                 .productId(String.valueOf(apiProduct.getParentId()))
                 .sku(apiProduct.getCode())
                 .barcode(apiProduct.getBarcode())
@@ -317,7 +319,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
             BigDecimal lineTotal = price
                     .multiply(BigDecimal.ONE.add(vat))
                     .multiply(quantity)
-                    .subtract(discount != null ? discount : BigDecimal.ZERO);
+                    .subtract(!ObjectUtils.isEmpty(discount) ? discount : BigDecimal.ZERO);
 
             totalPrice = totalPrice.add(lineTotal);
         }
@@ -442,7 +444,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
                 NhanhvnOrderResponse response = responseOpt.get();
 
-                if (response.getData() == null || response.getData().isEmpty()) {
+                if (ObjectUtils.isEmpty(response.getData())) {
                     if (response.getCode() == 1) {
                         break;
                     }
@@ -462,7 +464,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 log.info("[NhanhvnServiceImpl.syncOrder] Fetched {} order items, total so far: {}", pageOrderItem.size(), pageOrderItem.size());
 
                 // xử lý next
-                if (response.getPaginator() != null && response.getPaginator().getNext() != null) {
+                if (!ObjectUtils.isEmpty(response.getPaginator()) && !ObjectUtils.isEmpty(response.getPaginator().getNext())) {
                     paginator.setNext(response.getPaginator().getNext());
                 } else {
                     break; // hết data
@@ -486,7 +488,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
 
     private SyncHistoryEntity toSyncHistory(SyncHistoryEntity syncHistoryEntity, SyncErrorMessage syncErrorMessage, Boolean isSyncSuccess) {
-        if (isSyncSuccess == false) {
+        if (Boolean.FALSE.equals(isSyncSuccess)) {
             syncHistoryEntity.setEndTime(LocalDateTime.now());
             syncHistoryEntity.setErrorMessage(syncErrorMessage.getMessage());
             return syncHistoryEntity;
@@ -521,6 +523,8 @@ public class NhanhvnServiceImpl implements PosManagementService {
     }
 
     private boolean isInvalidRequest(NhanhvnRequest request) {
-        return request.getAppId() == null || request.getBusinessId() == null || request.getAccessToken() == null;
+        return ObjectUtils.isEmpty(request.getAppId())
+                || ObjectUtils.isEmpty(request.getBusinessId())
+                || ObjectUtils.isEmpty(request.getAccessToken());
     }
 }

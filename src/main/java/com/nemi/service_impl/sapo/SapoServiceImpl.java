@@ -4,12 +4,11 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.client.SapoClient;
 import com.nemi.configuration.SapoConfig;
-import com.nemi.entity.OrderEntity;
-import com.nemi.entity.OrderItemEntity;
-import com.nemi.entity.PosEntity;
-import com.nemi.entity.ProductEntity;
-import com.nemi.entity.ProductVariantEntity;
-import com.nemi.entity.SyncHistoryEntity;
+import com.nemi.constant.SapoConstants;
+import com.nemi.entity.*;
+import com.nemi.enums.PosName;
+import com.nemi.enums.PosStatus;
+import com.nemi.enums.SyncErrorMessage;
 import com.nemi.enums.PosName;
 import com.nemi.enums.PosStatus;
 import com.nemi.enums.SyncErrorMessage;
@@ -22,6 +21,7 @@ import com.nemi.model.response.PosConnectionResponse;
 import com.nemi.model.response.sapo.SapoAccessTokenResponse;
 import com.nemi.model.response.sapo.SapoOrderResponse;
 import com.nemi.model.response.sapo.SapoProductResponse;
+import com.nemi.model.response.sapo.SapoWebhookResponse;
 import com.nemi.repository.OrderItemRepository;
 import com.nemi.repository.OrderRepository;
 import com.nemi.repository.PosRepository;
@@ -90,9 +90,10 @@ public class SapoServiceImpl implements PosManagementService {
             String userId = claimUtil.getUserId();
 
             Map<String, String> configMap = new HashMap<>();
-            configMap.put("clientId", posConnectionRequest.getClientId());
-            configMap.put("clientSecret", posConnectionRequest.getClientSecret());
-            configMap.put("storeName", posConnectionRequest.getStoreName());
+            configMap.put(SapoConstants.CLIENT_ID, posConnectionRequest.getClientId());
+            configMap.put(SapoConstants.CLIENT_SECRET, posConnectionRequest.getClientSecret());
+            configMap.put(SapoConstants.STORE_NAME, posConnectionRequest.getStoreName());
+
 
             SapoAccessTokenResponse tokenResponse = sapoClient.getAccessToken(posConnectionRequest);
             if (tokenResponse.getAccessToken() == null) {
@@ -110,6 +111,15 @@ public class SapoServiceImpl implements PosManagementService {
                     .build();
 
             posRepository.save(posEntityBuilder);
+            
+            // Register webhooks
+            List<SapoWebhookResponse> webhooks = sapoClient.registerWebhook(
+                    posConnectionRequest.getStoreName(),
+                    tokenResponse.getAccessToken(),
+                    posEntityBuilder.getId()
+            );
+            log.info("Registered {} webhooks for POS: {}", webhooks.size(), posEntityBuilder.getId());
+            
             PosConnectionResponse posConnectionResponse = PosConnectionResponse.toPosConnectionResponse(posEntityBuilder);
             log.info("Sapo response is {}", posConnectionResponse);
             return posConnectionResponse;
@@ -136,9 +146,9 @@ public class SapoServiceImpl implements PosManagementService {
                     new TypeReference<>() {
                     }
             );
-            String clientId = configMap.get("clientId");
-            String clientSecret = configMap.get("clientSecret");
-            String storeName = configMap.get("storeName");
+            String clientId = configMap.get(SapoConstants.CLIENT_ID);
+            String clientSecret = configMap.get(SapoConstants.CLIENT_SECRET);
+            String storeName = configMap.get(SapoConstants.STORE_NAME);
             String accessToken = posEntity.getAccessToken();
 
             if (clientId == null || clientSecret == null || storeName == null || accessToken == null) {
@@ -187,7 +197,7 @@ public class SapoServiceImpl implements PosManagementService {
 
                     // Convert variants
                     if (sapoProduct.getVariants() != null && !sapoProduct.getVariants().isEmpty()) {
-                        List<ProductVariantEntity> variants = convertToVariantEntities(productEntity.getProductId(), sapoProduct.getVariants());
+                        List<ProductVariantEntity> variants = convertToVariantEntities(posId, productEntity.getProductId(), sapoProduct.getVariants());
                         allVariants.addAll(variants);
                     }
                 }
@@ -197,7 +207,6 @@ public class SapoServiceImpl implements PosManagementService {
                 if (response.getProducts().size() >= limit) {
                     page++;
                     paginator.put("page", page);
-                    continue;
                 } else {
                     break; // hết data
                 }
@@ -239,7 +248,7 @@ public class SapoServiceImpl implements PosManagementService {
         product.setDescription(apiProduct.getContent());
         product.setBrand(apiProduct.getVendor());
         product.setCategory(apiProduct.getProductType());
-        product.setStatus(apiProduct.getStatus());
+        product.setStatus(apiProduct.getStatus().toUpperCase());
         product.setImages(JsonUtils.toJson(apiProduct.getImages().stream()
                 .map(SapoProductResponse.Image::getSrc) // Dùng method reference
                 .collect(Collectors.toList())));
@@ -254,17 +263,18 @@ public class SapoServiceImpl implements PosManagementService {
         return product;
     }
 
-    private List<ProductVariantEntity> convertToVariantEntities(String productId, List<SapoProductResponse.Variant> apiVariants) {
+    private List<ProductVariantEntity> convertToVariantEntities(String posId, String productId, List<SapoProductResponse.Variant> apiVariants) {
         return apiVariants.stream()
-                .map(apiVariant -> convertToVariantEntity(productId, apiVariant))
+                .map(apiVariant -> convertToVariantEntity(posId, productId, apiVariant))
                 .collect(Collectors.toList());
     }
 
-    private ProductVariantEntity convertToVariantEntity(String productId, SapoProductResponse.Variant apiVariant) {
+    private ProductVariantEntity convertToVariantEntity(String posId, String productId, SapoProductResponse.Variant apiVariant) {
         ProductVariantEntity variant = new ProductVariantEntity();
 
         // Required fields
         variant.setVariantId(String.valueOf(apiVariant.getId()));
+        variant.setPosId(posId);
         variant.setProductId(productId);
 
         // Handle nullable fields with defaults
@@ -414,6 +424,7 @@ public class SapoServiceImpl implements PosManagementService {
 
     public OrderEntity convertToOrderEntity(String posId, SapoOrderResponse.Order order) {
 
+
         Map<String, String> mapping = sapoConfig.getOrder().getStatus().getMapping();
         String status = mapping.getOrDefault(order.getStatus(), "unknown");
 
@@ -455,6 +466,9 @@ public class SapoServiceImpl implements PosManagementService {
     }
 
     public List<OrderItemEntity> convertToOrderItemEntity(SapoOrderResponse.Order apiOrder) {
+        SapoOrderResponse.LineItem sapoLineItem = new SapoOrderResponse.LineItem();
+        BigDecimal totalPrice = sapoLineItem.getPrice().multiply(BigDecimal.valueOf(sapoLineItem.getQuantity()));
+
         List<OrderItemEntity> orderItemEntities = new ArrayList<>();
         for (SapoOrderResponse.LineItem product : apiOrder.getLineItems()) {
             orderItemEntities.add(OrderItemEntity.builder()
@@ -464,7 +478,7 @@ public class SapoServiceImpl implements PosManagementService {
                     .sku(product.getSku())
                     .variantName(product.getVariantTitle())
                     .price(product.getPrice())
-                    .totalPrice(product.getTotalDiscount())
+                    .totalPrice(totalPrice)
                     .productName(product.getName())
                     .fulfillableQuantity(product.getCurrentQuantity())
                     .createdBy(claimUtil.getUserName())
@@ -529,12 +543,13 @@ public class SapoServiceImpl implements PosManagementService {
             Map<String, String> configMap = objectMapper.readValue(
                     posEntity.getConfig(), new TypeReference<>() {
                     });
-            String cliendId = configMap.get("clientId");
-            String clientSecret = configMap.get("clientSecret");
-            String storeName = configMap.get("storeName");
+
+            String clientId = configMap.get(SapoConstants.CLIENT_ID);
+            String clientSecret = configMap.get(SapoConstants.CLIENT_SECRET);
+            String storeName = configMap.get(SapoConstants.STORE_NAME);
             String accessToken = posEntity.getAccessToken();
 
-            if (cliendId == null || clientSecret == null || storeName == null || accessToken == null) {
+            if (clientId == null || clientSecret == null || storeName == null || accessToken == null) {
                 syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.MISSING_CONFIG, false));
                 log.error("Missing required config for posId={}", posId);
                 return false;
