@@ -14,7 +14,7 @@ import com.nemi.exception.pojo.AlertMessages;
 import com.nemi.model.request.nhanhvn.NhanhvnRequest;
 import com.nemi.model.response.nhanhvn.NhanhvnOrderResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
-import com.nemi.model.response.nhanhvn.NhanhvnWebhookResponse;
+import com.nemi.model.response.nhanhvn.NhanhvnWebhookRequest;
 import com.nemi.repository.*;
 import com.nemi.service.WebhookService;
 import com.nemi.util.JsonUtils;
@@ -49,12 +49,12 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
     }
 
     @Override
-    public boolean processWebhook(String posId, Map<String, String> headers, String body) {
+    public boolean processWebhook(String posId, Map<String, String> headers, Object body) {
         WebhookHistoryEntity webhookHistory = WebhookHistoryEntity.builder()
                 .header(JsonUtils.toJson(headers))
-                .body(body)
                 .status(WebhookConstants.Status.FAILED)
                 .createdBy(WebhookConstants.UNKNOWN)
+                .updatedBy(WebhookConstants.UNKNOWN)
                 .build();
         try {
             String verifyToken = headers.get(HttpHeaders.AUTHORIZATION);
@@ -63,17 +63,18 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
                 return false;
             }
 
-            NhanhvnWebhookResponse webhookResponse = JsonUtils.fromJson(body, NhanhvnWebhookResponse.class);
-            log.info("[NhanhvnWebhookServiceImpl.processWebhook] Webhook response convert from Body: {}", webhookResponse);
-            if (ObjectUtils.isEmpty(webhookResponse) || ObjectUtils.isEmpty(webhookResponse.getEvent())) {
+            NhanhvnWebhookRequest webhookRequest = JsonUtils.map(body, NhanhvnWebhookRequest.class);
+            webhookHistory.setBody(JsonUtils.toJson(webhookRequest));
+            log.info("[NhanhvnWebhookServiceImpl.processWebhook] Webhook response convert from Body: {}", webhookRequest);
+            if (ObjectUtils.isEmpty(webhookRequest) || ObjectUtils.isEmpty(webhookRequest.getEvent())) {
                 log.error("[NhanhvnWebhookServiceImpl.processWebhook] Invalid webhook payload: {}", body);
                 return false;
             }
 
-            boolean isSuccess = handleEvent(posId, webhookResponse, webhookHistory);
+            boolean isSuccess = handleEvent(posId, webhookRequest, webhookHistory);
             String webhookStatus = isSuccess ? WebhookConstants.Status.SUCCESS : WebhookConstants.Status.FAILED;
             webhookHistory.setStatus(webhookStatus);
-            webhookHistory.setCreatedBy(WebhookConstants.CREATED_BY);
+            webhookHistory.setCreatedBy(WebhookConstants.WEBHOOK);
 
             return isSuccess;
         } catch (Exception e) {
@@ -84,7 +85,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
         }
     }
 
-    private boolean handleEvent(String posId, NhanhvnWebhookResponse webhookResponse, WebhookHistoryEntity webhookHistory) {
+    private boolean handleEvent(String posId, NhanhvnWebhookRequest webhookResponse, WebhookHistoryEntity webhookHistory) {
         NhanhvnEvent event = NhanhvnEvent.fromValue(webhookResponse.getEvent());
         Object data = webhookResponse.getData();
 

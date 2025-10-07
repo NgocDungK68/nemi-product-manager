@@ -25,19 +25,6 @@ public class PosUtils {
         return headers;
     }
 
-    public static String readBody(HttpServletRequest request) {
-        StringBuilder sb = new StringBuilder();
-        try (BufferedReader reader = request.getReader()) {
-            String line;
-            while (!ObjectUtils.isEmpty((line = reader.readLine()))) {
-                sb.append(line);
-            }
-        } catch (IOException e) {
-            log.error("Error reading request body", e);
-        }
-        return sb.toString();
-    }
-
     public static LocalDateTime parseDateTime(String dateTimeString) {
         if (ObjectUtils.isEmpty(dateTimeString) || ObjectUtils.isEmpty(dateTimeString.trim())) {
             return null;
