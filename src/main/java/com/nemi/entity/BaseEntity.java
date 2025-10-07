@@ -28,6 +28,9 @@ public class BaseEntity {
     @Column(name = "created_by")
     private String createdBy;
 
+    @Column(name = "updated_by")
+    private String updatedBy;
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
