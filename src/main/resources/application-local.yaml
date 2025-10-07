@@ -27,7 +27,7 @@ spring:
   #        format_sql: true
 
 server:
-  port: 5201
+  port: 5200
   error:
     include-stacktrace: never
 
