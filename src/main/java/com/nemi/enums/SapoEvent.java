@@ -15,7 +15,8 @@ public enum SapoEvent {
     PRODUCT_DELETE("products/delete", WebhookConstants.SyncType.PRODUCT, WebhookConstants.EventType.DELETE),
     ORDER_ADD("orders/create", WebhookConstants.SyncType.ORDER, WebhookConstants.EventType.ADD),
     ORDER_UPDATE("orders/update", WebhookConstants.SyncType.ORDER, WebhookConstants.EventType.UPDATE),
-    ORDER_DELETE("orders/delete", WebhookConstants.SyncType.ORDER, WebhookConstants.EventType.DELETE);
+    ORDER_DELETE("orders/delete", WebhookConstants.SyncType.ORDER, WebhookConstants.EventType.DELETE),
+    ORDER_UPDATED("orders/updated", WebhookConstants.SyncType.ORDER, WebhookConstants.EventType.UPDATED);
 
     private final String value;
     private final String syncType;
