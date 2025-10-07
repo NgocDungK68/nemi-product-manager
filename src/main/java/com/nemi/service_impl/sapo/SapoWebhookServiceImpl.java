@@ -483,19 +483,21 @@ public class SapoWebhookServiceImpl implements WebhookService {
      * Convert SapoLineItem to OrderItemEntity
      */
     private OrderItemEntity convertToOrderItemEntity(SapoOrderResponse.LineItem sapoLineItem, String orderId) {
-        BigDecimal totalPrice = sapoLineItem.getPrice().multiply(BigDecimal.valueOf(sapoLineItem.getQuantity()));
+        BigDecimal price = sapoLineItem.getPrice() != null ? sapoLineItem.getPrice() : BigDecimal.ZERO;
+        int quantity = sapoLineItem.getQuantity() != null ? sapoLineItem.getQuantity() : 0;
+        BigDecimal totalPrice = price.multiply(BigDecimal.valueOf(quantity));
 
         return OrderItemEntity.builder()
                 .orderId(orderId)
                 .sku(sapoLineItem.getSku())
-                .productName(sapoLineItem.getTitle())
-                .variantName(sapoLineItem.getVariantTitle())
-                .quantity(sapoLineItem.getQuantity())
-                .price(sapoLineItem.getPrice())
+                .productName(sapoLineItem.getTitle() != null ? sapoLineItem.getTitle() : null)
+                .variantName(sapoLineItem.getVariantTitle() != null ? sapoLineItem.getVariantTitle() : null)
+                .quantity(quantity)
+                .price(price)
                 .totalPrice(totalPrice)
-                .fulfillableQuantity(sapoLineItem.getCurrentQuantity())
+                .fulfillableQuantity(sapoLineItem.getCurrentQuantity() != null ? sapoLineItem.getCurrentQuantity() : 0)
                 .createdAt(LocalDateTime.now())
-                .createdBy(claimUtil.getUserName())
+                .createdBy(claimUtil.getUserName() != null ? claimUtil.getUserName() : "system")
                 .build();
     }
 

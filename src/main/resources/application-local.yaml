@@ -111,7 +111,7 @@ sapo:
     topic:
       - orders/create
       - orders/delete
-      - orders/update              # Fixed: was 'orders/updated'
+      - orders/updated
       - orders/paid                # Khi đơn hàng được thanh toán thành công
       - orders/cancelled           # Khi đơn hàng bị hủy
       - orders/fulfilled           # Khi đơn hàng đã được giao (hoàn tất)

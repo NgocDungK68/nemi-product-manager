@@ -106,8 +106,8 @@ public class SapoServiceImpl implements PosManagementService {
                     .accessToken(tokenResponse.getAccessToken())
                     .status(PosStatus.ACTIVE.name())
                     .config(JsonUtils.toJson(configMap))
-                    .companyId(String.valueOf(claimUtil.getCompanyId()))
-                    .createdBy(claimUtil.getUserName())
+                    .companyId(String.valueOf(claimUtil.getCompanyId()) != null ? String.valueOf(claimUtil.getCompanyId()) : "default")
+                    .createdBy(claimUtil.getUserName() != null ? claimUtil.getUserName() : "system")
                     .build();
 
             posRepository.save(posEntityBuilder);
@@ -466,22 +466,31 @@ public class SapoServiceImpl implements PosManagementService {
     }
 
     public List<OrderItemEntity> convertToOrderItemEntity(SapoOrderResponse.Order apiOrder) {
-        SapoOrderResponse.LineItem sapoLineItem = new SapoOrderResponse.LineItem();
-        BigDecimal totalPrice = sapoLineItem.getPrice().multiply(BigDecimal.valueOf(sapoLineItem.getQuantity()));
-
         List<OrderItemEntity> orderItemEntities = new ArrayList<>();
+        if (apiOrder == null || apiOrder.getLineItems() == null || apiOrder.getLineItems().isEmpty()) {
+            return orderItemEntities;
+        }
+
         for (SapoOrderResponse.LineItem product : apiOrder.getLineItems()) {
+            if (product == null) {
+                continue;
+            }
+
+            BigDecimal price = product.getPrice() != null ? product.getPrice() : BigDecimal.ZERO;
+            int quantity = product.getQuantity() != null ? product.getQuantity() : 0;
+            BigDecimal totalPrice = price.multiply(BigDecimal.valueOf(quantity));
+
             orderItemEntities.add(OrderItemEntity.builder()
                     .orderItemId(String.valueOf(product.getId()))
                     .orderId(String.valueOf(apiOrder.getId()))
-                    .quantity(product.getQuantity())
+                    .quantity(quantity)
                     .sku(product.getSku())
                     .variantName(product.getVariantTitle())
-                    .price(product.getPrice())
+                    .price(price)
                     .totalPrice(totalPrice)
                     .productName(product.getName())
-                    .fulfillableQuantity(product.getCurrentQuantity())
-                    .createdBy(claimUtil.getUserName())
+                    .fulfillableQuantity(product.getCurrentQuantity() != null ? product.getCurrentQuantity() : 0)
+                    .createdBy(claimUtil.getUserName() != null ? claimUtil.getUserName() : "system")
                     .build());
         }
         return orderItemEntities;
