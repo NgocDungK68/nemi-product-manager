@@ -54,41 +54,49 @@ public class SapoWebhookServiceImpl implements WebhookService {
             // 2. Read raw body
             String body = PosUtils.readBody(request);
             log.info("Payload body: {}", body);
+            String topic = request.getHeader("x-sapo-topic");
 
-            // 3. Parse JSON payload using JsonUtils
-            if (!body.trim().isEmpty()) {
-                SapoProductResponse.Product payloadProduct = JsonUtils.fromJson(body, SapoProductResponse.Product.class);
-                SapoOrderResponse.Order payloadOrder = JsonUtils.fromJson(body, SapoOrderResponse.Order.class);
-                if (payloadProduct == null || payloadOrder == null) {
-                    log.error("Failed to parse webhook payload ");
+            SapoProductResponse.Product payloadProduct = null;
+            SapoOrderResponse.Order payloadOrder = null;
+
+            // 1️⃣ Parse payload theo loại topic
+            if (topic.startsWith("products")) {
+                payloadProduct = JsonUtils.fromJson(body, SapoProductResponse.Product.class);
+                if (payloadProduct == null) {
+                    log.error("Failed to parse Sapo product webhook payload");
                     return false;
                 }
-            
-                
-                // 5. Process webhook data based on event type
-                String topic = request.getHeader("x-sapo-topic");
-                return switch (topic) {
-                    case "products/create" -> processProductWebhook(posId, payloadProduct);
-                    case "products/delete" -> processProductDeleteWebhook(posId, payloadProduct);
-                    case "products/update" -> processProductUpdateWebhook(posId, payloadProduct);
-                    case "orders/create" -> processOrderCreateWebhook(posId, payloadOrder);
-                    case "orders/delete" -> processOrderDeleteWebhook(posId, payloadOrder);
-                    case "orders/update" -> processOrderUpdateWebhook(posId, payloadOrder);
-                    default -> {
-                        log.warn("Unhandled webhook event type: {}", topic);
-                        yield true; // Return true for unhandled events to acknowledge receipt
-                    }
-                };
+            } else if (topic.startsWith("orders")) {
+                payloadOrder = JsonUtils.fromJson(body, SapoOrderResponse.Order.class);
+                if (payloadOrder == null) {
+                    log.error("Failed to parse Sapo order webhook payload");
+                    return false;
+                }
             } else {
-                log.warn("Empty webhook body received");
-                return false;
+                log.warn("Unknown webhook topic: {}", topic);
+                return true; // acknowledge unknown topics
             }
 
+            // 5. Process webhook data based on event type
+
+            return switch (topic) {
+                case "products/create" -> processProductWebhook(posId, payloadProduct);
+                case "products/delete" -> processProductDeleteWebhook(posId, payloadProduct);
+                case "products/update" -> processProductUpdateWebhook(posId, payloadProduct);
+                case "orders/create" -> processOrderCreateWebhook(posId, payloadOrder);
+                case "orders/delete" -> processOrderDeleteWebhook(posId, payloadOrder);
+                case "orders/update" -> processOrderUpdateWebhook(posId, payloadOrder);
+                default -> {
+                    log.warn("Unhandled webhook event type: {}", topic);
+                    yield true; // Return true for unhandled events to acknowledge receipt
+                }
+            };
         } catch (Exception e) {
-            log.error("Process webhook failed: {}", e.getMessage(), e);
+            log.error("Failed to process Sapo webhook: {}", e.getMessage(), e);
             return false;
         }
     }
+
 
     private Map<String, String> extractHeaders(HttpServletRequest request) {
         Map<String, String> map = new HashMap<>();
