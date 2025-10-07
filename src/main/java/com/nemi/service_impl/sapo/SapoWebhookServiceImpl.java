@@ -1,6 +1,7 @@
 package com.nemi.service_impl.sapo;
 
 import com.nemi.configuration.SapoConfig;
+import com.nemi.constant.WebhookConstants;
 import com.nemi.entity.*;
 import com.nemi.enums.PosName;
 import com.nemi.model.response.sapo.SapoOrderResponse;
@@ -49,7 +50,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
             SapoProductResponse.Product payloadProduct = null;
             SapoOrderResponse.Order payloadOrder = null;
 
-            // 1️⃣ Parse payload theo loại topic
+            //  Parse payload theo loại topic
             if (topic.startsWith("products")) {
                 payloadProduct = JsonUtils.fromJson(body, SapoProductResponse.Product.class);
                 if (payloadProduct == null) {
@@ -75,7 +76,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 case "products/update" -> processProductUpdateWebhook(posId, payloadProduct);
                 case "orders/create" -> processOrderCreateWebhook(posId, payloadOrder);
                 case "orders/delete" -> processOrderDeleteWebhook(posId, payloadOrder);
-                case "orders/update" -> processOrderUpdateWebhook(posId, payloadOrder);
+                case "orders/updated" -> processOrderUpdateWebhook(posId, payloadOrder);
                 default -> {
                     log.warn("Unhandled webhook event type: {}", topic);
                     yield true; // Return true for unhandled events to acknowledge receipt
@@ -452,6 +453,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
 
         return OrderItemEntity.builder()
                 .orderId(orderId)
+                .orderItemId(sapoLineItem.getId() != null ? String.valueOf(sapoLineItem.getId()) : java.util.UUID.randomUUID().toString())
                 .sku(sapoLineItem.getSku())
                 .productName(sapoLineItem.getTitle() != null ? sapoLineItem.getTitle() : null)
                 .variantName(sapoLineItem.getVariantTitle() != null ? sapoLineItem.getVariantTitle() : null)
@@ -460,7 +462,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 .totalPrice(totalPrice)
                 .fulfillableQuantity(sapoLineItem.getCurrentQuantity() != null ? sapoLineItem.getCurrentQuantity() : 0)
                 .createdAt(LocalDateTime.now())
-                .createdBy(claimUtil.getUserName() != null ? claimUtil.getUserName() : "system")
+                .createdBy(WebhookConstants.UNKNOWN)
                 .build();
     }
 
