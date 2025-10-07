@@ -1,7 +1,7 @@
 package com.nemi.constant;
 
 public final class WebhookConstants {
-    public static final String CREATED_BY = "webhook";
+    public static final String WEBHOOK = "webhook";
     public static final String UNKNOWN = "unknown";
 
     public static final class Status {

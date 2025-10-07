@@ -35,7 +35,6 @@ import java.util.Optional;
 @RequiredArgsConstructor
 @Slf4j
 public class PancakeWebhookServiceImpl implements WebhookService {
-
     private final PancakeConfig pancakeConfig;
     private final ObjectMapper objectMapper;
     private final ProductRepository productRepository;
@@ -50,17 +49,17 @@ public class PancakeWebhookServiceImpl implements WebhookService {
     }
 
     @Override
-    public boolean processWebhook(String posId, Map<String, String> headers, String body) {
+    public boolean processWebhook(String posId, Map<String, String> headers, Object body) {
         try {
-            // ✅ 1. Xác thực header x-api-key
+            // 1. Xác thực header x-api-key
             String apiKey = headers.get("x-api-key");
             if (Objects.isEmpty(apiKey) || !apiKey.equals(pancakeConfig.getXApiKey())) { //sau nay de thg user nhap rong connect post- regiset webhook gi do...
                 log.error("[PancakeWebhookServiceImpl.processWebhook] Invalid x-api-key: {}", apiKey);
                 return false;
             }
 
-            // ✅ 2. Parse JSON về model
-            PancakeWebhookResponse webhookResponse = JsonUtils.fromJson(body, PancakeWebhookResponse.class);
+            // 2. Parse JSON về model
+            PancakeWebhookResponse webhookResponse = JsonUtils.map(body, PancakeWebhookResponse.class);
             if (Objects.isEmpty(webhookResponse) || Objects.isEmpty(webhookResponse.getEventType())) {
                 log.error("[PancakeWebhookServiceImpl.processWebhook] Invalid webhook payload: {}", body);
                 return false;
@@ -68,7 +67,7 @@ public class PancakeWebhookServiceImpl implements WebhookService {
 
             log.info("[PancakeWebhookServiceImpl.processWebhook] Parsed webhook: {}", webhookResponse.getType());
 
-            // ✅ 3. Xử lý từng loại webhook
+            // 3. Xử lý từng loại webhook
             return handleEvent(posId, webhookResponse);
 
         } catch (Exception e) {

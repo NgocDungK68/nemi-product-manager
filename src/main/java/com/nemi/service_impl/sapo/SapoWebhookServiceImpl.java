@@ -4,12 +4,10 @@ import com.nemi.configuration.SapoConfig;
 import com.nemi.constant.WebhookConstants;
 import com.nemi.entity.*;
 import com.nemi.enums.PosName;
+import com.nemi.enums.SapoEvent;
 import com.nemi.model.response.sapo.SapoOrderResponse;
 import com.nemi.model.response.sapo.SapoProductResponse;
-import com.nemi.repository.OrderItemRepository;
-import com.nemi.repository.OrderRepository;
-import com.nemi.repository.ProductRepository;
-import com.nemi.repository.ProductVariantRepository;
+import com.nemi.repository.*;
 import com.nemi.service.WebhookService;
 import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
@@ -36,6 +34,8 @@ public class SapoWebhookServiceImpl implements WebhookService {
     private final OrderItemRepository orderItemRepository;
     private final SapoConfig sapoConfig;
     private final ClaimUtil claimUtil;
+    private final WebhookHistoryRepository webhookHistoryRepository;
+
     @Override
     public String getPosName() {
         return PosName.SAPO.getValue();
@@ -43,7 +43,13 @@ public class SapoWebhookServiceImpl implements WebhookService {
 
     @Override
     @Transactional
-    public boolean processWebhook(String posId, Map<String, String> headers, String body) {
+    public boolean processWebhook(String posId, Map<String, String> headers, Object body) {
+        WebhookHistoryEntity webhookHistory = WebhookHistoryEntity.builder()
+                .header(JsonUtils.toJson(headers))
+                .status(WebhookConstants.Status.FAILED)
+                .createdBy(WebhookConstants.UNKNOWN)
+                .updatedBy(WebhookConstants.UNKNOWN)
+                .build();
         try {
             String topic = headers.get("x-sapo-topic");
 
@@ -52,13 +58,13 @@ public class SapoWebhookServiceImpl implements WebhookService {
 
             //  Parse payload theo loại topic
             if (topic.startsWith("products")) {
-                payloadProduct = JsonUtils.fromJson(body, SapoProductResponse.Product.class);
+                payloadProduct = JsonUtils.map(body, SapoProductResponse.Product.class);
                 if (payloadProduct == null) {
                     log.error("Failed to parse Sapo product webhook payload");
                     return false;
                 }
             } else if (topic.startsWith("orders")) {
-                payloadOrder = JsonUtils.fromJson(body, SapoOrderResponse.Order.class);
+                payloadOrder = JsonUtils.map(body, SapoOrderResponse.Order.class);
                 if (payloadOrder == null) {
                     log.error("Failed to parse Sapo order webhook payload");
                     return false;
@@ -69,22 +75,20 @@ public class SapoWebhookServiceImpl implements WebhookService {
             }
 
             // 5. Process webhook data based on event type
-
-            return switch (topic) {
-                case "products/create" -> processProductWebhook(posId, payloadProduct);
-                case "products/delete" -> processProductDeleteWebhook(posId, payloadProduct);
-                case "products/update" -> processProductUpdateWebhook(posId, payloadProduct);
-                case "orders/create" -> processOrderCreateWebhook(posId, payloadOrder);
-                case "orders/delete" -> processOrderDeleteWebhook(posId, payloadOrder);
-                case "orders/updated" -> processOrderUpdateWebhook(posId, payloadOrder);
-                default -> {
-                    log.warn("Unhandled webhook event type: {}", topic);
-                    yield true; // Return true for unhandled events to acknowledge receipt
-                }
+            SapoEvent event = SapoEvent.fromValue(topic);
+            return switch (event) {
+                case PRODUCT_ADD -> processProductWebhook(posId, payloadProduct);
+                case PRODUCT_DELETE -> processProductDeleteWebhook(posId, payloadProduct);
+                case PRODUCT_UPDATE -> processProductUpdateWebhook(posId, payloadProduct);
+                case ORDER_ADD -> processOrderCreateWebhook(posId, payloadOrder);
+                case ORDER_DELETE -> processOrderDeleteWebhook(posId, payloadOrder);
+                case ORDER_UPDATE -> processOrderUpdateWebhook(posId, payloadOrder);
             };
         } catch (Exception e) {
             log.error("Failed to process Sapo webhook: {}", e.getMessage(), e);
             return false;
+        } finally {
+            webhookHistoryRepository.save(webhookHistory);
         }
     }
 
