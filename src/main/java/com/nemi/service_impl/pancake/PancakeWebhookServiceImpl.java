@@ -1,15 +1,12 @@
 package com.nemi.service_impl.pancake;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.configuration.PancakeConfig;
 import com.nemi.entity.OrderEntity;
 import com.nemi.entity.OrderItemEntity;
-import com.nemi.enums.NhanhvnEvent;
-import com.nemi.enums.PancakEvent;
+import com.nemi.enums.PancakeEvent;
 import com.nemi.enums.PosName;
 import com.nemi.enums.Status;
-import com.nemi.model.response.nhanhvn.NhanhvnOrderResponse;
 import com.nemi.model.response.pancake.PancakeOrderResponse;
 import com.nemi.model.response.pancake.PancakeWebhookResponse;
 import com.nemi.repository.OrderItemRepository;
@@ -18,18 +15,15 @@ import com.nemi.repository.ProductRepository;
 import com.nemi.repository.ProductVariantRepository;
 import com.nemi.service.WebhookService;
 import com.nemi.util.JsonUtils;
-import jakarta.servlet.http.HttpServletRequest;
+import io.jsonwebtoken.lang.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
-import java.io.BufferedReader;
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 
@@ -56,29 +50,25 @@ public class PancakeWebhookServiceImpl implements WebhookService {
     }
 
     @Override
-    public boolean processWebhook(String posId, HttpServletRequest request) {
+    public boolean processWebhook(String posId, Map<String, String> headers, String body) {
         try {
             // ✅ 1. Xác thực header x-api-key
-            String apiKey = request.getHeader("x-api-key");
-            if (apiKey == null || apiKey.isEmpty() || !apiKey.equals(pancakeConfig.getXApiKey())) { //sau nay de thg user nhap rong connect post- regiset webhook gi do...
+            String apiKey = headers.get("x-api-key");
+            if (Objects.isEmpty(apiKey) || !apiKey.equals(pancakeConfig.getXApiKey())) { //sau nay de thg user nhap rong connect post- regiset webhook gi do...
                 log.error("[PancakeWebhookServiceImpl.processWebhook] Invalid x-api-key: {}", apiKey);
                 return false;
             }
 
-            // ✅ 2. Đọc body JSON
-            String body = readBody(request);
-            log.info("[PancakeWebhookServiceImpl.processWebhook] Raw body: {}", body);
-
-            // ✅ 3. Parse JSON về model
+            // ✅ 2. Parse JSON về model
             PancakeWebhookResponse webhookResponse = JsonUtils.fromJson(body, PancakeWebhookResponse.class);
-            if (webhookResponse == null || webhookResponse.getEventType() == null) {
+            if (Objects.isEmpty(webhookResponse) || Objects.isEmpty(webhookResponse.getEventType())) {
                 log.error("[PancakeWebhookServiceImpl.processWebhook] Invalid webhook payload: {}", body);
                 return false;
             }
 
             log.info("[PancakeWebhookServiceImpl.processWebhook] Parsed webhook: {}", webhookResponse.getType());
 
-            // ✅ 4. Xử lý từng loại webhook
+            // ✅ 3. Xử lý từng loại webhook
             return handleEvent(posId, webhookResponse);
 
         } catch (Exception e) {
@@ -88,7 +78,7 @@ public class PancakeWebhookServiceImpl implements WebhookService {
     }
 
     private boolean handleEvent(String posId, PancakeWebhookResponse response) {
-        PancakEvent event = PancakEvent.fromValue(response.getEventType());
+        PancakeEvent event = PancakeEvent.fromValue(response.getEventType());
 
         return switch (event) {
             case ORDER_ADD -> handleOrderWebhook(posId, response);
@@ -112,14 +102,14 @@ public class PancakeWebhookServiceImpl implements WebhookService {
         );
         log.info("[NhanhvnWebhookServiceImpl.handleOrderUpdate] Update OrderData: {}", orderData);
 
-        if (orderData == null || orderData.getId() == null) {
+        if (Objects.isEmpty(orderData) || Objects.isEmpty(orderData.getId())) {
             log.error("[NhanhvnWebhookServiceImpl.handleOrderUpdate] Failed to update order data: {}", orderData);
             return false;
         }
 
         // Convert OrderEntity
         OrderEntity orderEntity = convertToOrderEntity(posId, orderData);
-        if (orderEntity == null) {
+        if (Objects.isEmpty(orderEntity)) {
             log.error("[NhanhvnWebhookServiceImpl.handleOrderUpdate] Failed to convert orderData={} to OrderEntity", orderData.getId());
             return false;
         }
@@ -201,27 +191,8 @@ public class PancakeWebhookServiceImpl implements WebhookService {
         }
         return orderItemEntities;
     }
-
-
-
-
-
     /**
      * Xử lý webhook type=variations_warehouses
      * - Cập nhật tồn kho
      */
-
-
-    private String readBody(HttpServletRequest request) {
-        StringBuilder sb = new StringBuilder();
-        try (BufferedReader reader = request.getReader()) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line);
-            }
-        } catch (IOException e) {
-            log.error("Error reading request body", e);
-        }
-        return sb.toString();
-    }
 }

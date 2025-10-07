@@ -9,9 +9,6 @@ import com.nemi.entity.*;
 import com.nemi.enums.PosName;
 import com.nemi.enums.PosStatus;
 import com.nemi.enums.SyncErrorMessage;
-import com.nemi.enums.PosName;
-import com.nemi.enums.PosStatus;
-import com.nemi.enums.SyncErrorMessage;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
@@ -22,15 +19,11 @@ import com.nemi.model.response.sapo.SapoAccessTokenResponse;
 import com.nemi.model.response.sapo.SapoOrderResponse;
 import com.nemi.model.response.sapo.SapoProductResponse;
 import com.nemi.model.response.sapo.SapoWebhookResponse;
-import com.nemi.repository.OrderItemRepository;
-import com.nemi.repository.OrderRepository;
-import com.nemi.repository.PosRepository;
-import com.nemi.repository.ProductRepository;
-import com.nemi.repository.ProductVariantRepository;
-import com.nemi.repository.SyncHistoryRepository;
+import com.nemi.repository.*;
 import com.nemi.service.PosManagementService;
 import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
+import com.nemi.utils.PosUtils;
 import jakarta.annotation.PostConstruct;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
@@ -38,15 +31,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -111,7 +97,7 @@ public class SapoServiceImpl implements PosManagementService {
                     .build();
 
             posRepository.save(posEntityBuilder);
-            
+
             // Register webhooks
             List<SapoWebhookResponse> webhooks = sapoClient.registerWebhook(
                     posConnectionRequest.getStoreName(),
@@ -119,7 +105,7 @@ public class SapoServiceImpl implements PosManagementService {
                     posEntityBuilder.getId()
             );
             log.info("Registered {} webhooks for POS: {}", webhooks.size(), posEntityBuilder.getId());
-            
+
             PosConnectionResponse posConnectionResponse = PosConnectionResponse.toPosConnectionResponse(posEntityBuilder);
             log.info("Sapo response is {}", posConnectionResponse);
             return posConnectionResponse;
@@ -255,10 +241,10 @@ public class SapoServiceImpl implements PosManagementService {
 
         // Set timestamps - parse from string format
         if (apiProduct.getCreatedOn() != null && !apiProduct.getCreatedOn().isEmpty()) {
-            product.setCreatedAt(parseSapoDateTime(apiProduct.getCreatedOn()));
+            product.setCreatedAt(PosUtils.parseDateTime(apiProduct.getCreatedOn()));
         }
         if (apiProduct.getModifiedOn() != null && !apiProduct.getModifiedOn().isEmpty()) {
-            product.setUpdatedAt(parseSapoDateTime(apiProduct.getModifiedOn()));
+            product.setUpdatedAt(PosUtils.parseDateTime(apiProduct.getModifiedOn()));
         }
         return product;
     }
@@ -381,28 +367,6 @@ public class SapoServiceImpl implements PosManagementService {
         }
     }
 
-
-    private LocalDateTime parseSapoDateTime(String dateTimeString) {
-        if (dateTimeString == null || dateTimeString.trim().isEmpty()) {
-            return null;
-        }
-
-        try {
-            // 1. Dùng Instant để xử lý chuỗi ISO 8601 có 'Z' (Zulu/UTC)
-            // Instant.parse() xử lý định dạng "yyyy-MM-ddTHH:mm:ssZ" hoặc có mili giây.
-            Instant instant = Instant.parse(dateTimeString.trim());
-
-            // 2. Chuyển Instant (UTC time) sang LocalDateTime (bỏ thông tin múi giờ)
-            // Sử dụng ZoneOffset.UTC để đảm bảo chuyển đổi chính xác từ UTC.
-            return LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
-
-        } catch (Exception e) {
-            // Ghi log chi tiết hơn để dễ debug
-            log.warn("[SapoServiceImpl] Failed to parse date time '{}'. Error: {}", dateTimeString, e.getMessage());
-            return null;
-        }
-    }
-
     private SyncHistoryEntity toSyncHistory(SyncHistoryEntity syncHistoryEntity, SyncErrorMessage syncErrorMessage, Boolean isSyncSuccess) {
         if (Boolean.FALSE.equals(isSyncSuccess)) {
             syncHistoryEntity.setEndTime(LocalDateTime.now());
@@ -423,8 +387,6 @@ public class SapoServiceImpl implements PosManagementService {
     }
 
     public OrderEntity convertToOrderEntity(String posId, SapoOrderResponse.Order order) {
-
-
         Map<String, String> mapping = sapoConfig.getOrder().getStatus().getMapping();
         String status = mapping.getOrDefault(order.getStatus(), "unknown");
 

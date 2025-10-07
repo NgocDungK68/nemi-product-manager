@@ -1,5 +1,8 @@
 package com.nemi.enums;
 
+import lombok.Getter;
+
+@Getter
 public enum Status {
     NEW("new"),
     PROCESSING("processing"),
@@ -18,7 +21,4 @@ public enum Status {
         this.value = value;
     }
 
-    public String getValue() {
-        return value;
-    }
 }

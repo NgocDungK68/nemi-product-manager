@@ -2,7 +2,6 @@ package com.nemi.repository;
 
 import com.nemi.entity.ProductVariantEntity;
 import com.nemi.entity.VariantId;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
