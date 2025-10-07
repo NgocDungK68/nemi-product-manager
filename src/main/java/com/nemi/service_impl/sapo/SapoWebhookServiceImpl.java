@@ -11,7 +11,6 @@ import com.nemi.repository.ProductVariantRepository;
 import com.nemi.service.WebhookService;
 import com.nemi.util.JsonUtils;
 import com.nemi.utils.PosUtils;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -19,7 +18,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -37,19 +38,8 @@ public class SapoWebhookServiceImpl implements WebhookService {
 
     @Override
     @Transactional
-    public boolean processWebhook(String posId, HttpServletRequest request) {
+    public boolean processWebhook(String posId, Map<String, String> headers, String body) {
         try {
-            // 1. Read headers
-            Map<String, String> headers = extractHeaders(request);
-            log.info("=== Sapo Webhook received for posId: {} ===", posId);
-            log.info("Headers:");
-            headers.forEach((k, v) -> log.info("  {} = {}", k, v));
-
-            // 2. Read raw body
-            String body = PosUtils.readBody(request);
-            log.info("Payload body: {}", body);
-
-            // 3. Parse JSON payload using JsonUtils
             if (!body.trim().isEmpty()) {
                 SapoProductResponse.Product payloadProduct = JsonUtils.fromJson(body, SapoProductResponse.Product.class);
                 SapoOrderResponse.Order payloadOrder = JsonUtils.fromJson(body, SapoOrderResponse.Order.class);
@@ -59,7 +49,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 }
 
                 // 4. Process webhook data based on event type
-                String topic = request.getHeader("x-sapo-topic");
+                String topic = headers.get("x-sapo-topic");
                 return switch (topic) {
                     case "products/create" -> processProductWebhook(posId, payloadProduct);
                     case "products/delete" -> processProductDeleteWebhook(posId, payloadProduct);
@@ -81,19 +71,6 @@ public class SapoWebhookServiceImpl implements WebhookService {
             log.error("Process webhook failed: {}", e.getMessage(), e);
             return false;
         }
-    }
-
-    private Map<String, String> extractHeaders(HttpServletRequest request) {
-        Map<String, String> map = new HashMap<>();
-        Enumeration<String> names = request.getHeaderNames();
-        if (names != null) {
-            while (names.hasMoreElements()) {
-                String name = names.nextElement();
-                String value = request.getHeader(name);
-                map.put(name, value);
-            }
-        }
-        return map;
     }
 
     /**

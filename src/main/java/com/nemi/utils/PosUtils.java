@@ -1,5 +1,7 @@
 package com.nemi.utils;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.ObjectUtils;
@@ -9,9 +11,23 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.TreeMap;
 
 @Slf4j
 public class PosUtils {
+    public static Map<String, String> extractHeaders(HttpServletRequest request) {
+        Map<String, String> headers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        Enumeration<String> headerNames = request.getHeaderNames();
+        while (headerNames.hasMoreElements()) {
+            String key = headerNames.nextElement();
+            headers.put(key, request.getHeader(key));
+        }
+        return headers;
+    }
+
     public static String readBody(HttpServletRequest request) {
         StringBuilder sb = new StringBuilder();
         try (BufferedReader reader = request.getReader()) {
