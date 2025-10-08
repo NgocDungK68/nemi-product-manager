@@ -88,9 +88,12 @@ public class SapoWebhookServiceImpl implements WebhookService {
             webhookHistory.setEventType(event.getEventType());
 
             boolean isSuccess = switch (event) {
-                case PRODUCT_ADD, PRODUCT_UPDATE -> processProductUpsertWebhook(posId, payloadProduct);
+                case PRODUCT_ADD -> processProductAddWebhook(posId, payloadProduct);
+                case PRODUCT_UPDATE -> processProductUpdateWebhook(posId, payloadProduct);
                 case PRODUCT_DELETE -> processProductDeleteWebhook(posId, payloadProduct);
-                case ORDER_ADD, ORDER_UPDATED, ORDER_FULFILLED -> processOrderUpsertWebhook(posId, payloadOrder);
+                case ORDER_ADD -> processOrderAddWebhook(posId, payloadOrder);
+                case ORDER_UPDATED -> processOrderUpdatedWebhook(posId, payloadOrder);
+                case ORDER_FULFILLED -> processOrderFulfilledWebhook(posId, payloadOrder);
                 case ORDER_UPDATE -> false;
                 case ORDER_DELETE -> processOrderDeleteWebhook(posId, payloadOrder);
             };
@@ -315,6 +318,27 @@ public class SapoWebhookServiceImpl implements WebhookService {
             log.error("Failed to process order webhook: {}", e.getMessage(), e);
             return false;
         }
+    }
+
+    // Event-specific wrappers (kept separate for clarity and future custom logic per event)
+    private boolean processProductAddWebhook(String posId, SapoProductResponse.Product payload) {
+        return processProductUpsertWebhook(posId, payload);
+    }
+
+    private boolean processProductUpdateWebhook(String posId, SapoProductResponse.Product payload) {
+        return processProductUpsertWebhook(posId, payload);
+    }
+
+    private boolean processOrderAddWebhook(String posId, SapoOrderResponse.Order payload) {
+        return processOrderUpsertWebhook(posId, payload);
+    }
+
+    private boolean processOrderUpdatedWebhook(String posId, SapoOrderResponse.Order payload) {
+        return processOrderUpsertWebhook(posId, payload);
+    }
+
+    private boolean processOrderFulfilledWebhook(String posId, SapoOrderResponse.Order payload) {
+        return processOrderUpsertWebhook(posId, payload);
     }
 
     /**
