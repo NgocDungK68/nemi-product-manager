@@ -8,6 +8,7 @@ public class NhanhvnConstants {
     public static final String FILTERS = "filters";
     public static final String RETURN_LINK = "returnLink";
     public static final String VERSION = "version";
+    public static final String IDS = "ids";
 
     public static final int SUCCESS_CODE = 1;
     public static final Integer PARENT_PRODUCT = -2;

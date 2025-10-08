@@ -31,6 +31,7 @@ import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -307,7 +308,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
         BigDecimal totalPrice = BigDecimal.valueOf(0);
         for (NhanhvnOrderResponse.Product product : apiOrders.getProducts()) {
             BigDecimal price = product.getPrice(); // BigDecimal
-            BigDecimal vat = product.getVat().divide(BigDecimal.valueOf(100));
+            BigDecimal vat = product.getVat().divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
             BigDecimal quantity = BigDecimal.valueOf(product.getQuantity());
             BigDecimal discount = product.getDiscount();
 
