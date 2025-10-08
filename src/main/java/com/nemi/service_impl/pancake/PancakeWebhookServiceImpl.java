@@ -18,6 +18,7 @@ import com.nemi.repository.WebhookHistoryRepository;
 import com.nemi.service.WebhookService;
 import com.nemi.util.JsonUtils;
 import io.jsonwebtoken.lang.Objects;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ObjectUtils;
@@ -52,6 +53,7 @@ public class PancakeWebhookServiceImpl implements WebhookService {
     }
 
     @Override
+    @Transactional
     public boolean processWebhook(String posId, Map<String, String> headers, Object body) {
         WebhookHistoryEntity webhookHistory = WebhookHistoryEntity.builder()
                 .header(JsonUtils.toJson(headers))
