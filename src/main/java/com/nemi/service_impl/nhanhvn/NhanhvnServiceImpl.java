@@ -58,8 +58,6 @@ public class NhanhvnServiceImpl implements PosManagementService {
     public PosConnectionResponse connectPos(PosConnectionRequest posConnectionRequest) {
         try {
             String userId = claimUtil.getUserId();
-            String companyId = String.valueOf(claimUtil.getCompanyId());
-            String username = claimUtil.getUserName();
 
             // 1. Kiểm tra đã connectPos chưa
             Optional<PosEntity> existingPosOpt = posRepository.findByUserIdAndPosName(userId, PosName.NHANHVN.getValue());

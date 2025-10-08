@@ -33,10 +33,8 @@ public class PosManagementController {
                                                             @RequestBody PosConnectionRequest posConnectionRequest) {
         PosManagementService posManagementService = posManagementFactory.getPosName(posName);
         PosConnectionResponse posConnectionResponse = posManagementService.connectPos(posConnectionRequest);
-        if (posConnectionResponse.getStatus().equals(PosStatus.ACTIVE.name())) {
-            if (posManagementService.syncProduct(posConnectionResponse.getId())) {
-                posManagementService.syncOrder(posConnectionResponse.getId());
-            }
+        if (posManagementService.syncProduct(posConnectionResponse.getId())) {
+            posManagementService.syncOrder(posConnectionResponse.getId());
         }
 
         return ResponseEntity.ok(posConnectionResponse);
