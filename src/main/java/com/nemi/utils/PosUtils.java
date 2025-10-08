@@ -1,11 +1,21 @@
 package com.nemi.utils;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nemi.configuration.NhanhvnConfig;
+import com.nemi.constant.NhanhvnConstants;
+import com.nemi.entity.PosEntity;
+import com.nemi.exception.TechnicalAlertCode;
+import com.nemi.exception.TechnicalException;
+import com.nemi.exception.pojo.AlertMessages;
+import io.jsonwebtoken.lang.Objects;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 import org.springframework.util.ObjectUtils;
+import org.springframework.web.util.UriComponentsBuilder;
 
-import java.io.BufferedReader;
-import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -14,7 +24,12 @@ import java.util.Map;
 import java.util.TreeMap;
 
 @Slf4j
+@RequiredArgsConstructor
+@Component
 public class PosUtils {
+    private final NhanhvnConfig nhanhvnConfig;
+    private final ObjectMapper objectMapper;
+
     public static Map<String, String> extractHeaders(HttpServletRequest request) {
         Map<String, String> headers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         Enumeration<String> headerNames = request.getHeaderNames();

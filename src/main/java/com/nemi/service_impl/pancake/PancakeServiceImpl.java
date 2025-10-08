@@ -4,14 +4,10 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.client.PancakeClient;
 import com.nemi.configuration.PancakeConfig;
-import com.nemi.entity.OrderEntity;
-import com.nemi.entity.OrderItemEntity;
-import com.nemi.entity.PosEntity;
-import com.nemi.entity.ProductEntity;
-import com.nemi.entity.SyncHistoryEntity;
-import com.nemi.enums.Status;
+import com.nemi.entity.*;
 import com.nemi.enums.PosName;
 import com.nemi.enums.PosStatus;
+import com.nemi.enums.Status;
 import com.nemi.enums.SyncErrorMessage;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
@@ -21,11 +17,8 @@ import com.nemi.model.request.pancake.PancakeRequest;
 import com.nemi.model.response.PosConnectionResponse;
 import com.nemi.model.response.pancake.PancakeOrderResponse;
 import com.nemi.model.response.pancake.PancakeProductResponse;
-import com.nemi.repository.OrderItemRepository;
-import com.nemi.repository.OrderRepository;
-import com.nemi.repository.PosRepository;
-import com.nemi.repository.ProductRepository;
-import com.nemi.repository.SyncHistoryRepository;
+import com.nemi.repository.*;
+import com.nemi.service.GeneralPosService;
 import com.nemi.service.PosManagementService;
 import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
@@ -38,12 +31,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -59,6 +47,7 @@ public class PancakeServiceImpl implements PosManagementService {
     private final SyncHistoryRepository syncHistoryRepository;
     private final OrderItemRepository orderItemRepository;
     private final PancakeConfig pancakeConfig;
+    private final GeneralPosService generalPosService;
 
     private int orderBatchSize;
     private int orderItemBatchSize;
@@ -118,7 +107,7 @@ public class PancakeServiceImpl implements PosManagementService {
                 .syncStatus(PosStatus.FAIL.name())
                 .build();
         try {
-            PosEntity posEntity = getPos(posId);
+            PosEntity posEntity = generalPosService.getPos(posId);
 
             Map<String, String> configMap = objectMapper.readValue(
                     posEntity.getConfig(), new TypeReference<>() {
@@ -200,15 +189,6 @@ public class PancakeServiceImpl implements PosManagementService {
             log.error("Failed to save Pancake products synchronously: {}", e.getMessage(), e);
             throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
         }
-    }
-
-    public PosEntity getPos(String posId) {
-        log.debug("[PancakeSyncDataImpl.getPos] posId: {}", posId);
-        return posRepository.findById(posId)
-                .orElseThrow(() -> {
-                    log.error("Error [PancakeSyncDataImpl.getPos] not found posId: {}", posId);
-                    return new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_INVALID));
-                });
     }
 
     private List<ProductEntity> convertToProductEntities(String posId, List<PancakeProductResponse.ProductData> apiProducts) {
@@ -361,7 +341,7 @@ public class PancakeServiceImpl implements PosManagementService {
                 .syncStatus(PosStatus.FAIL.name())
                 .build();
         try {
-            PosEntity posEntity = getPos(posId);
+            PosEntity posEntity = generalPosService.getPos(posId);
 
             Map<String, String> configMap = objectMapper.readValue(
                     posEntity.getConfig(), new TypeReference<>() {

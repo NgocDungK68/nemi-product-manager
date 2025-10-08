@@ -24,7 +24,5 @@ public interface PosRepository extends JpaRepository<PosEntity, String> {
 
     Optional<PosEntity> findByConfigContaining(String config);
 
-
-
-
+    Optional<PosEntity> findByUserIdAndPosName(String userId,String posName);
 }

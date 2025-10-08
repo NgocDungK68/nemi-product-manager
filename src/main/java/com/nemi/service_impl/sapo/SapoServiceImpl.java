@@ -20,6 +20,7 @@ import com.nemi.model.response.sapo.SapoOrderResponse;
 import com.nemi.model.response.sapo.SapoProductResponse;
 import com.nemi.model.response.sapo.SapoWebhookResponse;
 import com.nemi.repository.*;
+import com.nemi.service.GeneralPosService;
 import com.nemi.service.PosManagementService;
 import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
@@ -51,6 +52,7 @@ public class SapoServiceImpl implements PosManagementService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final SapoConfig sapoConfig;
+    private final GeneralPosService generalPosService;
     private int orderBatchSize;
     private int orderItemBatchSize;
     private int productBatchSize;
@@ -124,7 +126,7 @@ public class SapoServiceImpl implements PosManagementService {
                 .build();
         try {
             //B1 : Lay posentity va validate posName
-            PosEntity posEntity = getPos(posId);
+            PosEntity posEntity = generalPosService.getPos(posId);
 
             // B2: parse config
             Map<String, String> configMap = objectMapper.readValue(
@@ -210,18 +212,6 @@ public class SapoServiceImpl implements PosManagementService {
             return false;
         }
     }
-
-    public PosEntity getPos(String posId) {
-        log.debug("[SapoSyncDataImpl.getPos] posId: {}", posId);
-
-        // Lấy PosEntity từ DB
-        return posRepository.findById(posId)
-                .orElseThrow(() -> {
-                    log.error("Error [SapoSyncDataImpl.getPos] not found posId: {}", posId);
-                    return new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_INVALID));
-                });
-    }
-
 
     private ProductEntity convertToProductEntity(String posId, SapoProductResponse.Product apiProduct) {
         ProductEntity product = new ProductEntity();
@@ -509,7 +499,7 @@ public class SapoServiceImpl implements PosManagementService {
                 .syncStatus(PosStatus.FAIL.name())
                 .build();
         try {
-            PosEntity posEntity = getPos(posId);
+            PosEntity posEntity = generalPosService.getPos(posId);
 
             Map<String, String> configMap = objectMapper.readValue(
                     posEntity.getConfig(), new TypeReference<>() {

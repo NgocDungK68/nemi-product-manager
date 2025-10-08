@@ -22,10 +22,10 @@ import java.util.stream.Collectors;
 @Slf4j
 @RequiredArgsConstructor
 public abstract class AbstractPosManagementService {
-
     protected final PosRepository posRepository;
     protected final ClaimUtil claimUtil;
     protected final SyncHistoryRepository syncHistoryRepository;
+    protected final PosReAuthService posReAuthService;
 
     /**
      * Get POS status by ID
@@ -58,12 +58,39 @@ public abstract class AbstractPosManagementService {
      * List all POS connections for a user
      */
     public List<PosConnectionResponse> getAllPos() {
-        List<PosEntity> posEntities = posRepository.findByUserId(claimUtil.getUserId());
-        log.debug("Found {} POS entities for userId={}", posEntities.size(), claimUtil.getUserId());
+        String userId = claimUtil.getUserId();
+        List<PosEntity> posEntities = posRepository.findByUserId(userId);
+        log.debug("Found {} POS entities for userId={}", posEntities.size(), userId);
 
         return posEntities.stream()
-                .map(PosConnectionResponse::toPosConnectionResponse)
+                .map(pos -> {
+                    // Check token hết hạn
+                    if (posReAuthService.isAccessTokenExpired(pos)) {
+                        if (!PosStatus.EXPIRED.name().equals(pos.getStatus())) {
+                            pos.setStatus(PosStatus.EXPIRED.name());
+                            posRepository.save(pos);
+                            log.info("POS expired for userId={}, posId={}", userId, pos.getId());
+                        }
+
+                        String reAuthLink = posReAuthService.buildReAuthLink(pos);
+                        return PosConnectionResponse.expired(pos, reAuthLink);
+                    }
+
+                    // Trường hợp token còn hạn, status ACTIVE
+                    return PosConnectionResponse.toPosConnectionResponse(pos);
+                })
                 .collect(Collectors.toList());
+    }
+
+    public PosEntity getPos(String posId) {
+        log.debug("posId: {}", posId);
+
+        // Lấy PosEntity từ DB
+        return posRepository.findById(posId)
+                .orElseThrow(() -> {
+                    log.error("Error not found posId: {}", posId);
+                    return new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_INVALID));
+                });
     }
 }
 

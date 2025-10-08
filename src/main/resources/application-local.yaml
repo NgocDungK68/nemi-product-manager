@@ -32,11 +32,14 @@ server:
     include-stacktrace: never
 
 nhanhvn:
-  base-url: https://pos.open.nhanh.vn
+  base-url: https://nhanh.vn
+  pos-url: https://pos.open.nhanh.vn
+  return-link: https://nemi-dev-02.ecombase.net/nemi-product-manager/nhanhvn/auth
   api-version: v3.0
+  url-oauth: oauth
   url-access-token: app/getaccesstoken
   url-products: product/list
-  url-orders: /order/list
+  url-orders: order/list
   verify-token: nemiWebhook123!@#
   secret-key: NHdyJR8NKO2v8Md7Nwb06o1n0nOAW5YcLBeQs4DdyoLmoXJK8jz6Hf3nQcadBx2m5Ys9kGydcKs0g3Kn94rVgXyU1nhmDtQSZipWJjiHo5A6ffCamfsL81DXUSm9n3AT
   product:
@@ -68,10 +71,11 @@ nhanhvn:
         73: "RETURNED"      # Đổi kho xuất hàng
         74: "RETURNED"      # Xác nhận hoàn
   sync:
-    order: 100
-    order-item: 200
-    product: 100
-    page-start: 1
+    batch:
+      order: 50
+      order-item: 50
+      product: 50
+    page-size: 50
 pancake:
   secret: elqsF9ERiFWGacWQO9Gg5XC4kXojot
   base-url: https://pos.pages.fm/api/v1

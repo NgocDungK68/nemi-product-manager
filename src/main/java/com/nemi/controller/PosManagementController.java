@@ -1,5 +1,6 @@
 package com.nemi.controller;
 
+import com.nemi.enums.PosStatus;
 import com.nemi.model.request.ChangeStatusRequest;
 import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.response.PosConnectionResponse;
@@ -35,6 +36,7 @@ public class PosManagementController {
         if (posManagementService.syncProduct(posConnectionResponse.getId())) {
             posManagementService.syncOrder(posConnectionResponse.getId());
         }
+
         return ResponseEntity.ok(posConnectionResponse);
     }
 

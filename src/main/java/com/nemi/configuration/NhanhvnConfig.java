@@ -11,7 +11,9 @@ import java.util.Map;
 @ConfigurationProperties("nhanhvn")
 public class NhanhvnConfig {
     private String baseUrl;
-    private String urlAccessCode;
+    private String posUrl;
+    private String returnLink;
+    private String urlOauth;
     private String urlAccessToken;
     private String urlProducts;
     private String urlOrders;
@@ -20,6 +22,7 @@ public class NhanhvnConfig {
     private String secretKey;
     private ProductConfig product;
     private OrderConfig order;
+    private SyncConfig sync;
 
     @Data
     public static class ProductConfig {
@@ -34,5 +37,18 @@ public class NhanhvnConfig {
     @Data
     public static class StatusConfig {
         private Map<Integer, String> mapping;
+    }
+
+    @Data
+    public static class SyncConfig {
+        private BatchConfig batch;
+        private int pageSize;
+    }
+
+    @Data
+    public static class BatchConfig {
+        private int order;
+        private int orderItem;
+        private int product;
     }
 }

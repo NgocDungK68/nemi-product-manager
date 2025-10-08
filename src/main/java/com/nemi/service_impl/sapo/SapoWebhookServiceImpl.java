@@ -45,14 +45,12 @@ public class SapoWebhookServiceImpl implements WebhookService {
 
     @Override
     @Transactional
-    public boolean processWebhook(String posId, Map<String, String> headers, Object body) {
+    public boolean processWebhook(String posId, String posName, Map<String, String> headers, Object body) {
         WebhookHistoryEntity webhookHistory = WebhookHistoryEntity.builder()
                 .header(JsonUtils.toJson(headers))
                 .status(WebhookConstants.Status.FAILED)
-                .syncType(WebhookConstants.UNKNOWN)
-                .eventType(WebhookConstants.UNKNOWN)
-                .createdBy(WebhookConstants.UNKNOWN)
-                .updatedBy(WebhookConstants.UNKNOWN)
+                .posId(posId)
+                .posName(posName)
                 .build();
         try {
             String topic = headers.get(SapoConstants.X_SAPO_TOPIC);
@@ -67,12 +65,14 @@ public class SapoWebhookServiceImpl implements WebhookService {
                     log.error("Failed to parse Sapo product webhook payload");
                     return false;
                 }
+                webhookHistory.setBody(JsonUtils.toJson(payloadProduct));
             } else if (topic.startsWith("orders")) {
                 payloadOrder = JsonUtils.map(body, SapoOrderResponse.Order.class);
                 if (payloadOrder == null) {
                     log.error("Failed to parse Sapo order webhook payload");
                     return false;
                 }
+                webhookHistory.setBody(JsonUtils.toJson(payloadOrder));
             } else {
                 log.warn("Unknown webhook topic: {}", topic);
                 return false; // acknowledge unknown topics
