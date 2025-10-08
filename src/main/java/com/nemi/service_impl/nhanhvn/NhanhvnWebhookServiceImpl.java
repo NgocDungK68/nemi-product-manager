@@ -13,17 +13,17 @@ import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
 import com.nemi.model.request.nhanhvn.NhanhvnRequest;
+import com.nemi.model.request.nhanhvn.NhanhvnWebhookRequest;
 import com.nemi.model.response.nhanhvn.NhanhvnOrderResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
-import com.nemi.model.request.nhanhvn.NhanhvnWebhookRequest;
 import com.nemi.repository.*;
 import com.nemi.service.WebhookService;
 import com.nemi.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
-import org.springframework.util.ObjectUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -413,7 +413,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
             request.setFilters(Map.of(NhanhvnConstants.IDS, id));
             Optional<NhanhvnProductResponse> responseOpt = nhanhvnClient.getProducts(request);
 
-            if (responseOpt.isPresent() && !ObjectUtils.isEmpty(responseOpt.get().getData())) {
+            if (responseOpt.isPresent() && ObjectUtils.isNotEmpty(responseOpt.get().getData())) {
                 return responseOpt.get().getData().get(0);
             }
 
