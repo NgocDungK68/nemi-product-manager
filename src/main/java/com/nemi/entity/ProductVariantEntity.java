@@ -1,21 +1,20 @@
 package com.nemi.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 import java.math.BigDecimal;
 
+@EqualsAndHashCode(callSuper = true)
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-@Builder
+@SuperBuilder
 @Entity
 @Table(name = "product_variant", schema = "product_manager")
 @IdClass(VariantId.class)
-public class ProductVariantEntity {
+public class ProductVariantEntity extends BaseEntity {
     @Id
     @Column(name = "variant_id")
     private String variantId;
