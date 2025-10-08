@@ -22,7 +22,7 @@ public class NhanhvnConfig {
     private String secretKey;
     private ProductConfig product;
     private OrderConfig order;
-    private BatchConfig sync;
+    private SyncConfig sync;
 
     @Data
     public static class ProductConfig {
@@ -40,10 +40,15 @@ public class NhanhvnConfig {
     }
 
     @Data
+    public static class SyncConfig {
+        private BatchConfig batch;
+        private int pageSize;
+    }
+
+    @Data
     public static class BatchConfig {
         private int order;
         private int orderItem;
         private int product;
-        private int pageSize;
     }
 }

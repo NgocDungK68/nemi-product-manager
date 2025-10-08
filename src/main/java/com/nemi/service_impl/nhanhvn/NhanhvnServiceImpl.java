@@ -60,9 +60,9 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
     @PostConstruct
     public void init() {
-        orderBatchSize = nhanhvnConfig.getSync().getOrder();
-        orderItemBatchSize = nhanhvnConfig.getSync().getOrderItem();
-        productBatchSize = nhanhvnConfig.getSync().getProduct();
+        orderBatchSize = nhanhvnConfig.getSync().getBatch().getOrder();
+        orderItemBatchSize = nhanhvnConfig.getSync().getBatch().getOrderItem();
+        productBatchSize = nhanhvnConfig.getSync().getBatch().getProduct();
         pageSize = nhanhvnConfig.getSync().getPageSize();
     }
 

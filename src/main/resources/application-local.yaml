@@ -71,9 +71,10 @@ nhanhvn:
         73: "RETURNED"      # Đổi kho xuất hàng
         74: "RETURNED"      # Xác nhận hoàn
   sync:
-    order: 50
-    order-item: 50
-    product: 50
+    batch:
+      order: 50
+      order-item: 50
+      product: 50
     page-size: 50
 pancake:
   secret: elqsF9ERiFWGacWQO9Gg5XC4kXojot
