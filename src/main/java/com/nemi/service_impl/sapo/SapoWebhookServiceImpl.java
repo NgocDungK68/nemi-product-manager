@@ -10,11 +10,11 @@ import com.nemi.model.response.sapo.SapoOrderResponse;
 import com.nemi.model.response.sapo.SapoProductResponse;
 import com.nemi.repository.*;
 import com.nemi.service.WebhookService;
-import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
 import com.nemi.utils.PosUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.ObjectUtils;
@@ -36,7 +36,6 @@ public class SapoWebhookServiceImpl implements WebhookService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final SapoConfig sapoConfig;
-    private final ClaimUtil claimUtil;
     private final WebhookHistoryRepository webhookHistoryRepository;
 
     @Override
@@ -89,13 +88,11 @@ public class SapoWebhookServiceImpl implements WebhookService {
             webhookHistory.setEventType(event.getEventType());
 
             boolean isSuccess = switch (event) {
-                case PRODUCT_ADD -> processProductWebhook(posId, payloadProduct);
+                case PRODUCT_ADD, PRODUCT_UPDATE -> processProductUpsertWebhook(posId, payloadProduct);
                 case PRODUCT_DELETE -> processProductDeleteWebhook(posId, payloadProduct);
-                case PRODUCT_UPDATE -> processProductUpdateWebhook(posId, payloadProduct);
-                case ORDER_ADD -> processOrderCreateWebhook(posId, payloadOrder);
+                case ORDER_ADD, ORDER_UPDATED, ORDER_FULFILLED -> processOrderUpsertWebhook(posId, payloadOrder);
                 case ORDER_UPDATE -> false;
                 case ORDER_DELETE -> processOrderDeleteWebhook(posId, payloadOrder);
-                case ORDER_UPDATED -> processOrderUpdateWebhook(posId, payloadOrder);
             };
 
             String webhookStatus = isSuccess ? WebhookConstants.Status.SUCCESS : WebhookConstants.Status.FAILED;
@@ -112,26 +109,39 @@ public class SapoWebhookServiceImpl implements WebhookService {
     }
 
     /**
-     * Process product create/update webhook
+     * Process product create/update webhook with upsert logic
      */
-    private boolean processProductWebhook(String posId, SapoProductResponse.Product payload) {
+    private boolean processProductUpsertWebhook(String posId, SapoProductResponse.Product payload) {
         try {
-            // Convert and save product
-            ProductEntity product = convertToProductEntity(posId, payload);
-            productRepository.save(product);
-            log.info("Successfully processed Sapo product webhook for product: {} (SKU: {})",
-                    product.getProductId(), product.getCode());
+            Long productId = payload.getId();
+            if (productId == null || productId == 0) {
+                log.error("No product ID found in webhook payload");
+                return false;
+            }
 
-            // Process variants if any
+            Optional<ProductEntity> existingProductOpt = productRepository.findById(new ProductId(String.valueOf(productId), posId));
+            
+            ProductEntity product;
+            if (existingProductOpt.isPresent()) {
+                product = existingProductOpt.get();
+                updateProductFromPayload(product, payload);
+                log.info("Updating existing Sapo product: {}", productId);
+            } else {
+                product = convertToProductEntity(posId, payload);
+                log.info("Creating new Sapo product: {}", productId);
+            }
+            
+            productRepository.save(product);
+
             if (payload.getVariants() != null && !payload.getVariants().isEmpty()) {
+                productVariantRepository.deleteAllByProductIdAndPosId(String.valueOf(productId), posId);
                 for (SapoProductResponse.Variant variant : payload.getVariants()) {
-                    ProductVariantEntity variantEntity = convertToVariantEntity(posId, variant, payload.getId());
+                    ProductVariantEntity variantEntity = convertToVariantEntity(posId, variant, productId);
                     productVariantRepository.save(variantEntity);
-                    log.info("Successfully saved variant: {} for product: {}",
-                            variantEntity.getVariantId(), product.getProductId());
                 }
             }
 
+            log.info("Successfully processed Sapo product: {} (SKU: {})", product.getProductId(), product.getCode());
             return true;
 
         } catch (Exception e) {
@@ -177,113 +187,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
         }
     }
 
-    /**
-     * Process product update webhook - only update changed fields
-     */
 
-    private boolean processProductUpdateWebhook(String posId, SapoProductResponse.Product payload) {
-        try {
-            Long productId = payload.getId();
-            if (productId == null || productId == 0) {
-                log.error("No product ID found in update webhook payload");
-                return false;
-            }
-
-            // Find existing product in database
-            Optional<ProductEntity> existingProductOpt = productRepository.findById(new ProductId(String.valueOf(productId), posId));
-            if (existingProductOpt.isEmpty()) {
-                log.warn("Product with ID {} not found in database, creating new product", productId);
-                return processProductWebhook(posId, payload); // Create new product
-            }
-
-            ProductEntity existingProduct = existingProductOpt.get();
-            boolean hasChanges = false;
-
-            // Check and update name
-            if (payload.getName() != null && !payload.getName().equals(existingProduct.getName())) {
-                log.info("Updating product name: {} -> {}", existingProduct.getName(), payload.getName());
-                existingProduct.setName(payload.getName());
-                hasChanges = true;
-            }
-
-            // Check and update content (description)
-            if (payload.getContent() != null && !payload.getContent().equals(existingProduct.getDescription())) {
-                log.info("Updating product description: {} -> {}", existingProduct.getDescription(), payload.getContent());
-                existingProduct.setDescription(payload.getContent());
-                hasChanges = true;
-            }
-
-            // Check and update status
-            if (payload.getStatus() != null && !payload.getStatus().equals(existingProduct.getStatus())) {
-                log.info("Updating product status: {} -> {}", existingProduct.getStatus(), payload.getStatus());
-                existingProduct.setStatus(payload.getStatus());
-                hasChanges = true;
-            }
-
-            // Check and update product_type (category)
-            if (payload.getProductType() != null && !payload.getProductType().equals(existingProduct.getCategory())) {
-                log.info("Updating product category: {} -> {}", existingProduct.getCategory(), payload.getProductType());
-                existingProduct.setCategory(payload.getProductType());
-                hasChanges = true;
-            }
-
-            // Check and update vendor (brand)
-            if (payload.getVendor() != null && !payload.getVendor().equals(existingProduct.getBrand())) {
-                log.info("Updating product brand: {} -> {}", existingProduct.getBrand(), payload.getVendor());
-                existingProduct.setBrand(payload.getVendor());
-                hasChanges = true;
-            }
-
-            // Check and update images
-            if (payload.getImages() != null && !payload.getImages().isEmpty()) {
-                String newImages = JsonUtils.toJson(payload.getImages().stream()
-                        .map(SapoProductResponse.Image::getSrc)
-                        .collect(Collectors.toList()));
-                assert newImages != null;
-                if (!newImages.equals(existingProduct.getImages())) {
-                    log.info("Updating product images");
-                    existingProduct.setImages(newImages);
-                    hasChanges = true;
-                }
-            }
-
-            // Check and update modified timestamp
-            LocalDateTime newModifiedTime = PosUtils.parseDateTime(payload.getModifiedOn());
-
-            if (newModifiedTime != null && !newModifiedTime.equals(existingProduct.getUpdatedAt())) {
-                log.info("Updating product modified time: {} -> {}", existingProduct.getUpdatedAt(), newModifiedTime);
-                existingProduct.setUpdatedAt(newModifiedTime);
-                hasChanges = true;
-            }
-
-            // Save updated product to database if there are changes
-            if (hasChanges) {
-                productRepository.save(existingProduct);
-                log.info("Successfully updated Sapo product: {} with some changes", productId);
-            } else {
-                log.info("No changes detected for Sapo product: {}", productId);
-            }
-
-            // Update variants if any
-            if (payload.getVariants() != null && !payload.getVariants().isEmpty()) {
-                // Delete existing variants first
-                productVariantRepository.deleteAllByProductIdAndPosId(String.valueOf(productId), posId);
-
-                // Save new variants
-                for (SapoProductResponse.Variant variant : payload.getVariants()) {
-                    ProductVariantEntity variantEntity = convertToVariantEntity(posId, variant, productId);
-                    productVariantRepository.save(variantEntity);
-                    log.info("Updated variant: {} for product: {}", variantEntity.getVariantId(), productId);
-                }
-            }
-
-            return true;
-
-        } catch (Exception e) {
-            log.error("Failed to process product update webhook: {}", e.getMessage(), e);
-            return false;
-        }
-    }
 
 
     /**
@@ -320,6 +224,27 @@ public class SapoWebhookServiceImpl implements WebhookService {
     }
 
     /**
+     * Update existing ProductEntity from payload
+     */
+    private void updateProductFromPayload(ProductEntity product, SapoProductResponse.Product payload) {
+        product.setName(payload.getName());
+        product.setDescription(payload.getContent());
+        product.setStatus(payload.getStatus().toUpperCase());
+        product.setCategory(payload.getProductType());
+        product.setBrand(payload.getVendor());
+        
+        if (payload.getImages() != null && !payload.getImages().isEmpty()) {
+            product.setImages(JsonUtils.toJson(payload.getImages().stream()
+                    .map(SapoProductResponse.Image::getSrc)
+                    .collect(Collectors.toList())));
+        } else {
+            product.setImages(null);
+        }
+        
+        product.setUpdatedAt(PosUtils.parseDateTime(payload.getModifiedOn()));
+    }
+
+    /**
      * Convert Sapo variant to ProductVariantEntity
      */
     private ProductVariantEntity convertToVariantEntity(String posId, SapoProductResponse.Variant variant, Long productId) {
@@ -340,30 +265,54 @@ public class SapoWebhookServiceImpl implements WebhookService {
     }
 
     /**
-     * Process order create webhook
+     * Process order create/update webhook with upsert logic
      */
-    private boolean processOrderCreateWebhook(String posId, SapoOrderResponse.Order payload) {
+    private boolean processOrderUpsertWebhook(String posId, SapoOrderResponse.Order payload) {
         try {
-            // Convert and save order
-            OrderEntity order = convertToOrderEntity(posId, payload);
-            orderRepository.save(order);
-            log.info("Successfully processed Sapo order webhook for order: {} (Code: {})",
-                    order.getOrderId(), order.getOrderCode());
+            String externalOrderId = payload.getId() != null ? payload.getId().toString() : null;
+            if (externalOrderId == null) {
+                log.error("No order ID found in webhook payload");
+                return false;
+            }
 
-            // Process order items if any
+            Optional<OrderEntity> existingOrderOpt = orderRepository.findByOrderIdAndPosId(externalOrderId, posId);
+            
+            OrderEntity order;
+            if (existingOrderOpt.isPresent()) {
+                order = existingOrderOpt.get();
+                updateOrderFromPayload(order, posId, payload);
+                log.info("Updating existing Sapo order: {}", externalOrderId);
+            } else {
+                order = convertToOrderEntity(posId, payload);
+                log.info("Creating new Sapo order: {}", externalOrderId);
+            }
+            
+            try {
+                orderRepository.save(order);
+            } catch (DataIntegrityViolationException e) {
+                log.warn("Race condition detected for order {}, retrying with existing order", externalOrderId);
+                existingOrderOpt = orderRepository.findByOrderIdAndPosId(externalOrderId, posId);
+                if (existingOrderOpt.isPresent()) {
+                    order = existingOrderOpt.get();
+                    updateOrderFromPayload(order, posId, payload);
+                    orderRepository.save(order);
+                } else {
+                    throw new RuntimeException("Order not found after duplicate key error", e);
+                }
+            }
+
             if (payload.getLineItems() != null && !payload.getLineItems().isEmpty()) {
                 for (SapoOrderResponse.LineItem lineItem : payload.getLineItems()) {
                     OrderItemEntity orderItem = convertToOrderItemEntity(lineItem, order.getOrderId());
                     orderItemRepository.save(orderItem);
-                    log.info("Successfully saved order item: {} for order: {}",
-                            orderItem.getOrderItemId(), order.getOrderId());
                 }
             }
 
+            log.info("Successfully processed Sapo order: {} (Code: {})", order.getOrderId(), order.getOrderCode());
             return true;
 
         } catch (Exception e) {
-            log.error("Failed to process order create webhook: {}", e.getMessage(), e);
+            log.error("Failed to process order webhook: {}", e.getMessage(), e);
             return false;
         }
     }
@@ -396,44 +345,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
         }
     }
 
-    /**
-     * Process order update webhook
-     */
-    private boolean processOrderUpdateWebhook(String posId, SapoOrderResponse.Order payload) {
-        try {
-            // Find existing order
-            Optional<OrderEntity> existingOrderOpt = orderRepository.findByOrderIdAndPosId(payload.getId().toString(), posId);
-            if (existingOrderOpt.isPresent()) {
-                OrderEntity existingOrder = existingOrderOpt.get();
-                // Update existing order
-                OrderEntity updatedOrder = convertToOrderEntity(posId, payload);
-                updatedOrder.setOrderId(existingOrder.getOrderId()); // Keep the same internal ID
-                orderRepository.save(updatedOrder);
 
-                // Update order items - delete existing and create new ones
-                List<OrderItemEntity> existingOrderItems = orderItemRepository.findByOrderId(existingOrder.getOrderId());
-                orderItemRepository.deleteAll(existingOrderItems);
-
-                if (payload.getLineItems() != null && !payload.getLineItems().isEmpty()) {
-                    for (SapoOrderResponse.LineItem lineItem : payload.getLineItems()) {
-                        OrderItemEntity orderItem = convertToOrderItemEntity(lineItem, updatedOrder.getOrderId());
-                        orderItemRepository.save(orderItem);
-                    }
-                }
-
-                log.info("Successfully updated Sapo order: {} (Code: {})",
-                        updatedOrder.getOrderId(), updatedOrder.getOrderCode());
-            } else {
-                // Create new order if not found
-                return processOrderCreateWebhook(posId, payload);
-            }
-            return true;
-
-        } catch (Exception e) {
-            log.error("Failed to process order update webhook: {}", e.getMessage(), e);
-            return false;
-        }
-    }
 
     /**
      * Convert SapoOrder to OrderEntity
@@ -547,6 +459,28 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 .orElse(0.0);
     }
 
-    // Helper methods for extracting data from SapoOrder
+    /**
+     * Update existing OrderEntity from payload without creating new instance
+     */
+    private void updateOrderFromPayload(OrderEntity order, String posId, SapoOrderResponse.Order payload) {
+        SapoOrderResponse.OriginAddress originAddress = extractOriginAddress(payload);
+        Map<String, String> mapping = sapoConfig.getOrder().getStatus().getMapping();
+        String status = mapping.getOrDefault(payload.getStatus(), "unknown");
+
+        order.setOrderCode(payload.getName());
+        order.setPosId(posId);
+        order.setCustomerName(extractOriginAddressName(originAddress));
+        order.setCustomerPhone(extractOriginAddressPhone(originAddress));
+        order.setCustomerEmail(payload.getEmail());
+        order.setShippingAddress(extractOriginAddressAddress(originAddress));
+        order.setStatus(status.toUpperCase());
+        order.setPaymentMethod(extractPaymentMethods(payload));
+        order.setShippingMethod(extractShippingMethod(payload));
+        order.setTotalPrice(payload.getTotalPrice());
+        order.setShippingFee(extractShippingFee(payload));
+        order.setDiscountAmount(extractDiscountAmount(payload));
+        order.setCreatedAt(PosUtils.parseDateTime(payload.getCreatedOn()));
+        order.setUpdatedAt(PosUtils.parseDateTime(payload.getCancelledOn()));
+    }
 
 }
