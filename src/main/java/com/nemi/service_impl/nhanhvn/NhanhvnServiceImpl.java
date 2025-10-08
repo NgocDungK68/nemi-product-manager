@@ -253,7 +253,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 .productId(String.valueOf(apiProduct.getId()))
                 .code(apiProduct.getCode())
                 .name(apiProduct.getName())
-                .status(status.toUpperCase())
+                .status(status)
                 .build();
     }
 
@@ -307,7 +307,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 .paymentMethod(apiOrder.getPayment().getBusinessPayment().toString())
                 .shippingFee(apiOrder.getCarrier().getShipFee())
                 .totalPrice(totalProductPrice(apiOrder))
-                .status(status.toUpperCase())
+                .status(status)
                 .createdBy(claimUtil.getUserName())
                 .build();
     }

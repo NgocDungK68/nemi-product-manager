@@ -49,24 +49,24 @@ nhanhvn:
   order:
     status:
       mapping:
-        54: "new"           # Đơn mới
-        55: "processing"    # Đang xác nhận
-        56: "processing"    # Đã xác nhận
-        57: "processing"    # Chờ khách xác nhận
-        42: "processing"    # Đang đóng gói
-        40: "processing"    # Đã đóng gói
-        43: "ready_to_ship" # Chờ thu gom
-        59: "shipping"      # Đang chuyển
-        60: "delivered"     # Thành công
-        58: "cancelled"     # Hãng vận chuyển hủy
-        63: "cancelled"     # Khách hủy
-        64: "cancelled"     # Hệ thống hủy
-        68: "cancelled"     # Hết hàng
-        61: "failed"        # Thất bại
-        71: "returned"      # Đang chuyển hoàn
-        72: "returned"      # Đã chuyển hoàn
-        73: "returned"      # Đổi kho xuất hàng
-        74: "returned"      # Xác nhận hoàn
+        54: "NEW"           # Đơn mới
+        55: "PROCESSING"    # Đang xác nhận
+        56: "PROCESSING"    # Đã xác nhận
+        57: "PROCESSING"    # Chờ khách xác nhận
+        42: "PROCESSING"    # Đang đóng gói
+        40: "PROCESSING"    # Đã đóng gói
+        43: "READY_TO_SHIP" # Chờ thu gom
+        59: "SHIPPING"      # Đang chuyển
+        60: "DELIVERED"     # Thành công
+        58: "CANCELLED"     # Hãng vận chuyển hủy
+        63: "CANCELLED"     # Khách hủy
+        64: "CANCELLED"     # Hệ thống hủy
+        68: "CANCELLED"     # Hết hàng
+        61: "FAILED"        # Thất bại
+        71: "RETURNED"      # Đang chuyển hoàn
+        72: "RETURNED"      # Đã chuyển hoàn
+        73: "RETURNED"      # Đổi kho xuất hàng
+        74: "RETURNED"      # Xác nhận hoàn
   sync:
     order: 100
     order-item: 200
@@ -85,22 +85,22 @@ pancake:
   order:
     status:
       mapping:
-        0: "new"            # Mới
-        20: "new"            # Đã đặt hàng
-        1: "processing"     # Đã xác nhận
-        11: "processing"     # Chờ hàng
-        12: "processing"     # Chờ in
-        13: "processing"     # Đã in
-        8: "processing"     # Đang đóng hàng
-        9: "ready_to_ship"  # Chờ chuyển hàng
-        2: "shipping"       # Đã gửi hàng
-        3: "delivered"      # Đã nhận
-        16: "delivered"      # Đã thu tiền
-        4: "returned"       # Đang hoàn
-        15: "returned"       # Hoàn một phần (⚠️ partial return – note riêng nếu cần)
-        5: "returned" # Đã hoàn
-        6: "cancelled"      # Đã hủy
-        7: "cancelled"      # da xoa
+        0: "NEW"            # Mới
+        20: "NEW"            # Đã đặt hàng
+        1: "PROCESSING"     # Đã xác nhận
+        11: "PROCESSING"     # Chờ hàng
+        12: "PROCESSING"     # Chờ in
+        13: "PROCESSING"     # Đã in
+        8: "PROCESSING"     # Đang đóng hàng
+        9: "READY_TO_SHIP"  # Chờ chuyển hàng
+        2: "SHIPPING"       # Đã gửi hàng
+        3: "DELIVERED"      # Đã nhận
+        16: "DELIVERED"      # Đã thu tiền
+        4: "RETURNED"       # Đang hoàn
+        15: "RETURNED"       # Hoàn một phần (⚠️ partial return – note riêng nếu cần)
+        5: "RETURNED" # Đã hoàn
+        6: "CANCELLED"      # Đã hủy
+        7: "CANCELLED"      # da xoa
   sync:
     order: 100
     order-item: 200
