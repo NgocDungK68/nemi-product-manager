@@ -5,11 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.configuration.NhanhvnConfig;
 import com.nemi.constant.NhanhvnConstants;
 import com.nemi.entity.PosEntity;
-import com.nemi.enums.PosStatus;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
-import com.nemi.repository.PosRepository;
 import io.jsonwebtoken.lang.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,7 +24,6 @@ import java.util.Map;
 public class PosReAuthService {
     private final NhanhvnConfig nhanhvnConfig;
     private final ObjectMapper objectMapper;
-    private final PosRepository posRepository;
 
     /**
      * Kiểm tra accessToken của POS đã hết hạn chưa
