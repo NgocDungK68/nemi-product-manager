@@ -6,6 +6,8 @@ public class NhanhvnConstants {
     public static final String SECRET_ID = "secretId";
     public static final String PAGINATOR = "paginator";
     public static final String FILTERS = "filters";
+    public static final String RETURN_LINK = "returnLink";
+    public static final String VERSION = "version";
 
     private NhanhvnConstants() {
     }

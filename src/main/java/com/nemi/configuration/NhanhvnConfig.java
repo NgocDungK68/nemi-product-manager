@@ -11,7 +11,9 @@ import java.util.Map;
 @ConfigurationProperties("nhanhvn")
 public class NhanhvnConfig {
     private String baseUrl;
-    private String urlAccessCode;
+    private String posUrl;
+    private String returnLink;
+    private String urlOauth;
     private String urlAccessToken;
     private String urlProducts;
     private String urlOrders;

@@ -23,6 +23,7 @@ import com.nemi.repository.*;
 import com.nemi.service.PosManagementService;
 import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
+import com.nemi.service.PosReAuthService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -46,6 +47,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final NhanhvnConfig nhanhvnConfig;
+    private final PosReAuthService posReAuthService;
 
     @Override
     public String getPosName() {
@@ -55,36 +57,46 @@ public class NhanhvnServiceImpl implements PosManagementService {
     @Override
     public PosConnectionResponse connectPos(PosConnectionRequest posConnectionRequest) {
         try {
-
             String userId = claimUtil.getUserId();
+            String companyId = String.valueOf(claimUtil.getCompanyId());
+            String username = claimUtil.getUserName();
 
-            Map<String, String> configMap = new HashMap<>();
-            configMap.put(NhanhvnConstants.SECRET_ID, posConnectionRequest.getAppSecret());
-            configMap.put(NhanhvnConstants.APP_ID, posConnectionRequest.getAppId());
-            configMap.put(NhanhvnConstants.BUSINESS_ID, posConnectionRequest.getBusinessId());
+            // 1. Kiểm tra đã connectPos chưa
+            Optional<PosEntity> existingPosOpt = posRepository.findByUserIdAndPosName(userId, PosName.NHANHVN.getValue());
+            if (existingPosOpt.isPresent()) {
+                PosEntity existingPos = existingPosOpt.get();
+
+                // 2. Trường hợp accessToken hết hạn và PosStatus = ACTIVE
+                if (posReAuthService.isAccessTokenExpired(existingPos) && PosStatus.ACTIVE.name().equals(existingPos.getStatus())) {
+                    existingPos.setStatus(PosStatus.EXPIRED.name());
+                    posRepository.save(existingPos);
+
+                    String reAuthLink = posReAuthService.buildReAuthLink(existingPos);
+                    log.info("[NhanhvnServiceImpl.connectPos] POS expired for userId {}, reAuth link: {}", userId, reAuthLink);
+
+                    return PosConnectionResponse.expired(existingPos, reAuthLink);
+                }
+
+                // 3. Trường hợp accessToken còn hạn
+                if (PosStatus.ACTIVE.name().equals(existingPos.getStatus())) {
+                    log.warn("[NhanhvnServiceImpl.connectPos] POS already connected for userId {}", userId);
+                    throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_ALREADY_CONNECTED));
+                }
+            }
 
             NhanhvnAccessTokenResponse tokenResponse = nhanhvnClient.getAccessToken(posConnectionRequest);
-
             if (ObjectUtils.isEmpty(tokenResponse.getData()) || ObjectUtils.isEmpty(tokenResponse.getData().getAccessToken())) {
                 log.error("[NhanhvnServiceImpl.connectPos] Nhanhvn response is null, stop persist to db {}", tokenResponse);
                 throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
             }
 
+            Map<String, String> configMap = buildConfigMap(posConnectionRequest);
             LocalDateTime expiredTime = LocalDateTime.now().plusYears(1);
-            PosEntity posEntityBuilder = PosEntity.builder()
-                    .posName(PosName.NHANHVN.getValue())
-                    .userId(userId)
-                    .status(PosStatus.ACTIVE.name())
-                    .accessToken(tokenResponse.getData().getAccessToken())
-                    .config(JsonUtils.toJson(configMap))
-                    .expiredTime(expiredTime)
-                    .companyId(String.valueOf(claimUtil.getCompanyId()))
-                    .createdBy(claimUtil.getUserName())
-                    .build();
+            PosEntity savedEntity = existingPosOpt.map(pos -> updateExistingPos(pos, tokenResponse, expiredTime))
+                            .orElseGet(() -> createNewPos(tokenResponse, configMap, expiredTime));
 
-            posRepository.save(posEntityBuilder);
-            PosConnectionResponse posConnectionResponse = PosConnectionResponse.toPosConnectionResponse(posEntityBuilder);
-            log.info("[NhanhvnServiceImpl.connectPos] Nhanhvn response is {}", posConnectionResponse);
+            PosConnectionResponse posConnectionResponse = PosConnectionResponse.toPosConnectionResponse(savedEntity);
+            log.info("[NhanhvnServiceImpl.connectPos] Connected successfully: {}", savedEntity.getId());
             return posConnectionResponse;
         } catch (Exception e) {
             log.error("[NhanhvnServiceImpl.connectPos] Exchange token failed: {}", e.getMessage(), e);
@@ -501,6 +513,40 @@ public class NhanhvnServiceImpl implements PosManagementService {
         syncHistoryEntity.setSyncStatus(PosStatus.SUCCESS.name());
         syncHistoryEntity.setEndTime(LocalDateTime.now());
         return syncHistoryEntity;
+    }
+
+    private PosEntity updateExistingPos(PosEntity existingPos,
+                                        NhanhvnAccessTokenResponse tokenResponse,
+                                        LocalDateTime expiredTime) {
+        existingPos.setAccessToken(tokenResponse.getData().getAccessToken());
+        existingPos.setExpiredTime(expiredTime);
+        existingPos.setStatus(PosStatus.ACTIVE.name());
+        return posRepository.save(existingPos);
+    }
+
+    private PosEntity createNewPos(NhanhvnAccessTokenResponse tokenResponse,
+                                   Map<String, String> configMap,
+                                   LocalDateTime expiredTime) {
+        PosEntity newPos = PosEntity.builder()
+                .posName(PosName.NHANHVN.getValue())
+                .userId(claimUtil.getUserId())
+                .status(PosStatus.ACTIVE.name())
+                .accessToken(tokenResponse.getData().getAccessToken())
+                .config(JsonUtils.toJson(configMap))
+                .expiredTime(expiredTime)
+                .companyId(String.valueOf(claimUtil.getCompanyId()))
+                .createdBy(claimUtil.getUserName())
+                .build();
+
+        return posRepository.save(newPos);
+    }
+
+    private Map<String, String> buildConfigMap(PosConnectionRequest request) {
+        Map<String, String> map = new HashMap<>();
+        map.put(NhanhvnConstants.SECRET_ID, request.getAppSecret());
+        map.put(NhanhvnConstants.APP_ID, request.getAppId());
+        map.put(NhanhvnConstants.BUSINESS_ID, request.getBusinessId());
+        return map;
     }
 
     public NhanhvnRequest buildRequest(PosEntity posEntity) {

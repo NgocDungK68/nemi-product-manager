@@ -22,7 +22,7 @@ public class RestTemplateConfig {
         RestTemplate restTemplate = new RestTemplate();
 
         restTemplate.setUriTemplateHandler(new DefaultUriBuilderFactory(
-                nhanhvnConfig.getBaseUrl() + "/" + nhanhvnConfig.getApiVersion() + "/")
+                nhanhvnConfig.getPosUrl() + "/" + nhanhvnConfig.getApiVersion() + "/")
         );
 
         return restTemplate;
