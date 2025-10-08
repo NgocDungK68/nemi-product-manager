@@ -14,6 +14,7 @@ import com.nemi.util.JsonUtils;
 import com.nemi.utils.PosUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.ObjectUtils;
@@ -89,7 +90,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
             boolean isSuccess = switch (event) {
                 case PRODUCT_ADD, PRODUCT_UPDATE -> processProductUpsertWebhook(posId, payloadProduct);
                 case PRODUCT_DELETE -> processProductDeleteWebhook(posId, payloadProduct);
-                case ORDER_ADD, ORDER_UPDATED -> processOrderUpsertWebhook(posId, payloadOrder);
+                case ORDER_ADD, ORDER_UPDATED, ORDER_FULFILLED -> processOrderUpsertWebhook(posId, payloadOrder);
                 case ORDER_UPDATE -> false;
                 case ORDER_DELETE -> processOrderDeleteWebhook(posId, payloadOrder);
             };
@@ -286,7 +287,19 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 log.info("Creating new Sapo order: {}", externalOrderId);
             }
             
-            orderRepository.save(order);
+            try {
+                orderRepository.save(order);
+            } catch (DataIntegrityViolationException e) {
+                log.warn("Race condition detected for order {}, retrying with existing order", externalOrderId);
+                existingOrderOpt = orderRepository.findByOrderIdAndPosId(externalOrderId, posId);
+                if (existingOrderOpt.isPresent()) {
+                    order = existingOrderOpt.get();
+                    updateOrderFromPayload(order, posId, payload);
+                    orderRepository.save(order);
+                } else {
+                    throw new RuntimeException("Order not found after duplicate key error", e);
+                }
+            }
 
             if (payload.getLineItems() != null && !payload.getLineItems().isEmpty()) {
                 for (SapoOrderResponse.LineItem lineItem : payload.getLineItems()) {
