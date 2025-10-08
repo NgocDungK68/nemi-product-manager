@@ -22,6 +22,7 @@ public class NhanhvnConfig {
     private String secretKey;
     private ProductConfig product;
     private OrderConfig order;
+    private BatchConfig sync;
 
     @Data
     public static class ProductConfig {
@@ -36,5 +37,13 @@ public class NhanhvnConfig {
     @Data
     public static class StatusConfig {
         private Map<Integer, String> mapping;
+    }
+
+    @Data
+    public static class BatchConfig {
+        private int order;
+        private int orderItem;
+        private int product;
+        private int pageSize;
     }
 }

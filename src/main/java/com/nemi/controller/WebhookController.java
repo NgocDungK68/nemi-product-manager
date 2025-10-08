@@ -51,7 +51,7 @@ public class WebhookController {
         log.info("Using webhook service: {}", webhookService.getClass().getSimpleName());
 
         // Process webhook using the appropriate service
-        boolean isSuccess = webhookService.processWebhook(posId, headers, body);
+        boolean isSuccess = webhookService.processWebhook(posId, posName, headers, body);
         String webhookStatus = isSuccess ? WebhookConstants.Status.SUCCESS : WebhookConstants.Status.FAILED;
 
         log.info("Webhook processed by {} with result: {}",

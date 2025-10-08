@@ -49,14 +49,12 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
     }
 
     @Override
-    public boolean processWebhook(String posId, Map<String, String> headers, Object body) {
+    public boolean processWebhook(String posId, String posName, Map<String, String> headers, Object body) {
         WebhookHistoryEntity webhookHistory = WebhookHistoryEntity.builder()
                 .header(JsonUtils.toJson(headers))
-                .syncType(WebhookConstants.UNKNOWN)
-                .eventType(WebhookConstants.UNKNOWN)
                 .status(WebhookConstants.Status.FAILED)
-                .createdBy(WebhookConstants.UNKNOWN)
-                .updatedBy(WebhookConstants.UNKNOWN)
+                .posId(posId)
+                .posName(posName)
                 .build();
         try {
             String verifyToken = headers.get(HttpHeaders.AUTHORIZATION);
@@ -67,6 +65,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
 
             NhanhvnWebhookRequest webhookRequest = JsonUtils.map(body, NhanhvnWebhookRequest.class);
             webhookHistory.setBody(JsonUtils.toJson(webhookRequest));
+
             log.info("[NhanhvnWebhookServiceImpl.processWebhook] Webhook response convert from Body: {}", webhookRequest);
             if (ObjectUtils.isEmpty(webhookRequest) || ObjectUtils.isEmpty(webhookRequest.getEvent())) {
                 log.error("[NhanhvnWebhookServiceImpl.processWebhook] Invalid webhook payload: {}", body);

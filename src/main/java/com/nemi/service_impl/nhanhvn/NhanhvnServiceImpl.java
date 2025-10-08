@@ -20,17 +20,20 @@ import com.nemi.model.response.nhanhvn.NhanhvnAccessTokenResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnOrderResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
 import com.nemi.repository.*;
+import com.nemi.service.GeneralPosService;
 import com.nemi.service.PosManagementService;
 import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
-import com.nemi.service.PosReAuthService;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.stereotype.Service;
-import org.springframework.util.ObjectUtils;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.*;
 
 @Service
@@ -47,7 +50,20 @@ public class NhanhvnServiceImpl implements PosManagementService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final NhanhvnConfig nhanhvnConfig;
-    private final PosReAuthService posReAuthService;
+    private final GeneralPosService generalPosService;
+
+    private int orderBatchSize;
+    private int orderItemBatchSize;
+    private int productBatchSize;
+    private int pageSize;
+
+    @PostConstruct
+    public void init() {
+        orderBatchSize = nhanhvnConfig.getSync().getOrder();
+        orderItemBatchSize = nhanhvnConfig.getSync().getOrderItem();
+        productBatchSize = nhanhvnConfig.getSync().getProduct();
+        pageSize = nhanhvnConfig.getSync().getPageSize();
+    }
 
     @Override
     public String getPosName() {
@@ -57,31 +73,6 @@ public class NhanhvnServiceImpl implements PosManagementService {
     @Override
     public PosConnectionResponse connectPos(PosConnectionRequest posConnectionRequest) {
         try {
-            String userId = claimUtil.getUserId();
-
-            // 1. Kiểm tra đã connectPos chưa
-            Optional<PosEntity> existingPosOpt = posRepository.findByUserIdAndPosName(userId, PosName.NHANHVN.getValue());
-            if (existingPosOpt.isPresent()) {
-                PosEntity existingPos = existingPosOpt.get();
-
-                // 2. Trường hợp accessToken hết hạn và PosStatus = ACTIVE
-                if (posReAuthService.isAccessTokenExpired(existingPos) && PosStatus.ACTIVE.name().equals(existingPos.getStatus())) {
-                    existingPos.setStatus(PosStatus.EXPIRED.name());
-                    posRepository.save(existingPos);
-
-                    String reAuthLink = posReAuthService.buildReAuthLink(existingPos);
-                    log.info("[NhanhvnServiceImpl.connectPos] POS expired for userId {}, reAuth link: {}", userId, reAuthLink);
-
-                    return PosConnectionResponse.expired(existingPos, reAuthLink);
-                }
-
-                // 3. Trường hợp accessToken còn hạn
-                if (PosStatus.ACTIVE.name().equals(existingPos.getStatus())) {
-                    log.warn("[NhanhvnServiceImpl.connectPos] POS already connected for userId {}", userId);
-                    throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_ALREADY_CONNECTED));
-                }
-            }
-
             NhanhvnAccessTokenResponse tokenResponse = nhanhvnClient.getAccessToken(posConnectionRequest);
             if (ObjectUtils.isEmpty(tokenResponse.getData()) || ObjectUtils.isEmpty(tokenResponse.getData().getAccessToken())) {
                 log.error("[NhanhvnServiceImpl.connectPos] Nhanhvn response is null, stop persist to db {}", tokenResponse);
@@ -89,12 +80,14 @@ public class NhanhvnServiceImpl implements PosManagementService {
             }
 
             Map<String, String> configMap = buildConfigMap(posConnectionRequest);
-            LocalDateTime expiredTime = LocalDateTime.now().plusYears(1);
-            PosEntity savedEntity = existingPosOpt.map(pos -> updateExistingPos(pos, tokenResponse, expiredTime))
-                            .orElseGet(() -> createNewPos(tokenResponse, configMap, expiredTime));
+            LocalDateTime expiredTime = Instant.ofEpochSecond(tokenResponse.getData().getExpiredAt())
+                    .atZone(ZoneId.systemDefault())
+                    .toLocalDateTime();
 
-            PosConnectionResponse posConnectionResponse = PosConnectionResponse.toPosConnectionResponse(savedEntity);
-            log.info("[NhanhvnServiceImpl.connectPos] Connected successfully: {}", savedEntity.getId());
+            PosEntity newPos = createNewPos(tokenResponse, configMap, expiredTime);
+            PosConnectionResponse posConnectionResponse = PosConnectionResponse.toPosConnectionResponse(newPos);
+
+            log.info("[NhanhvnServiceImpl.connectPos] Connected successfully: {}", newPos.getId());
             return posConnectionResponse;
         } catch (Exception e) {
             log.error("[NhanhvnServiceImpl.connectPos] Exchange token failed: {}", e.getMessage(), e);
@@ -111,7 +104,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 .build();
         try {
             // lấy PosEntity và validate posName
-            PosEntity posEntity = getPos(posId);
+            PosEntity posEntity = generalPosService.getPos(posId);
             NhanhvnRequest request = buildRequest(posEntity);
 
             if (isInvalidRequest(request)) {
@@ -125,7 +118,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
             // set size mỗi page
             NhanhvnRequest.Paginator paginator = new NhanhvnRequest.Paginator();
-            paginator.setSize(50);
+            paginator.setSize(pageSize);
             request.setPaginator(paginator);
 
             while (true) {
@@ -133,15 +126,15 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
                 if (responseOpt.isEmpty()) {
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
-                    log.error("[NhanhvnServiceImpl.syncProduct] Missing required config for posId={}", posId);
-                    log.error("[NhanhvnServiceImpl.syncProduct] Failed to fetch products with paginator: {}", paginator);
+                    log.error("[NhanhvnServiceImpl.syncProduct] Missing required config for posId={}," +
+                            " Failed to fetch products with paginator: {}", posId, paginator);
                     throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
                 }
 
                 NhanhvnProductResponse response = responseOpt.get();
 
                 if (ObjectUtils.isEmpty(response.getData())) {
-                    if (response.getCode() == 1) {
+                    if (response.getCode() == NhanhvnConstants.SUCCESS_CODE) {
                         break;
                     }
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.CONNECTION_FAILED, false));
@@ -160,7 +153,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 log.info("[NhanhvnServiceImpl.syncProduct] Fetched {} variants, total so far: {}", pageVariants.size(), allVariants.size());
 
                 // xử lý next
-                if (!ObjectUtils.isEmpty(response.getPaginator()) && !ObjectUtils.isEmpty(response.getPaginator().getNext())) {
+                if (ObjectUtils.isNotEmpty(response.getPaginator()) && ObjectUtils.isNotEmpty(response.getPaginator().getNext())) {
                     paginator.setNext(response.getPaginator().getNext());
                 } else {
                     break; // hết data
@@ -170,8 +163,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
             saveAllProductsSync(allProducts);
             saveAllVariantsSync(allVariants);
 
-            log.info("[NhanhvnServiceImpl.syncProduct] Successfully synced {} products from Nhanh.vn", allProducts.size());
-            log.info("[NhanhvnServiceImpl.syncProduct] Successfully synced {} variants from Nhanh.vn", allVariants.size());
+            log.info("[NhanhvnServiceImpl.syncProduct] Successfully synced {} products and {} variants from Nhanh.vn", allProducts.size(), allVariants.size());
             return true;
 
         } catch (Exception e) {
@@ -190,7 +182,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
         }
 
         try {
-            int batchSize = 50;
+            int batchSize = productBatchSize;
             for (int i = 0; i < products.size(); i += batchSize) {
                 int endIndex = Math.min(i + batchSize, products.size());
                 List<ProductEntity> batch = products.subList(i, endIndex);
@@ -216,7 +208,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
         }
 
         try {
-            int batchSize = 50;
+            int batchSize = productBatchSize;
             for (int i = 0; i < variants.size(); i += batchSize) {
                 int endIndex = Math.min(i + batchSize, variants.size());
                 List<ProductVariantEntity> batch = variants.subList(i, endIndex);
@@ -233,17 +225,6 @@ public class NhanhvnServiceImpl implements PosManagementService {
         }
     }
 
-    private PosEntity getPos(String posId) {
-        log.debug("[NhanhvnServiceImpl.getPos] posId: {}", posId);
-
-        // Lấy PosEntity từ DB
-        return posRepository.findById(posId)
-                .orElseThrow(() -> {
-                    log.error("Error [NhanhvnServiceImpl.getPos] not found posId: {}", posId);
-                    return new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_INVALID));
-                });
-    }
-
     private List<ProductEntity> convertToProductEntities(String posId, List<NhanhvnProductResponse.ProductData> apiProducts) {
         return apiProducts.stream()
                 .map(apiProduct -> convertToProductEntity(posId, apiProduct))
@@ -252,7 +233,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
     }
 
     public ProductEntity convertToProductEntity(String posId, NhanhvnProductResponse.ProductData apiProduct) {
-        if (apiProduct.getParentId() != -2) return null;
+        if (!(apiProduct.getParentId()).equals(NhanhvnConstants.PARENT_PRODUCT)) return null;
 
         int statusCode = apiProduct.getStatus();
         Map<Integer, String> mapping = nhanhvnConfig.getProduct().getStatus().getMapping();
@@ -275,7 +256,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
     }
 
     public ProductVariantEntity convertToVariantEntity(String posId, NhanhvnProductResponse.ProductData apiProduct) {
-        if (apiProduct.getParentId() == -2) return null;
+        if ((apiProduct.getParentId()).equals(NhanhvnConstants.PARENT_PRODUCT)) return null;
         return ProductVariantEntity.builder()
                 .variantId(String.valueOf(apiProduct.getId()))
                 .posId(posId)
@@ -334,7 +315,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
             BigDecimal lineTotal = price
                     .multiply(BigDecimal.ONE.add(vat))
                     .multiply(quantity)
-                    .subtract(!ObjectUtils.isEmpty(discount) ? discount : BigDecimal.ZERO);
+                    .subtract(ObjectUtils.isNotEmpty(discount) ? discount : BigDecimal.ZERO);
 
             totalPrice = totalPrice.add(lineTotal);
         }
@@ -378,7 +359,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
         }
 
         try {
-            int batchSize = 50;
+            int batchSize = orderBatchSize;
             for (int i = 0; i < orderEntities.size(); i += batchSize) {
                 int endIndex = Math.min(i + batchSize, orderEntities.size());
                 List<OrderEntity> batch = orderEntities.subList(i, endIndex);
@@ -404,7 +385,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
         }
 
         try {
-            int batchSize = 50;
+            int batchSize = orderItemBatchSize;
             for (int i = 0; i < orderItemEntities.size(); i += batchSize) {
                 int endIndex = Math.min(i + batchSize, orderItemEntities.size());
                 List<OrderItemEntity> batch = orderItemEntities.subList(i, endIndex);
@@ -430,7 +411,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 .build();
         try {
             // lấy PosEntity và validate posName
-            PosEntity posEntity = getPos(posId);
+            PosEntity posEntity = generalPosService.getPos(posId);
             NhanhvnRequest request = buildRequest(posEntity);
 
             if (isInvalidRequest(request)) {
@@ -444,7 +425,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
             // set size mỗi page
             NhanhvnRequest.Paginator paginator = new NhanhvnRequest.Paginator();
-            paginator.setSize(50);
+            paginator.setSize(pageSize);
             request.setPaginator(paginator);
 
             while (true) {
@@ -452,15 +433,15 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
                 if (responseOpt.isEmpty()) {
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
-                    log.error("[NhanhvnServiceImpl.syncOrder] Missing required config for posId={}", posId);
-                    log.error("[NhanhvnServiceImpl.syncOrder] Failed to fetch products with paginator: {}", paginator);
+                    log.error("[NhanhvnServiceImpl.syncOrder] Missing required config for posId={}," +
+                            " Failed to fetch products with paginator: {}", posId, paginator);
                     return false;
                 }
 
                 NhanhvnOrderResponse response = responseOpt.get();
 
                 if (ObjectUtils.isEmpty(response.getData())) {
-                    if (response.getCode() == 1) {
+                    if (response.getCode() == NhanhvnConstants.SUCCESS_CODE) {
                         break;
                     }
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.CONNECTION_FAILED, false));
@@ -479,7 +460,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 log.info("[NhanhvnServiceImpl.syncOrder] Fetched {} order items, total so far: {}", pageOrderItem.size(), pageOrderItem.size());
 
                 // xử lý next
-                if (!ObjectUtils.isEmpty(response.getPaginator()) && !ObjectUtils.isEmpty(response.getPaginator().getNext())) {
+                if (ObjectUtils.isNotEmpty(response.getPaginator()) && ObjectUtils.isNotEmpty(response.getPaginator().getNext())) {
                     paginator.setNext(response.getPaginator().getNext());
                 } else {
                     break; // hết data
@@ -490,8 +471,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
             saveAllOrderItemSync(allOrderItems);
             syncHistoryRepository.save(toSyncHistory(history, null, true));
 
-            log.info("[NhanhvnServiceImpl.syncOrder] Successfully synced {} orders from Nhanh.vn", allOrders.size());
-            log.info("[NhanhvnServiceImpl.syncOrder] Successfully synced {} order items from Nhanh.vn", allOrderItems.size());
+            log.info("[NhanhvnServiceImpl.syncOrder] Successfully synced {} orders and {} order items from Nhanh.vn", allOrders.size(), allOrderItems.size());
             return true;
 
         } catch (Exception e) {
@@ -511,15 +491,6 @@ public class NhanhvnServiceImpl implements PosManagementService {
         syncHistoryEntity.setSyncStatus(PosStatus.SUCCESS.name());
         syncHistoryEntity.setEndTime(LocalDateTime.now());
         return syncHistoryEntity;
-    }
-
-    private PosEntity updateExistingPos(PosEntity existingPos,
-                                        NhanhvnAccessTokenResponse tokenResponse,
-                                        LocalDateTime expiredTime) {
-        existingPos.setAccessToken(tokenResponse.getData().getAccessToken());
-        existingPos.setExpiredTime(expiredTime);
-        existingPos.setStatus(PosStatus.ACTIVE.name());
-        return posRepository.save(existingPos);
     }
 
     private PosEntity createNewPos(NhanhvnAccessTokenResponse tokenResponse,
