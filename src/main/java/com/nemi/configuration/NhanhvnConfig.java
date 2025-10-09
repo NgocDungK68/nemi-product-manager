@@ -1,10 +1,12 @@
 package com.nemi.configuration;
 
+import com.nemi.constant.NhanhvnConstants;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.Map;
+import java.util.Optional;
 
 @Data
 @Configuration
@@ -50,5 +52,21 @@ public class NhanhvnConfig {
         private int order;
         private int orderItem;
         private int product;
+    }
+
+    public String getProductStatus(Integer statusCode) {
+        return Optional.ofNullable(product)
+                .map(ProductConfig::getStatus)
+                .map(StatusConfig::getMapping)
+                .map(m -> m.getOrDefault(statusCode, NhanhvnConstants.UNKNOWN))
+                .orElse(NhanhvnConstants.UNKNOWN);
+    }
+
+    public String getOrderStatus(Integer statusCode) {
+        return Optional.ofNullable(order)
+                .map(OrderConfig::getStatus)
+                .map(StatusConfig::getMapping)
+                .map(m -> m.getOrDefault(statusCode, NhanhvnConstants.UNKNOWN))
+                .orElse(NhanhvnConstants.UNKNOWN);
     }
 }
