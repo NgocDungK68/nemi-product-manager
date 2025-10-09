@@ -57,7 +57,7 @@ public class SapoServiceImpl implements PosManagementService {
     private int orderItemBatchSize;
     private int productBatchSize;
     private int pageStartNumber;
-    private int pageLimit;
+    private int productLimit;
 
     @PostConstruct
     public void init() {
@@ -65,7 +65,7 @@ public class SapoServiceImpl implements PosManagementService {
         orderItemBatchSize = sapoConfig.getSync().getOrderItem();
         productBatchSize = sapoConfig.getSync().getProduct();
         pageStartNumber = sapoConfig.getSync().getPageStart();
-        pageLimit = sapoConfig.getSync().getPageLimit();
+        productLimit = sapoConfig.getSync().getProductLimit();
     }
 
 
@@ -153,7 +153,7 @@ public class SapoServiceImpl implements PosManagementService {
             //chi set size cho lan dau tien + page-based pagination (Sapo: limit tối đa 250)
             Map<String, Object> paginator = new HashMap<>();
             int limit =productBatchSize;
-            int page = pageLimit;
+            int page = productLimit;
             paginator.put("limit", limit);
             paginator.put("page", page);
 

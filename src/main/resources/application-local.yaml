@@ -73,9 +73,9 @@ nhanhvn:
   sync:
     batch:
       order: 50
-      order-item: 50
+      orderItem: 50
       product: 50
-    page-size: 50
+    pageSize: 50
 pancake:
   secret: elqsF9ERiFWGacWQO9Gg5XC4kXojot
   base-url: https://pos.pages.fm/api/v1
@@ -110,6 +110,8 @@ pancake:
     order-item: 200
     product: 100
     page-start: 1
+    product-limit: 250
+
 
 
 sapo:
@@ -148,7 +150,7 @@ sapo:
     order-item: 200
     product: 100
     page-start: 1
-    page-limit: 200
+    product-limit: 250
 
 
 secret:
