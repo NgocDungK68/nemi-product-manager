@@ -54,14 +54,12 @@ public class PancakeWebhookServiceImpl implements WebhookService {
 
     @Override
     @Transactional
-    public boolean processWebhook(String posId, Map<String, String> headers, Object body) {
+    public boolean processWebhook(String posId, String posName, Map<String, String> headers, Object body) {
         WebhookHistoryEntity webhookHistory = WebhookHistoryEntity.builder()
                 .header(JsonUtils.toJson(headers))
-                .syncType(WebhookConstants.UNKNOWN)
-                .eventType(WebhookConstants.UNKNOWN)
                 .status(WebhookConstants.Status.FAILED)
-                .createdBy(WebhookConstants.UNKNOWN)
-                .updatedBy(WebhookConstants.UNKNOWN)
+                .posId(posId)
+                .posName(posName)
                 .build();
         try {
             // 1. Xác thực header x-api-key
@@ -73,6 +71,8 @@ public class PancakeWebhookServiceImpl implements WebhookService {
 
             // 2. Parse JSON về model
             PancakeWebhookRequest webhookRequest = JsonUtils.map(body, PancakeWebhookRequest.class);
+            webhookHistory.setBody(JsonUtils.toJson(webhookRequest));
+
             if (Objects.isEmpty(webhookRequest) || Objects.isEmpty(webhookRequest.getEventType())) {
                 log.error("[PancakeWebhookServiceImpl.processWebhook] Invalid webhook payload: {}", body);
                 return false;
@@ -174,11 +174,11 @@ public class PancakeWebhookServiceImpl implements WebhookService {
         String paymentMethod = Optional.ofNullable(apiOrders.getPaymentPurchaseHistories())
                 .filter(histories -> !histories.isEmpty())
                 .map(histories -> histories.get(0).getType())
-                .orElse(Status.UNKNOWN.getValue());
+                .orElse(null);
 
         String orderCode = Optional.ofNullable(apiOrders.getPartner())
                 .map(PancakeOrderResponse.Partner::getExtendCode)
-                .orElse(Status.UNKNOWN.getValue());
+                .orElse(null);
 
         return OrderEntity.builder()
                 .posId(posId)

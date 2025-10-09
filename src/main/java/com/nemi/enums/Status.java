@@ -12,7 +12,9 @@ public enum Status {
     CANCELLED("cancelled"),
     FAILED("failed"),
     RETURNED("returned"),
-    UNKNOWN("unknown");
+    UNKNOWN("unknown"),
+    ACTIVE("ACTIVE"),
+    INACTIVE("INACTIVE");
 
 
     private final String value;

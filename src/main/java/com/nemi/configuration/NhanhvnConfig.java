@@ -14,7 +14,9 @@ import java.util.Optional;
 @ConfigurationProperties("nhanhvn")
 public class NhanhvnConfig {
     private String baseUrl;
-    private String urlAccessCode;
+    private String posUrl;
+    private String returnLink;
+    private String urlOauth;
     private String urlAccessToken;
     private String urlProducts;
     private String urlOrders;
@@ -23,6 +25,7 @@ public class NhanhvnConfig {
     private String secretKey;
     private ProductConfig product;
     private OrderConfig order;
+    private SyncConfig sync;
 
     @Data
     public static class ProductConfig {
@@ -38,11 +41,32 @@ public class NhanhvnConfig {
     public static class StatusConfig {
         private HashMap<Integer, String> mapping;
     }
-    public String getStatusMapping(Integer key) {
+    public String getOrderStatusMapping(Integer key) {
 
         return Optional.ofNullable(key)
                 .map(code -> this.getOrder().getStatus().getMapping()
                         .get(code))
-                .orElse(Status.UNKNOWN.getValue());
+                .orElse(null);
+    }
+
+    public String getProductStatusMapping(Integer key) {
+
+        return Optional.ofNullable(key)
+                .map(code -> this.getProduct().getStatus().getMapping()
+                        .get(code))
+                .orElse(null);
+    }
+
+    @Data
+    public static class SyncConfig {
+        private BatchConfig batch;
+        private int pageSize;
+    }
+
+    @Data
+    public static class BatchConfig {
+        private int order;
+        private int orderItem;
+        private int product;
     }
 }

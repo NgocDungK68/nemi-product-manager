@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.client.NhanhvnClient;
 import com.nemi.configuration.NhanhvnConfig;
+import com.nemi.constant.NhanhvnConstants;
 import com.nemi.constant.WebhookConstants;
 import com.nemi.entity.*;
 import com.nemi.enums.NhanhvnEvent;
@@ -12,20 +13,21 @@ import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
 import com.nemi.model.request.nhanhvn.NhanhvnRequest;
+import com.nemi.model.request.nhanhvn.NhanhvnWebhookRequest;
 import com.nemi.model.response.nhanhvn.NhanhvnOrderResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
-import com.nemi.model.request.nhanhvn.NhanhvnWebhookRequest;
 import com.nemi.repository.*;
 import com.nemi.service.WebhookService;
 import com.nemi.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
-import org.springframework.util.ObjectUtils;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -49,14 +51,12 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
     }
 
     @Override
-    public boolean processWebhook(String posId, Map<String, String> headers, Object body) {
+    public boolean processWebhook(String posId, String posName, Map<String, String> headers, Object body) {
         WebhookHistoryEntity webhookHistory = WebhookHistoryEntity.builder()
                 .header(JsonUtils.toJson(headers))
-                .syncType(WebhookConstants.UNKNOWN)
-                .eventType(WebhookConstants.UNKNOWN)
                 .status(WebhookConstants.Status.FAILED)
-                .createdBy(WebhookConstants.UNKNOWN)
-                .updatedBy(WebhookConstants.UNKNOWN)
+                .posId(posId)
+                .posName(posName)
                 .build();
         try {
             String verifyToken = headers.get(HttpHeaders.AUTHORIZATION);
@@ -67,6 +67,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
 
             NhanhvnWebhookRequest webhookRequest = JsonUtils.map(body, NhanhvnWebhookRequest.class);
             webhookHistory.setBody(JsonUtils.toJson(webhookRequest));
+
             log.info("[NhanhvnWebhookServiceImpl.processWebhook] Webhook response convert from Body: {}", webhookRequest);
             if (ObjectUtils.isEmpty(webhookRequest) || ObjectUtils.isEmpty(webhookRequest.getEvent())) {
                 log.error("[NhanhvnWebhookServiceImpl.processWebhook] Invalid webhook payload: {}", body);
@@ -134,7 +135,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
         }
 
         // Kiểm tra xem data có phải sản phẩm con không
-        if (newVariant.getParentId() != -1) {
+        if (!(newVariant.getParentId()).equals(NhanhvnConstants.STANDALONE_PRODUCT)) {
             VariantId variantId = new VariantId(String.valueOf(newVariant.getParentId()), posId);
             Optional<ProductVariantEntity> parentOfVariantEntity = variantRepository.findById(variantId);
 
@@ -176,14 +177,14 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
             return false;
         }
 
-        if (productData.getParentId() == -2) {   // Trường hợp call về body sản phẩm cha
+        if ((productData.getParentId()).equals(NhanhvnConstants.PARENT_PRODUCT)) {   // Trường hợp call về body sản phẩm cha
             ProductEntity productEntity = nhanhvnService.convertToProductEntity(posId, productData);
             productRepository.save(productEntity);
             log.info("[NhanhvnWebhookServiceImpl.handleProductUpdate] Successfully update 1 product with id={}", productEntity.getProductId());
             return true;
         }
 
-        if (productData.getParentId() == -1) {   // Trường hợp call về body sản phẩm độc lập
+        if ((productData.getParentId()).equals(NhanhvnConstants.STANDALONE_PRODUCT)) {   // Trường hợp call về body sản phẩm độc lập
             // Nếu tồn tại sản phẩm cha trong DB thì sản phẩm cha lúc này là sản phẩm độc lập
             Optional<ProductEntity> productEntity = productRepository.findById(
                     new ProductId(String.valueOf(productData.getId()), posId)
@@ -193,14 +194,14 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
                 List<ProductVariantEntity> variantsOfProductEntity =
                         variantRepository.findByProductId(productEntity.get().getProductId());
 
-                if (variantsOfProductEntity.size() != 1) {
+                if (!Objects.equals(variantsOfProductEntity.size(), 1)) {
                     log.warn("[NhanhvnWebhookServiceImpl.handleProductUpdate] Expected 1 variant but found {} for productId={}", variantsOfProductEntity.size(), productEntity.get().getProductId());
                     return false;
                 }
 
                 // Sản phẩm con => Sản phẩm độc lập
                 ProductVariantEntity variantOfProductEntity = variantsOfProductEntity.get(0);
-                variantOfProductEntity.setProductId("-1");
+                variantOfProductEntity.setProductId(String.valueOf(NhanhvnConstants.STANDALONE_PRODUCT));
                 variantRepository.save(variantOfProductEntity);
                 log.info("[NhanhvnWebhookServiceImpl.handleProductUpdate] Successfully update 1 variant with id={}", variantOfProductEntity.getVariantId());
 
@@ -260,7 +261,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
         }
 
         // Kiểm tra xem data có phải sản phẩm con không
-        if (!variantEntity.get().getProductId().equals("-1")) {
+        if (!variantEntity.get().getProductId().equals(String.valueOf(NhanhvnConstants.STANDALONE_PRODUCT))) {
             String parentId = variantEntity.get().getProductId();
             Optional<ProductEntity> productEntity = productRepository.findById(
                     new ProductId(parentId, posId)
@@ -278,7 +279,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
                 return false;
             }
 
-            if (parentProduct.getParentId() != -2) {
+            if (!(parentProduct.getParentId()).equals(NhanhvnConstants.PARENT_PRODUCT)) {
                 productRepository.deleteById(new ProductId(parentId, posId));
                 log.info("[NhanhvnWebhookServiceImpl.handleProductDelete] Deleted product with id={} because it is now a variant", parentId);
 
@@ -409,10 +410,10 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
                     .orElseThrow(() -> new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_NOTFOUND)));
 
             NhanhvnRequest request = nhanhvnService.buildRequest(posEntity);
-            request.setFilters(Map.of("ids", id));
+            request.setFilters(Map.of(NhanhvnConstants.IDS, id));
             Optional<NhanhvnProductResponse> responseOpt = nhanhvnClient.getProducts(request);
 
-            if (responseOpt.isPresent() && !ObjectUtils.isEmpty(responseOpt.get().getData())) {
+            if (responseOpt.isPresent() && ObjectUtils.isNotEmpty(responseOpt.get().getData())) {
                 return responseOpt.get().getData().get(0);
             }
 

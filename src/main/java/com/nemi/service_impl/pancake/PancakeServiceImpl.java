@@ -22,7 +22,6 @@ import com.nemi.exception.pojo.AlertMessages;
 import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.request.pancake.PancakeRequest;
 import com.nemi.model.response.PosConnectionResponse;
-import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
 import com.nemi.model.response.pancake.PancakeOrderResponse;
 import com.nemi.model.response.pancake.PancakeProductResponse;
 import com.nemi.repository.OrderItemRepository;
@@ -31,6 +30,7 @@ import com.nemi.repository.PosRepository;
 import com.nemi.repository.ProductRepository;
 import com.nemi.repository.ProductVariantRepository;
 import com.nemi.repository.SyncHistoryRepository;
+import com.nemi.service.GeneralPosService;
 import com.nemi.service.PosManagementService;
 import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
@@ -39,7 +39,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.security.access.method.P;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -66,6 +65,7 @@ public class PancakeServiceImpl implements PosManagementService {
     private final OrderItemRepository orderItemRepository;
     private final PancakeConfig pancakeConfig;
     private final ProductVariantRepository productVariantRepository;
+    private final GeneralPosService generalPosService;
 
     private int orderBatchSize;
     private int orderItemBatchSize;
@@ -125,7 +125,7 @@ public class PancakeServiceImpl implements PosManagementService {
                 .syncStatus(PosStatus.FAIL.name())
                 .build();
         try {
-            PosEntity posEntity = getPos(posId);
+            PosEntity posEntity = generalPosService.getPos(posId);
 
             Map<String, String> configMap = objectMapper.readValue(
                     posEntity.getConfig(), new TypeReference<>() {
@@ -214,15 +214,6 @@ public class PancakeServiceImpl implements PosManagementService {
         }
     }
 
-    public PosEntity getPos(String posId) {
-        log.debug("[PancakeSyncDataImpl.getPos] posId: {}", posId);
-        return posRepository.findById(posId)
-                .orElseThrow(() -> {
-                    log.error("Error [PancakeSyncDataImpl.getPos] not found posId: {}", posId);
-                    return new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_INVALID));
-                });
-    }
-
     private List<ProductEntity> convertToProductEntities(String posId, List<PancakeProductResponse.ProductData> apiProducts) {
         return apiProducts.stream()
                 .map(apiProduct -> convertToProductEntity(posId, apiProduct))
@@ -238,7 +229,7 @@ public class PancakeServiceImpl implements PosManagementService {
         }
 
         try {
-            int batchSize = 50;
+            int batchSize = productBatchSize;
             for (int i = 0; i < variants.size(); i += batchSize) {
                 int endIndex = Math.min(i + batchSize, variants.size());
                 List<ProductVariantEntity> batch = variants.subList(i, endIndex);
@@ -264,9 +255,9 @@ public class PancakeServiceImpl implements PosManagementService {
         product.setName(apiProducts.getProduct().getName());
         product.setProductId(apiProducts.getId());
         if (apiProducts.getIsLocked()) {
-            product.setStatus(Status.CANCELLED.getValue());
+            product.setStatus(Status.INACTIVE.getValue());
         } else {
-            product.setStatus(Status.PROCESSING.getValue());
+            product.setStatus(Status.ACTIVE.getValue());
         }
         return product;
     }
@@ -290,8 +281,6 @@ public class PancakeServiceImpl implements PosManagementService {
     }
 
 
-
-
     private List<OrderEntity> convertToOrderEntities(String posId, List<PancakeOrderResponse.DataItem> apiOrders) {
         return apiOrders.stream()
                 .map(orders -> convertToOrderEntity(posId, orders))
@@ -306,11 +295,12 @@ public class PancakeServiceImpl implements PosManagementService {
         String paymentMethod = Optional.ofNullable(apiOrders.getPaymentPurchaseHistories())
                 .filter(histories -> !histories.isEmpty())
                 .map(histories -> histories.get(0).getType())
-                .orElse(Status.UNKNOWN.getValue());
+                .orElse(null);
 
         String orderCode = Optional.ofNullable(apiOrders.getPartner())
                 .map(PancakeOrderResponse.Partner::getExtendCode)
-                .orElse(Status.UNKNOWN.getValue());
+                .orElse(null);
+
 
         return OrderEntity.builder()
                 .posId(posId)
@@ -353,6 +343,7 @@ public class PancakeServiceImpl implements PosManagementService {
         }
         return orderItemEntities;
     }
+
     public ProductVariantEntity convertToVariantEntity(String posId, PancakeProductResponse.ProductData apiProduct) {
 
         Integer remainQuantity = Optional.ofNullable(apiProduct.getVariationsWarehouses())
@@ -375,7 +366,6 @@ public class PancakeServiceImpl implements PosManagementService {
                 .weightUnit(WeightUnit.GAM.getValue())
                 .build();
     }
-
 
 
     public void saveAllOrdersSync(List<OrderEntity> orderEntities) {
@@ -428,7 +418,7 @@ public class PancakeServiceImpl implements PosManagementService {
                 .syncStatus(PosStatus.FAIL.name())
                 .build();
         try {
-            PosEntity posEntity = getPos(posId);
+            PosEntity posEntity = generalPosService.getPos(posId);
 
             Map<String, String> configMap = objectMapper.readValue(
                     posEntity.getConfig(), new TypeReference<>() {

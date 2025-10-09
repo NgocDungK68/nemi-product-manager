@@ -30,4 +30,10 @@ public class WebhookHistoryEntity extends BaseEntity {
 
     @Column(name = "status")
     private String status;
+
+    @Column(name = "pos_id")
+    private String posId;
+
+    @Column(name = "pos_name")
+    private String posName;
 }

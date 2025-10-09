@@ -1,20 +1,21 @@
 package com.nemi.controller;
 
-import com.nemi.model.request.PosConnectionRequest;
-import com.nemi.model.response.PosConnectionResponse;
-import com.nemi.service.PosManagementService;
+import com.nemi.entity.PosEntity;
+import com.nemi.repository.PosRepository;
+import com.nemi.service.PosReAuthService;
 import com.nemi.service_impl.pancake.PancakeServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
 public class TestController {
+    private final PosReAuthService posReAuthService;
+    private final PosRepository posRepository;
     private final PancakeServiceImpl pancakeService;
 
 
@@ -31,6 +32,12 @@ public class TestController {
     @GetMapping("/service-api/test")
     public String testService() {
         return "Test service api successful";
+    }
+
+    @PostMapping("/public-api/testReAuth/{posId}")
+    public String testReAuth(@PathVariable String posId) {
+        PosEntity posEntity = posRepository.findById(posId).orElse(null);
+        return posReAuthService.buildReAuthLink(posEntity);
     }
 
     @PostMapping("/public-api/pancake/{posId}")

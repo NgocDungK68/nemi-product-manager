@@ -1,10 +1,12 @@
 package com.nemi.configuration;
 
+import com.nemi.enums.Status;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.Map;
+import java.util.Optional;
 
 @Data
 @Configuration
@@ -34,6 +36,7 @@ public class SapoConfig {
         private int orderItem;
         private int product;
         private int pageStart;
+        private int productLimit;
     }
     private String baseUrl;
     private String storeName;
@@ -48,5 +51,13 @@ public class SapoConfig {
     @Data
     public static class Webhook {
         private java.util.List<String> topic;
+    }
+
+    public String getStatusMapping(String key) {
+
+        return Optional.ofNullable(key)
+                .map(code -> this.getOrder().getStatus().getMapping()
+                        .get(code))
+                .orElse(Status.UNKNOWN.getValue());
     }
 }

@@ -2,6 +2,7 @@ package com.nemi.model.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.nemi.entity.PosEntity;
+import com.nemi.enums.PosStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,6 +20,7 @@ public class PosConnectionResponse {
     private String posName;
     private String config;
     private String status;
+    private String reAuthLink;
     private LocalDateTime expiredTime;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -36,6 +38,19 @@ public class PosConnectionResponse {
                 .expiredTime(pos.getExpiredTime())
                 .createdAt(pos.getCreatedAt())
                 .updatedAt(pos.getUpdatedAt())
+                .build();
+    }
+
+    public static PosConnectionResponse expired(PosEntity entity, String reAuthLink) {
+        return PosConnectionResponse.builder()
+                .id(entity.getId())
+                .posName(entity.getPosName())
+                .config(entity.getConfig())
+                .status(PosStatus.EXPIRED.name())
+                .reAuthLink(reAuthLink)
+                .expiredTime(entity.getExpiredTime())
+                .createdAt(entity.getCreatedAt())
+                .updatedAt(entity.getUpdatedAt())
                 .build();
     }
 }
