@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.client.PancakeClient;
 import com.nemi.configuration.PancakeConfig;
+import com.nemi.constant.PancakeConstatns;
 import com.nemi.entity.OrderEntity;
 import com.nemi.entity.OrderItemEntity;
 import com.nemi.entity.PosEntity;
@@ -32,6 +33,9 @@ import com.nemi.util.JsonUtils;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.BooleanUtils;
+import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -84,7 +88,7 @@ public class PancakeServiceImpl implements PosManagementService {
         try {
             String userId = claimUtil.getUserId();
             Map<String, String> configMap = new HashMap<>();
-            configMap.put("shopId", posConnectionRequest.getShopId());
+            configMap.put(PancakeConstatns.SHOP_ID, posConnectionRequest.getShopId());
 
             LocalDateTime expiredTime = LocalDateTime.now().plusYears(1);
 
@@ -123,10 +127,10 @@ public class PancakeServiceImpl implements PosManagementService {
             Map<String, String> configMap = objectMapper.readValue(
                     posEntity.getConfig(), new TypeReference<>() {
                     });
-            String shopId = configMap.get("shopId");
+            String shopId = configMap.get(PancakeConstatns.SHOP_ID);
             String accessToken = posEntity.getAccessToken();
 
-            if (shopId == null || accessToken == null) {
+            if (StringUtils.isEmpty(shopId) || StringUtils.isEmpty(accessToken)) {
                 syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.MISSING_CONFIG, false));
                 log.error("Missing required config for posId={}", posId);
                 return false;
@@ -162,7 +166,7 @@ public class PancakeServiceImpl implements PosManagementService {
                 List<ProductEntity> pageProducts = convertToProductEntities(posId, response.getData());
                 allProducts.addAll(pageProducts);
 
-                if (response.getData() == null || response.getData().isEmpty()) {
+                if (ObjectUtils.isEmpty(response.getData())) {
                     log.info("No products found with page number: {}", pageNumber);
                     break;
                 } else {
@@ -251,10 +255,8 @@ public class PancakeServiceImpl implements PosManagementService {
     }
 
     public OrderEntity convertToOrderEntity(String posId, PancakeOrderResponse.DataItem apiOrders) {
-        String status = Optional.ofNullable(apiOrders.getStatus())
-                .map(code -> pancakeConfig.getOrder().getStatus().getMapping()
-                        .getOrDefault(code, Status.UNKNOWN.getValue()))
-                .orElse(apiOrders.getStatusName());
+        String status = pancakeConfig.getStatusMapping(apiOrders.getStatus(),apiOrders.getStatusName());
+        log.info("status of orderId {} is {}", apiOrders.getId(), status);
 
         String paymentMethod = Optional.ofNullable(apiOrders.getPaymentPurchaseHistories())
                 .filter(histories -> !histories.isEmpty())
@@ -264,10 +266,6 @@ public class PancakeServiceImpl implements PosManagementService {
         String orderCode = Optional.ofNullable(apiOrders.getPartner())
                 .map(PancakeOrderResponse.Partner::getExtendCode)
                 .orElse(Status.UNKNOWN.getValue());
-
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        String createdBy = (auth != null && auth.isAuthenticated()) ? claimUtil.getUserName() : "SYSTEM";
-
 
         return OrderEntity.builder()
                 .posId(posId)
@@ -280,7 +278,7 @@ public class PancakeServiceImpl implements PosManagementService {
                 .shippingFee(apiOrders.getShippingFee())
                 .totalPrice(apiOrders.getTotalPrice())
                 .status(status)
-                .createdBy(createdBy)
+                .createdBy(claimUtil.getUserName())
                 .build();
     }
 
@@ -366,10 +364,10 @@ public class PancakeServiceImpl implements PosManagementService {
             Map<String, String> configMap = objectMapper.readValue(
                     posEntity.getConfig(), new TypeReference<>() {
                     });
-            String shopId = configMap.get("shopId");
+            String shopId = configMap.get(PancakeConstatns.SHOP_ID);
             String accessToken = posEntity.getAccessToken();
 
-            if (shopId == null || accessToken == null) {
+            if (StringUtils.isEmpty(shopId)||StringUtils.isEmpty(accessToken)) {
                 syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.MISSING_CONFIG, false));
                 log.error("Missing required config for posId={}", posId);
                 return false;
@@ -431,8 +429,7 @@ public class PancakeServiceImpl implements PosManagementService {
             saveAllOrderItemSync(allOrderItems);
 
             syncHistoryRepository.save(toSyncHistory(history, null, true));
-            log.info("Successfully synced {} orders from Pancake", allOrders.size());
-            log.info("Successfully synced {} order items from Pancake", allOrderItems.size());
+            log.info("Successfully synced {} order items  and {} orders from Pancake", allOrderItems.size(),allOrders.size());
             return true;
         } catch (Exception e) {
             log.error("Failed to sync Pancake orders - {}", e.getMessage(), e);

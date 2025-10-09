@@ -1,10 +1,12 @@
 package com.nemi.configuration;
 
+import com.nemi.enums.Status;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.Map;
+import java.util.Optional;
 
 @Data
 @Configuration
@@ -14,7 +16,7 @@ public class PancakeConfig {
     private String apiKey;
     private String shopId;
     private int timeout;
-    private BatchConfig sync;
+    private Sync sync;
     private String xApiKey;
 
     @Data
@@ -23,32 +25,34 @@ public class PancakeConfig {
         private int backoffDelay;
     }
 
-    @Data
-    public static class Sync {
-        private int pageSize;
-        private int batchSize;
-        private int maxConcurrent;
-    }
 
     //---status-----
-    private OrderConfig order;
+    private Order order;
 
     @Data
-    public static class OrderConfig {
-        private StatusConfig status;
+    public static class Order {
+        private Status status;
 
         @Data
-        public static class StatusConfig {
+        public static class Status {
             private Map<Integer, String> mapping;
         }
     }
 
     @Data
-    public static class BatchConfig {
+    public static class Sync {
         private int order;
         private int orderItem;
         private int product;
         private int pageStart;
+    }
+
+    public String getStatusMapping(Integer key,String statusName) {
+
+        return Optional.ofNullable(key)
+                .map(code -> this.getOrder().getStatus().getMapping()
+                        .getOrDefault(code,statusName))
+                .orElse(Status.UNKNOWN.getValue());
     }
 
 }
