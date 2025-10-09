@@ -278,47 +278,52 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 return false;
             }
 
-            // Dùng khóa chính order_id để kiểm tra tồn tại nhằm tránh sai lệch khi PK không bao gồm pos_id
+            // Check if order exists
             Optional<OrderEntity> existingOrderOpt = orderRepository.findById(externalOrderId);
             
             OrderEntity order;
             if (existingOrderOpt.isPresent()) {
+                // UPDATE existing order
                 order = existingOrderOpt.get();
                 updateOrderFromPayload(order, posId, payload);
                 log.info("Updating existing Sapo order: {}", externalOrderId);
+                
+                orderRepository.save(order);
             } else {
-                order = convertToOrderEntity(posId, payload);
-                log.info("Creating new Sapo order: {}", externalOrderId);
-            }
-            
-            // Dùng saveAndFlush để đẩy SQL xuống DB ngay lập tức nhằm kiểm tra ràng buộc duy nhất
-            // (khóa chính order_id) tại thời điểm này (thay vì dồn đến lúc commit transaction).
-            // Nhờ đó ta có thể bắt DataIntegrityViolationException do nhiều webhook đồng thời
-            // cùng chèn một đơn hàng, rồi chuyển sang cập nhật bản ghi đã tồn tại (upsert idempotent).
-            try {
-                orderRepository.saveAndFlush(order);
-            } catch (DataIntegrityViolationException e) {
-                // Nhiều luồng cùng xử lý: khả năng bản ghi đã được chèn trước đó → đọc lại và UPDATE
-                log.warn("Race condition detected for order {}, retrying as update", externalOrderId);
-                existingOrderOpt = orderRepository.findById(externalOrderId);
-                if (existingOrderOpt.isPresent()) {
-                    order = existingOrderOpt.get();
-                    updateOrderFromPayload(order, posId, payload);
+                // CREATE new order - wrap in try-catch to handle race condition
+                try {
+                    order = convertToOrderEntity(posId, payload);
+                    log.info("Creating new Sapo order: {}", externalOrderId);
+                    
                     orderRepository.saveAndFlush(order);
-                } else {
-                    throw new RuntimeException("Order not found after duplicate key error", e);
+                } catch (DataIntegrityViolationException e) {
+                    // Race condition: another thread inserted this order
+                    log.warn("Duplicate key detected for order {}, retrying as update", externalOrderId);
+                    
+                    // Reload and update instead
+                    existingOrderOpt = orderRepository.findById(externalOrderId);
+                    if (existingOrderOpt.isPresent()) {
+                        order = existingOrderOpt.get();
+                        updateOrderFromPayload(order, posId, payload);
+                        orderRepository.save(order);
+                    } else {
+                        log.error("Order {} not found after duplicate key error", externalOrderId);
+                        return false;
+                    }
                 }
             }
 
+            // Sync order items - delete old ones first to avoid duplicates
             if (!ObjectUtils.isEmpty(payload.getLineItems())) {
-                List<OrderItemEntity> existingItems = orderItemRepository.findByOrderId(order.getOrderId());
-                if (!ObjectUtils.isEmpty(existingItems)) {
-                    orderItemRepository.deleteAll(existingItems);
-                }
+                orderItemRepository.deleteByOrderId(order.getOrderId());
+                
                 for (SapoOrderResponse.LineItem lineItem : payload.getLineItems()) {
                     OrderItemEntity orderItem = convertToOrderItemEntity(lineItem, order.getOrderId());
                     orderItemRepository.save(orderItem);
                 }
+                
+                log.info("Successfully synced {} order items for orderId={}", 
+                        payload.getLineItems().size(), order.getOrderId());
             }
 
             log.info("Successfully processed Sapo order: {} (Code: {})", order.getOrderId(), order.getOrderCode());
