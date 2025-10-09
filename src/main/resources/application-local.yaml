@@ -73,9 +73,9 @@ nhanhvn:
   sync:
     batch:
       order: 50
-      orderItem: 50
+      order-item: 50
       product: 50
-    pageSize: 50
+    page-size: 50
 pancake:
   secret: elqsF9ERiFWGacWQO9Gg5XC4kXojot
   base-url: https://pos.pages.fm/api/v1
@@ -107,11 +107,9 @@ pancake:
         7: "CANCELLED"      # da xoa
   sync:
     order: 100
-    orderItem: 200
+    order-item: 200
     product: 100
-    pageStart: 1
-
-
+    page-start: 1
 
 sapo:
   client-id: 4f7707502a2b4dabb25b2b08e4bf36ba
@@ -146,10 +144,9 @@ sapo:
         cancelled: "cancelled" # Các order bị hủy
   sync:
     order: 100
-    orderItem: 200
+    order-item: 200
     product: 100
-    pageStart: 1
-    productLimit: 250
+    page-start: 1
 
 
 secret:
