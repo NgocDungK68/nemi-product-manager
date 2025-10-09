@@ -278,7 +278,8 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 return false;
             }
 
-            Optional<OrderEntity> existingOrderOpt = orderRepository.findByOrderIdAndPosId(externalOrderId, posId);
+            // Dùng khóa chính order_id để kiểm tra tồn tại nhằm tránh sai lệch khi PK không bao gồm pos_id
+            Optional<OrderEntity> existingOrderOpt = orderRepository.findById(externalOrderId);
             
             OrderEntity order;
             if (existingOrderOpt.isPresent()) {
@@ -290,11 +291,16 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 log.info("Creating new Sapo order: {}", externalOrderId);
             }
             
+            // Dùng saveAndFlush để đẩy SQL xuống DB ngay lập tức nhằm kiểm tra ràng buộc duy nhất
+            // (khóa chính order_id) tại thời điểm này (thay vì dồn đến lúc commit transaction).
+            // Nhờ đó ta có thể bắt DataIntegrityViolationException do nhiều webhook đồng thời
+            // cùng chèn một đơn hàng, rồi chuyển sang cập nhật bản ghi đã tồn tại (upsert idempotent).
             try {
                 orderRepository.saveAndFlush(order);
             } catch (DataIntegrityViolationException e) {
+                // Nhiều luồng cùng xử lý: khả năng bản ghi đã được chèn trước đó → đọc lại và UPDATE
                 log.warn("Race condition detected for order {}, retrying as update", externalOrderId);
-                existingOrderOpt = orderRepository.findByOrderIdAndPosId(externalOrderId, posId);
+                existingOrderOpt = orderRepository.findById(externalOrderId);
                 if (existingOrderOpt.isPresent()) {
                     order = existingOrderOpt.get();
                     updateOrderFromPayload(order, posId, payload);
