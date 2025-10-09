@@ -1,10 +1,12 @@
 package com.nemi.configuration;
 
+import com.nemi.enums.Status;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.Map;
+import java.util.Optional;
 
 @Data
 @Configuration
@@ -34,5 +36,12 @@ public class NhanhvnConfig {
     @Data
     public static class StatusConfig {
         private Map<Integer, String> mapping;
+    }
+    public String getStatusMapping(Integer key) {
+
+        return Optional.ofNullable(key)
+                .map(code -> this.getOrder().getStatus().getMapping()
+                        .get(code))
+                .orElse(Status.UNKNOWN.getValue());
     }
 }

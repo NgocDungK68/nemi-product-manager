@@ -290,10 +290,8 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
     public OrderEntity convertToOrderEntity(String posId, NhanhvnOrderResponse.OrderData apiOrder) {
 
-        int statusCode = apiOrder.getInfo().getStatus();
-        Map<Integer, String> mapping = nhanhvnConfig.getOrder().getStatus().getMapping();
-        String status = mapping.getOrDefault(statusCode, "unknown");
-
+        String status = nhanhvnConfig.getStatusMapping(apiOrder.getInfo().getStatus());
+        log.info("status of orderId {} is {}", apiOrder.getInfo().getId(), status);
 
         return OrderEntity.builder()
                 .posId(posId)
