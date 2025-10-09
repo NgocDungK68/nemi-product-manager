@@ -291,20 +291,24 @@ public class SapoWebhookServiceImpl implements WebhookService {
             }
             
             try {
-                orderRepository.save(order);
+                orderRepository.saveAndFlush(order);
             } catch (DataIntegrityViolationException e) {
-                log.warn("Race condition detected for order {}, retrying with existing order", externalOrderId);
+                log.warn("Race condition detected for order {}, retrying as update", externalOrderId);
                 existingOrderOpt = orderRepository.findByOrderIdAndPosId(externalOrderId, posId);
                 if (existingOrderOpt.isPresent()) {
                     order = existingOrderOpt.get();
                     updateOrderFromPayload(order, posId, payload);
-                    orderRepository.save(order);
+                    orderRepository.saveAndFlush(order);
                 } else {
                     throw new RuntimeException("Order not found after duplicate key error", e);
                 }
             }
 
             if (!ObjectUtils.isEmpty(payload.getLineItems())) {
+                List<OrderItemEntity> existingItems = orderItemRepository.findByOrderId(order.getOrderId());
+                if (!ObjectUtils.isEmpty(existingItems)) {
+                    orderItemRepository.deleteAll(existingItems);
+                }
                 for (SapoOrderResponse.LineItem lineItem : payload.getLineItems()) {
                     OrderItemEntity orderItem = convertToOrderItemEntity(lineItem, order.getOrderId());
                     orderItemRepository.save(orderItem);

@@ -126,10 +126,10 @@ sapo:
       - orders/create
       - orders/delete
       - orders/updated
-      - orders/paid                # Khi đơn hàng được thanh toán thành công
-      - orders/cancelled           # Khi đơn hàng bị hủy
-      - orders/fulfilled           # Khi đơn hàng đã được giao
-      - orders/partially_fulfilled # Khi đơn hàng được giao một phần
+#      - orders/paid                # Khi đơn hàng được thanh toán thành công
+#      - orders/cancelled           # Khi đơn hàng bị hủy
+#      - orders/fulfilled           # Khi đơn hàng đã được giao
+#      - orders/partially_fulfilled # Khi đơn hàng được giao một phần
 
       # Product events
       - products/create
