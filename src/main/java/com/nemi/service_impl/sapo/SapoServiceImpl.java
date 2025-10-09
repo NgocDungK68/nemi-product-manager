@@ -410,7 +410,7 @@ public class SapoServiceImpl implements PosManagementService {
         }
 
         for (SapoOrderResponse.LineItem product : apiOrder.getLineItems()) {
-            if (product == null) {
+            if (ObjectUtils.isEmpty(product)) {
                 continue;
             }
 
@@ -545,10 +545,10 @@ public class SapoServiceImpl implements PosManagementService {
                 }
             }
 
-            if (!allOrders.isEmpty()) {
+            if (ObjectUtils.isNotEmpty(allOrders)) {
                 saveAllOrdersSync(allOrders);
             }
-            if (!allOrderItems.isEmpty()) {
+            if (ObjectUtils.isNotEmpty(allOrderItems)) {
                 saveAllOrderItemSync(allOrderItems);
             }
 
