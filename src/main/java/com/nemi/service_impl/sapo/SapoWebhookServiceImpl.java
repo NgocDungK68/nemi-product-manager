@@ -278,53 +278,14 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 return false;
             }
 
-            // Check if order exists
-            Optional<OrderEntity> existingOrderOpt = orderRepository.findById(externalOrderId);
-            
-            OrderEntity order;
-            if (existingOrderOpt.isPresent()) {
-                // UPDATE existing order
-                order = existingOrderOpt.get();
-                updateOrderFromPayload(order, posId, payload);
-                log.info("Updating existing Sapo order: {}", externalOrderId);
-                
-                orderRepository.save(order);
-            } else {
-                // CREATE new order - wrap in try-catch to handle race condition
-                try {
-                    order = convertToOrderEntity(posId, payload);
-                    log.info("Creating new Sapo order: {}", externalOrderId);
-                    
-                    orderRepository.saveAndFlush(order);
-                } catch (DataIntegrityViolationException e) {
-                    // Race condition: another thread inserted this order
-                    log.warn("Duplicate key detected for order {}, retrying as update", externalOrderId);
-                    
-                    // Reload and update instead
-                    existingOrderOpt = orderRepository.findById(externalOrderId);
-                    if (existingOrderOpt.isPresent()) {
-                        order = existingOrderOpt.get();
-                        updateOrderFromPayload(order, posId, payload);
-                        orderRepository.save(order);
-                    } else {
-                        log.error("Order {} not found after duplicate key error", externalOrderId);
-                        return false;
-                    }
-                }
+            // Upsert order
+            OrderEntity order = upsertOrder(posId, externalOrderId, payload);
+            if (order == null) {
+                return false;
             }
 
-            // Sync order items - delete old ones first to avoid duplicates
-            if (!ObjectUtils.isEmpty(payload.getLineItems())) {
-                orderItemRepository.deleteByOrderId(order.getOrderId());
-                
-                for (SapoOrderResponse.LineItem lineItem : payload.getLineItems()) {
-                    OrderItemEntity orderItem = convertToOrderItemEntity(lineItem, order.getOrderId());
-                    orderItemRepository.save(orderItem);
-                }
-                
-                log.info("Successfully synced {} order items for orderId={}", 
-                        payload.getLineItems().size(), order.getOrderId());
-            }
+            // Sync order items
+            syncOrderItems(order.getOrderId(), payload.getLineItems());
 
             log.info("Successfully processed Sapo order: {} (Code: {})", order.getOrderId(), order.getOrderCode());
             return true;
@@ -333,6 +294,65 @@ public class SapoWebhookServiceImpl implements WebhookService {
             log.error("Failed to process order webhook: {}", e.getMessage(), e);
             return false;
         }
+    }
+
+    /**
+     * Upsert order logic - handles both create and update with race condition
+     */
+    private OrderEntity upsertOrder(String posId, String externalOrderId, SapoOrderResponse.Order payload) {
+        Optional<OrderEntity> existingOrderOpt = orderRepository.findById(externalOrderId);
+        
+        OrderEntity order;
+        if (existingOrderOpt.isPresent()) {
+            // UPDATE existing order
+            order = existingOrderOpt.get();
+            updateOrderFromPayload(order, posId, payload);
+            log.info("Updating existing Sapo order: {}", externalOrderId);
+            orderRepository.save(order);
+        } else {
+            // CREATE new order - handle race condition
+            try {
+                order = convertToOrderEntity(posId, payload);
+                log.info("Creating new Sapo order: {}", externalOrderId);
+                orderRepository.saveAndFlush(order);
+            } catch (DataIntegrityViolationException e) {
+                // Race condition: another thread inserted this order
+                log.warn("Duplicate key detected for order {}, retrying as update", externalOrderId);
+                
+                existingOrderOpt = orderRepository.findById(externalOrderId);
+                if (existingOrderOpt.isPresent()) {
+                    order = existingOrderOpt.get();
+                    updateOrderFromPayload(order, posId, payload);
+                    orderRepository.save(order);
+                } else {
+                    log.error("Order {} not found after duplicate key error", externalOrderId);
+                    return null;
+                }
+            }
+        }
+        
+        return order;
+    }
+
+    /**
+     * Sync order items - delete old and insert new
+     */
+    private void syncOrderItems(String orderId, List<SapoOrderResponse.LineItem> lineItems) {
+        if (ObjectUtils.isEmpty(lineItems)) {
+            log.warn("No line items to sync for orderId={}", orderId);
+            return;
+        }
+
+        // Delete old items
+        orderItemRepository.deleteByOrderId(orderId);
+        
+        // Insert new items
+        for (SapoOrderResponse.LineItem lineItem : lineItems) {
+            OrderItemEntity orderItem = convertToOrderItemEntity(lineItem, orderId);
+            orderItemRepository.save(orderItem);
+        }
+        
+        log.info("Successfully synced {} order items for orderId={}", lineItems.size(), orderId);
     }
 
     // Event-specific wrappers (kept separate for clarity and future custom logic per event)
