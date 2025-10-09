@@ -147,6 +147,7 @@ sapo:
     order-item: 200
     product: 100
     page-start: 1
+    product-limit: 250
 
 
 secret:

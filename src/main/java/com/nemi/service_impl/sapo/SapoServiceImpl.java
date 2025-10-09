@@ -29,6 +29,7 @@ import jakarta.annotation.PostConstruct;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -41,6 +42,7 @@ import java.util.stream.Stream;
 @Slf4j
 @RequiredArgsConstructor
 public class SapoServiceImpl implements PosManagementService {
+
 
     private final ClaimUtil claimUtil;
     private final SapoClient sapoClient;
@@ -86,31 +88,21 @@ public class SapoServiceImpl implements PosManagementService {
 
 
             SapoAccessTokenResponse tokenResponse = sapoClient.getAccessToken(posConnectionRequest);
-            if (tokenResponse.getAccessToken() == null) {
+            if (ObjectUtils.isEmpty(tokenResponse.getAccessToken())) {
                 log.error("Sapo response does not contain accessToken: {}", tokenResponse);
             }
 
-            PosEntity posEntityBuilder = PosEntity.builder()
-                    .posName(PosName.SAPO.getValue())
-                    .userId(userId)
-                    .accessToken(tokenResponse.getAccessToken())
-                    .status(PosStatus.ACTIVE.name())
-                    .config(JsonUtils.toJson(configMap))
-                    .companyId(String.valueOf(claimUtil.getCompanyId()) != null ? String.valueOf(claimUtil.getCompanyId()) : "default")
-                    .createdBy(claimUtil.getUserName() != null ? claimUtil.getUserName() : "system")
-                    .build();
-
-            posRepository.save(posEntityBuilder);
+            PosEntity newPos = cretaeNewPos(tokenResponse, configMap);
+            PosConnectionResponse posConnectionResponse = PosConnectionResponse.toPosConnectionResponse(newPos);
 
             // Register webhooks
             List<SapoWebhookResponse> webhooks = sapoClient.registerWebhook(
                     posConnectionRequest.getStoreName(),
                     tokenResponse.getAccessToken(),
-                    posEntityBuilder.getId()
+                    newPos.getId()
             );
-            log.info("Registered {} webhooks for POS: {}", webhooks.size(), posEntityBuilder.getId());
+            log.info("Registered {} webhooks for POS: {}", webhooks.size(), newPos.getId());
 
-            PosConnectionResponse posConnectionResponse = PosConnectionResponse.toPosConnectionResponse(posEntityBuilder);
             log.info("Sapo response is {}", posConnectionResponse);
             return posConnectionResponse;
         } catch (Exception e) {
@@ -129,55 +121,41 @@ public class SapoServiceImpl implements PosManagementService {
         try {
             //B1 : Lay posentity va validate posName
             PosEntity posEntity = generalPosService.getPos(posId);
-
             // B2: parse config
-            Map<String, String> configMap = objectMapper.readValue(
-                    posEntity.getConfig(),
-                    new TypeReference<>() {
-                    }
-            );
-            String clientId = configMap.get(SapoConstants.CLIENT_ID);
-            String clientSecret = configMap.get(SapoConstants.CLIENT_SECRET);
-            String storeName = configMap.get(SapoConstants.STORE_NAME);
-            String accessToken = posEntity.getAccessToken();
+            SapoRequest request = buildRequest(posEntity);
 
-            if (clientId == null || clientSecret == null || storeName == null || accessToken == null) {
-                syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.MISSING_CONFIG, false));
-                log.error("Missing required config for posId={}", posId);
+            if (isInvalidRequest(request)) {
+                syncHistoryRepository.save(toSyncHistory(history, (SyncErrorMessage.MISSING_CONFIG), false));
+                log.error("[NhanhvnServiceImpl.syncProduct] Missing required config for posId={}", posId);
                 return false;
             }
+
 
             List<ProductEntity> allProducts = new ArrayList<>();
             List<ProductVariantEntity> allVariants = new ArrayList<>();
 
             //chi set size cho lan dau tien + page-based pagination (Sapo: limit tối đa 250)
-            Map<String, Object> paginator = new HashMap<>();
-            int limit =productBatchSize;
-            int page = productLimit;
-            paginator.put("limit", limit);
-            paginator.put("page", page);
+            SapoRequest.Paginator paginator = new SapoRequest.Paginator();
 
-            SapoRequest request = SapoRequest.builder()
-                    .clientId(clientId)
-                    .clientSecret(clientSecret)
-                    .storeName(storeName)
-                    .accessToken(accessToken)
-                    .paginator(paginator)
-                    .build();
+            paginator.setLimit(productLimit);
+            paginator.setPage(pageStartNumber);
+
             //B3 : goi SapoClient de lay du lieu
             while (true) {
                 Optional<SapoProductResponse> responseOpt = sapoClient.getProducts(request);
 
-                if (responseOpt.isEmpty()) {
+                if (ObjectUtils.isEmpty(responseOpt)) {
                     log.error("[SapoServiceImpl.syncData] response is empty");
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
                     return false;
                 }
 
                 SapoProductResponse response = responseOpt.get();
-                if (response.getProducts() == null || response.getProducts().isEmpty()) {
-                    log.info("[SapoServiceImpl.syncData] No more products to sync");
-                    break;
+                if (ObjectUtils.isEmpty(response.getProducts())) {
+
+                    syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.CONNECTION_FAILED, false));
+                    log.info("[SapoServiceImpl.syncProduct] No products found with paginator: {}", paginator);
+                    throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
                 }
 
                 // Convert products and variants
@@ -186,7 +164,7 @@ public class SapoServiceImpl implements PosManagementService {
                     allProducts.add(productEntity);
 
                     // Convert variants
-                    if (sapoProduct.getVariants() != null && !sapoProduct.getVariants().isEmpty()) {
+                    if (ObjectUtils.isNotEmpty(sapoProduct.getVariants())) {
                         List<ProductVariantEntity> variants = convertToVariantEntities(posId, productEntity.getProductId(), sapoProduct.getVariants());
                         allVariants.addAll(variants);
                     }
@@ -194,9 +172,9 @@ public class SapoServiceImpl implements PosManagementService {
                 log.info("Fetched {} products and {} variants", response.getProducts().size(), allVariants.size());
 
                 // xử lý next theo page: tăng page nếu vẫn còn đủ limit (== 250), ngược lại dừng
-                if (response.getProducts().size() >= limit) {
-                    page++;
-                    paginator.put("page", page);
+                if (response.getProducts().size() >= productLimit) {
+                    pageStartNumber++;
+                    paginator.setPage(pageStartNumber);
                 } else {
                     break; // hết data
                 }
@@ -232,10 +210,10 @@ public class SapoServiceImpl implements PosManagementService {
                 .collect(Collectors.toList())));
 
         // Set timestamps - parse from string format
-        if (apiProduct.getCreatedOn() != null && !apiProduct.getCreatedOn().isEmpty()) {
+        if (ObjectUtils.isEmpty(apiProduct.getCreatedOn())) {
             product.setCreatedAt(PosUtils.parseDateTime(apiProduct.getCreatedOn()));
         }
-        if (apiProduct.getModifiedOn() != null && !apiProduct.getModifiedOn().isEmpty()) {
+        if (ObjectUtils.isEmpty(apiProduct.getModifiedOn())) {
             product.setUpdatedAt(PosUtils.parseDateTime(apiProduct.getModifiedOn()));
         }
         return product;
@@ -256,8 +234,8 @@ public class SapoServiceImpl implements PosManagementService {
         variant.setProductId(productId);
 
         // Handle nullable fields with defaults
-        variant.setSku(apiVariant.getSku() != null ? apiVariant.getSku() : "");
-        variant.setBarcode(apiVariant.getBarcode() != null ? apiVariant.getBarcode() : "");
+        variant.setSku(apiVariant.getSku());
+        variant.setBarcode(apiVariant.getBarcode());
 
         // Parse price
         if (apiVariant.getPrice() != null) {
@@ -297,13 +275,13 @@ public class SapoServiceImpl implements PosManagementService {
     @NotNull
     private static Map<String, String> getStringStringMap(SapoProductResponse.Variant apiVariant) {
         Map<String, String> attributes = new HashMap<>();
-        if (apiVariant.getOption1() != null && !apiVariant.getOption1().isEmpty()) {
+        if (ObjectUtils.isNotEmpty(apiVariant.getOption1())) {
             attributes.put("option1", apiVariant.getOption1());
         }
-        if (apiVariant.getOption2() != null && !apiVariant.getOption2().isEmpty()) {
+        if (ObjectUtils.isNotEmpty(apiVariant.getOption2())) {
             attributes.put("option2", apiVariant.getOption2());
         }
-        if (apiVariant.getOption3() != null && !apiVariant.getOption3().isEmpty()) {
+        if (ObjectUtils.isEmpty(apiVariant.getOption3())) {
             attributes.put("option3", apiVariant.getOption3());
         }
         return attributes;
@@ -312,12 +290,15 @@ public class SapoServiceImpl implements PosManagementService {
     public void saveAllProductsSync(List<ProductEntity> products) {
         log.info("Saving {} Sapo products synchronously", products.size());
 
-        if (products.isEmpty()) {
+        //Vì danh sách rỗng là trường hợp hợp lệ, không phải lỗi. Khi phân trang, trang cuối cùng có thể trả về 0 sản phẩm; ta
+        // chỉ no-op thay vì fail toàn bộ sync.
+        //Nếu ném exception ở đây, cả quy trình đồng bộ sẽ bị đánh dấu lỗi dù hệ thống hoạt động đúng (không còn dữ liệu để lưu).
+        if (ObjectUtils.isEmpty(products)) {
             return;
         }
 
         try {
-            int batchSize = 100;
+            int batchSize = productBatchSize;
             for (int i = 0; i < products.size(); i += batchSize) {
                 int endIndex = Math.min(i + batchSize, products.size());
                 List<ProductEntity> batch = products.subList(i, endIndex);
@@ -337,12 +318,12 @@ public class SapoServiceImpl implements PosManagementService {
     public void saveAllVariantsSync(List<ProductVariantEntity> variants) {
         log.info("Saving {} Sapo variants synchronously", variants.size());
 
-        if (variants.isEmpty()) {
+        if (ObjectUtils.isEmpty(variants)) {
             return;
         }
 
         try {
-            int batchSize = 100;
+            int batchSize = productBatchSize;
             for (int i = 0; i < variants.size(); i += batchSize) {
                 int endIndex = Math.min(i + batchSize, variants.size());
                 List<ProductVariantEntity> batch = variants.subList(i, endIndex);
@@ -430,8 +411,8 @@ public class SapoServiceImpl implements PosManagementService {
                 continue;
             }
 
-            BigDecimal price = product.getPrice() != null ? product.getPrice() : BigDecimal.ZERO;
-            int quantity = product.getQuantity() != null ? product.getQuantity() : 0;
+            BigDecimal price = product.getPrice();
+            int quantity = product.getQuantity();
             BigDecimal totalPrice = price.multiply(BigDecimal.valueOf(quantity));
 
             orderItemEntities.add(OrderItemEntity.builder()
@@ -443,8 +424,8 @@ public class SapoServiceImpl implements PosManagementService {
                     .price(price)
                     .totalPrice(totalPrice)
                     .productName(product.getName())
-                    .fulfillableQuantity(product.getCurrentQuantity() != null ? product.getCurrentQuantity() : 0)
-                    .createdBy(claimUtil.getUserName() != null ? claimUtil.getUserName() : "system")
+                    .fulfillableQuantity(product.getCurrentQuantity())
+                    .createdBy(claimUtil.getUserName())
                     .build());
         }
         return orderItemEntities;
@@ -522,34 +503,29 @@ public class SapoServiceImpl implements PosManagementService {
             List<OrderEntity> allOrders = new ArrayList<>();
             List<OrderItemEntity> allOrderItems = new ArrayList<>();
 
+            // Initialize paginator similar to syncProduct
+            SapoRequest.Paginator paginator = new SapoRequest.Paginator();
+            paginator.setLimit(productLimit); // reuse productLimit as API max page size
+            paginator.setPage(pageNumber);
+
             SapoRequest request = SapoRequest.builder()
-                    .limit(orderBatchSize)
-                    .page(pageNumber)
                     .storeName(storeName)
                     .accessToken(accessToken)
+                    .paginator(paginator)
                     .build();
 
             while (true) {
                 Optional<SapoOrderResponse> responseOpt = sapoClient.getOrders(request);
-                if (responseOpt.isEmpty()) {
+                if (ObjectUtils.isEmpty(responseOpt)) {
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.ORDER_CONNECTION_FAILED, false));
-                    log.error("No response from Pancake API when fetching orders, posId={}", posId);
-                    if (!allOrders.isEmpty()) {
-                        saveAllOrdersSync(allOrders);
-                    }
-                    if (!allOrderItems.isEmpty()) {
-                        saveAllOrderItemSync(allOrderItems);
-                    }
-                    return false;
+                    log.error("No response from Sapo API when fetching orders, posId={}", posId);
+                    break;
                 }
 
                 SapoOrderResponse response = responseOpt.get();
-
-                if (response.getOrders() == null || response.getOrders().isEmpty()) {
-                    log.info("No orders found with page number: {}", pageNumber);
+                if (ObjectUtils.isEmpty(response.getOrders())) {
+                    log.info("No orders found with paginator: page={}, limit={}", paginator.getPage(), paginator.getLimit());
                     break;
-                } else {
-                    request.setPage(request.getPage() + 1);
                 }
 
                 List<OrderEntity> pageOrders = convertToOrderEntities(posId, response.getOrders());
@@ -558,10 +534,20 @@ public class SapoServiceImpl implements PosManagementService {
                 List<OrderItemEntity> pageOrderItems = convertToOrderItemEntities(response.getOrders());
                 allOrderItems.addAll(pageOrderItems);
 
+                // Continue pagination: increment page; stop if returned less than limit
+                if (response.getOrders().size() >= paginator.getLimit()) {
+                    paginator.setPage(paginator.getPage() + 1);
+                } else {
+                    break;
+                }
             }
 
-            saveAllOrdersSync(allOrders);
-            saveAllOrderItemSync(allOrderItems);
+            if (!allOrders.isEmpty()) {
+                saveAllOrdersSync(allOrders);
+            }
+            if (!allOrderItems.isEmpty()) {
+                saveAllOrderItemSync(allOrderItems);
+            }
 
             syncHistoryRepository.save(toSyncHistory(history, null, true));
             log.info("Successfully synced {} orders from Pancake", allOrders.size());
@@ -572,5 +558,51 @@ public class SapoServiceImpl implements PosManagementService {
             syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.ORDER_TECHNICAL_ERROR, false));
             return false;
         }
+    }
+    private PosEntity cretaeNewPos(SapoAccessTokenResponse tokenResponse, Map<String, String> configMap) {
+        PosEntity newPos = PosEntity.builder()
+                .posName(PosName.SAPO.getValue())
+                .accessToken(tokenResponse.getAccessToken())
+                .status(PosStatus.ACTIVE.name())
+                .config(JsonUtils.toJson(configMap))
+                .companyId(claimUtil.getCompanyId() != null ? String.valueOf(claimUtil.getCompanyId()) : "default")
+                .userId(claimUtil.getUserId() != null ? claimUtil.getUserId() : "system")
+                .createdBy(claimUtil.getUserName() != null ? claimUtil.getUserName() : "system")
+                .build();
+
+        return posRepository.save(newPos);
+    }
+
+    public SapoRequest buildRequest(PosEntity posEntity) {
+        try {
+            //parse config
+            Map<String, String> configMap = objectMapper.readValue(
+                    posEntity.getConfig(),
+                    new TypeReference<>() {
+                    }
+            );
+
+            String clientId = configMap.get(SapoConstants.CLIENT_ID);
+            String clientSecret = configMap.get(SapoConstants.CLIENT_SECRET);
+            String storeName = configMap.get(SapoConstants.STORE_NAME);
+            String accessToken = posEntity.getAccessToken();
+
+
+            return SapoRequest.builder()
+                    .clientId(clientId)
+                    .clientSecret(clientSecret)
+                    .storeName(storeName)
+                    .accessToken(accessToken)
+                    .build();
+        } catch (Exception e) {
+            log.error("Failed request PancakeRequest - {}", e.getMessage(), e);
+            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.JSON_PARSE_ERROR));
+        }
+    }
+
+    private boolean isInvalidRequest(SapoRequest request) {
+        return ObjectUtils.isEmpty(request.getClientId())
+                || ObjectUtils.isEmpty(request.getClientSecret())
+                || ObjectUtils.isEmpty(request.getAccessToken());
     }
 }

@@ -120,9 +120,11 @@ public class SapoClient {
             String url = "https://" + request.getStoreName() + ".mysapo.net/admin/orders.json";
             log.debug("[SapoClient.getProducts] Calling URL: {}", url);
 
+            int limit = request.getPaginator() != null ? request.getPaginator().getLimit() : 250;
+            int page = request.getPaginator() != null ? request.getPaginator().getPage() : 1;
             String urlWithParams = UriComponentsBuilder.fromHttpUrl(url)
-                    .queryParam("limit", request.getLimit())
-                    .queryParam("page", request.getPage())
+                    .queryParam("limit", limit)
+                    .queryParam("page", page)
                     .toUriString();
             log.debug("[SapoClient.getProducts] URL with params: {}", urlWithParams);
             HttpHeaders headers = new HttpHeaders();

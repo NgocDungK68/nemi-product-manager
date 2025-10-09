@@ -17,7 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.ObjectUtils;
+import org.apache.commons.lang3.ObjectUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -59,14 +59,14 @@ public class SapoWebhookServiceImpl implements WebhookService {
             SapoOrderResponse.Order payloadOrder = null;
 
             // Parse payload theo loại topic
-            if (topic.startsWith("products")) {
+            if (topic.startsWith(SapoConstants.TOPIC_PRODUCTS)) {
                 payloadProduct = JsonUtils.map(body, SapoProductResponse.Product.class);
                 if (payloadProduct == null) {
                     log.error("Failed to parse Sapo product webhook payload");
                     return false;
                 }
                 webhookHistory.setBody(JsonUtils.toJson(payloadProduct));
-            } else if (topic.startsWith("orders")) {
+            } else if (topic.startsWith(SapoConstants.TOPIC_ORDERS)) {
                 payloadOrder = JsonUtils.map(body, SapoOrderResponse.Order.class);
                 if (payloadOrder == null) {
                     log.error("Failed to parse Sapo order webhook payload");
@@ -136,7 +136,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
             
             productRepository.save(product);
 
-            if (payload.getVariants() != null && !payload.getVariants().isEmpty()) {
+            if (!ObjectUtils.isEmpty(payload.getVariants())) {
                 productVariantRepository.deleteAllByProductIdAndPosId(String.valueOf(productId), posId);
                 for (SapoProductResponse.Variant variant : payload.getVariants()) {
                     ProductVariantEntity variantEntity = convertToVariantEntity(posId, variant, productId);
@@ -211,7 +211,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
         product.setCategory(payload.getProductType());
         product.setBrand(payload.getVendor());
         // Handle null images
-        if (payload.getImages() != null && !payload.getImages().isEmpty()) {
+        if (!ObjectUtils.isEmpty(payload.getImages())) {
             product.setImages(JsonUtils.toJson(payload.getImages().stream()
                     .map(SapoProductResponse.Image::getSrc) // Dùng method reference
                     .collect(Collectors.toList())));
@@ -236,7 +236,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
         product.setCategory(payload.getProductType());
         product.setBrand(payload.getVendor());
         
-        if (payload.getImages() != null && !payload.getImages().isEmpty()) {
+        if (!ObjectUtils.isEmpty(payload.getImages())) {
             product.setImages(JsonUtils.toJson(payload.getImages().stream()
                     .map(SapoProductResponse.Image::getSrc)
                     .collect(Collectors.toList())));
@@ -304,7 +304,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 }
             }
 
-            if (payload.getLineItems() != null && !payload.getLineItems().isEmpty()) {
+            if (!ObjectUtils.isEmpty(payload.getLineItems())) {
                 for (SapoOrderResponse.LineItem lineItem : payload.getLineItems()) {
                     OrderItemEntity orderItem = convertToOrderItemEntity(lineItem, order.getOrderId());
                     orderItemRepository.save(orderItem);
