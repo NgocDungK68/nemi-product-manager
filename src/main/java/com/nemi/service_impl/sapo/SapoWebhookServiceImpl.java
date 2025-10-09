@@ -353,6 +353,8 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 // Race condition: another thread inserted this order
                 // Current transaction is aborted - must handle retry + sync in NEW transaction
                 log.warn("Duplicate key detected for order {}, retrying in new transaction", externalOrderId);
+                // Don't continue in this transaction - it's aborted
+                // Return the result from the new transaction
                 return retryUpdateAndSyncInNewTransaction(posId, externalOrderId, payload, lineItems);
             }
         }
@@ -367,19 +369,24 @@ public class SapoWebhookServiceImpl implements WebhookService {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public boolean retryUpdateAndSyncInNewTransaction(String posId, String externalOrderId, SapoOrderResponse.Order payload, List<SapoOrderResponse.LineItem> lineItems) {
-        Optional<OrderEntity> existingOrderOpt = orderRepository.findById(externalOrderId);
-        if (existingOrderOpt.isPresent()) {
-            OrderEntity order = existingOrderOpt.get();
-            updateOrderFromPayload(order, posId, payload);
-            orderRepository.save(order);
-            log.info("Successfully retried update for Sapo order: {}", externalOrderId);
-            
-            // Sync items in SAME new transaction
-            syncOrderItems(order.getOrderId(), lineItems);
-            
-            return true;
-        } else {
-            log.error("Order {} not found during retry", externalOrderId);
+        try {
+            Optional<OrderEntity> existingOrderOpt = orderRepository.findById(externalOrderId);
+            if (existingOrderOpt.isPresent()) {
+                OrderEntity order = existingOrderOpt.get();
+                updateOrderFromPayload(order, posId, payload);
+                orderRepository.save(order);
+                log.info("Successfully retried update for Sapo order: {}", externalOrderId);
+                
+                // Sync items in SAME new transaction
+                syncOrderItems(order.getOrderId(), lineItems);
+                
+                return true;
+            } else {
+                log.error("Order {} not found during retry", externalOrderId);
+                return false;
+            }
+        } catch (Exception e) {
+            log.error("Failed to retry update for Sapo order {}: {}", externalOrderId, e.getMessage(), e);
             return false;
         }
     }
