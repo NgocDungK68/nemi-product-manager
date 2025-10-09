@@ -10,9 +10,9 @@ import com.nemi.entity.OrderItemEntity;
 import com.nemi.entity.PosEntity;
 import com.nemi.entity.ProductEntity;
 import com.nemi.entity.SyncHistoryEntity;
-import com.nemi.enums.Status;
 import com.nemi.enums.PosName;
 import com.nemi.enums.PosStatus;
+import com.nemi.enums.Status;
 import com.nemi.enums.SyncErrorMessage;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
@@ -33,11 +33,8 @@ import com.nemi.util.JsonUtils;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -255,7 +252,7 @@ public class PancakeServiceImpl implements PosManagementService {
     }
 
     public OrderEntity convertToOrderEntity(String posId, PancakeOrderResponse.DataItem apiOrders) {
-        String status = pancakeConfig.getStatusMapping(apiOrders.getStatus(),apiOrders.getStatusName());
+        String status = pancakeConfig.getStatusMapping(apiOrders.getStatus(), apiOrders.getStatusName());
         log.info("status of orderId {} is {}", apiOrders.getId(), status);
 
         String paymentMethod = Optional.ofNullable(apiOrders.getPaymentPurchaseHistories())
@@ -367,7 +364,7 @@ public class PancakeServiceImpl implements PosManagementService {
             String shopId = configMap.get(PancakeConstatns.SHOP_ID);
             String accessToken = posEntity.getAccessToken();
 
-            if (StringUtils.isEmpty(shopId)||StringUtils.isEmpty(accessToken)) {
+            if (StringUtils.isEmpty(shopId) || StringUtils.isEmpty(accessToken)) {
                 syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.MISSING_CONFIG, false));
                 log.error("Missing required config for posId={}", posId);
                 return false;
@@ -429,7 +426,7 @@ public class PancakeServiceImpl implements PosManagementService {
             saveAllOrderItemSync(allOrderItems);
 
             syncHistoryRepository.save(toSyncHistory(history, null, true));
-            log.info("Successfully synced {} order items  and {} orders from Pancake", allOrderItems.size(),allOrders.size());
+            log.info("Successfully synced {} order items  and {} orders from Pancake", allOrderItems.size(), allOrders.size());
             return true;
         } catch (Exception e) {
             log.error("Failed to sync Pancake orders - {}", e.getMessage(), e);
