@@ -4,11 +4,18 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.client.PancakeClient;
 import com.nemi.configuration.PancakeConfig;
-import com.nemi.entity.*;
+import com.nemi.constant.PancakeConstatns;
+import com.nemi.entity.OrderEntity;
+import com.nemi.entity.OrderItemEntity;
+import com.nemi.entity.PosEntity;
+import com.nemi.entity.ProductEntity;
+import com.nemi.entity.ProductVariantEntity;
+import com.nemi.entity.SyncHistoryEntity;
 import com.nemi.enums.PosName;
 import com.nemi.enums.PosStatus;
 import com.nemi.enums.Status;
 import com.nemi.enums.SyncErrorMessage;
+import com.nemi.enums.WeightUnit;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
@@ -17,7 +24,12 @@ import com.nemi.model.request.pancake.PancakeRequest;
 import com.nemi.model.response.PosConnectionResponse;
 import com.nemi.model.response.pancake.PancakeOrderResponse;
 import com.nemi.model.response.pancake.PancakeProductResponse;
-import com.nemi.repository.*;
+import com.nemi.repository.OrderItemRepository;
+import com.nemi.repository.OrderRepository;
+import com.nemi.repository.PosRepository;
+import com.nemi.repository.ProductRepository;
+import com.nemi.repository.ProductVariantRepository;
+import com.nemi.repository.SyncHistoryRepository;
 import com.nemi.service.GeneralPosService;
 import com.nemi.service.PosManagementService;
 import com.nemi.util.ClaimUtil;
@@ -25,13 +37,18 @@ import com.nemi.util.JsonUtils;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -47,6 +64,7 @@ public class PancakeServiceImpl implements PosManagementService {
     private final SyncHistoryRepository syncHistoryRepository;
     private final OrderItemRepository orderItemRepository;
     private final PancakeConfig pancakeConfig;
+    private final ProductVariantRepository productVariantRepository;
     private final GeneralPosService generalPosService;
 
     private int orderBatchSize;
@@ -73,7 +91,7 @@ public class PancakeServiceImpl implements PosManagementService {
         try {
             String userId = claimUtil.getUserId();
             Map<String, String> configMap = new HashMap<>();
-            configMap.put("shopId", posConnectionRequest.getShopId());
+            configMap.put(PancakeConstatns.SHOP_ID, posConnectionRequest.getShopId());
 
             LocalDateTime expiredTime = LocalDateTime.now().plusYears(1);
 
@@ -112,16 +130,17 @@ public class PancakeServiceImpl implements PosManagementService {
             Map<String, String> configMap = objectMapper.readValue(
                     posEntity.getConfig(), new TypeReference<>() {
                     });
-            String shopId = configMap.get("shopId");
+            String shopId = configMap.get(PancakeConstatns.SHOP_ID);
             String accessToken = posEntity.getAccessToken();
 
-            if (shopId == null || accessToken == null) {
+            if (StringUtils.isEmpty(shopId) || StringUtils.isEmpty(accessToken)) {
                 syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.MISSING_CONFIG, false));
                 log.error("Missing required config for posId={}", posId);
                 return false;
             }
 
             List<ProductEntity> allProducts = new ArrayList<>();
+            List<ProductVariantEntity> allVariants = new ArrayList<>();
             int pageNumber = pageStartNumber;
 
             PancakeRequest request = PancakeRequest.builder()
@@ -151,7 +170,10 @@ public class PancakeServiceImpl implements PosManagementService {
                 List<ProductEntity> pageProducts = convertToProductEntities(posId, response.getData());
                 allProducts.addAll(pageProducts);
 
-                if (response.getData() == null || response.getData().isEmpty()) {
+                List<ProductVariantEntity> pageVariants = convertToVariantEntities(posId, response.getData());
+                allVariants.addAll(pageVariants);
+
+                if (ObjectUtils.isEmpty(response.getData())) {
                     log.info("No products found with page number: {}", pageNumber);
                     break;
                 } else {
@@ -162,6 +184,7 @@ public class PancakeServiceImpl implements PosManagementService {
 
             syncHistoryRepository.save(toSyncHistory(history, null, true));
             saveAllProductsSync(allProducts);
+            saveAllVariantsSync(allVariants);
             log.info("Successfully synced {} products from Pancake", allProducts.size());
             return true;
         } catch (Exception e) {
@@ -197,6 +220,33 @@ public class PancakeServiceImpl implements PosManagementService {
                 .collect(Collectors.toList());
     }
 
+    public void saveAllVariantsSync(List<ProductVariantEntity> variants) {
+        log.info("[NhanhvnServiceImpl.saveAllVariantsSync] Saving {} Nhanh.vn variants synchronously", variants.size());
+
+        if (variants.isEmpty()) {
+            log.info("[NhanhvnServiceImpl.saveAllVariantsSync] No variants to save.");
+            return;
+        }
+
+        try {
+            int batchSize = productBatchSize;
+            for (int i = 0; i < variants.size(); i += batchSize) {
+                int endIndex = Math.min(i + batchSize, variants.size());
+                List<ProductVariantEntity> batch = variants.subList(i, endIndex);
+
+                productVariantRepository.saveAll(batch);
+                log.info("[NhanhvnServiceImpl.saveAllVariantsSync] Saved batch {}-{} of {} variants",
+                        i + 1, endIndex, variants.size());
+            }
+
+            log.info("[NhanhvnServiceImpl.saveAllVariantsSync] Successfully saved all {} Nhanh.vn variants", variants.size());
+        } catch (Exception e) {
+            log.error("[NhanhvnServiceImpl.saveAllVariantsSync] Failed to save Nhanh.vn variants synchronously: {}", e.getMessage(), e);
+            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_PERSISTENCE_ERROR));
+        }
+    }
+
+
     private ProductEntity convertToProductEntity(String posId, PancakeProductResponse.ProductData apiProducts) {
         ProductEntity product = new ProductEntity();
         product.setPosId(posId);
@@ -205,9 +255,9 @@ public class PancakeServiceImpl implements PosManagementService {
         product.setName(apiProducts.getProduct().getName());
         product.setProductId(apiProducts.getId());
         if (apiProducts.getIsLocked()) {
-            product.setStatus(Status.CANCELLED.getValue());
+            product.setStatus(Status.INACTIVE.getValue());
         } else {
-            product.setStatus(Status.PROCESSING.getValue());
+            product.setStatus(Status.ACTIVE.getValue());
         }
         return product;
     }
@@ -223,6 +273,14 @@ public class PancakeServiceImpl implements PosManagementService {
         return syncHistoryEntity;
     }
 
+    private List<ProductVariantEntity> convertToVariantEntities(String posId, List<PancakeProductResponse.ProductData> apiProducts) {
+        return apiProducts.stream()
+                .map(apiProduct -> convertToVariantEntity(posId, apiProduct))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+
     private List<OrderEntity> convertToOrderEntities(String posId, List<PancakeOrderResponse.DataItem> apiOrders) {
         return apiOrders.stream()
                 .map(orders -> convertToOrderEntity(posId, orders))
@@ -231,22 +289,17 @@ public class PancakeServiceImpl implements PosManagementService {
     }
 
     public OrderEntity convertToOrderEntity(String posId, PancakeOrderResponse.DataItem apiOrders) {
-        String status = Optional.ofNullable(apiOrders.getStatus())
-                .map(code -> pancakeConfig.getOrder().getStatus().getMapping()
-                        .getOrDefault(code, Status.UNKNOWN.getValue()))
-                .orElse(apiOrders.getStatusName());
+        String status = pancakeConfig.getStatusMapping(apiOrders.getStatus(), apiOrders.getStatusName());
+        log.info("status of orderId {} is {}", apiOrders.getId(), status);
 
         String paymentMethod = Optional.ofNullable(apiOrders.getPaymentPurchaseHistories())
                 .filter(histories -> !histories.isEmpty())
                 .map(histories -> histories.get(0).getType())
-                .orElse(Status.UNKNOWN.getValue());
+                .orElse(null);
 
         String orderCode = Optional.ofNullable(apiOrders.getPartner())
                 .map(PancakeOrderResponse.Partner::getExtendCode)
-                .orElse(Status.UNKNOWN.getValue());
-
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        String createdBy = (auth != null && auth.isAuthenticated()) ? claimUtil.getUserName() : "SYSTEM";
+                .orElse(null);
 
 
         return OrderEntity.builder()
@@ -260,7 +313,7 @@ public class PancakeServiceImpl implements PosManagementService {
                 .shippingFee(apiOrders.getShippingFee())
                 .totalPrice(apiOrders.getTotalPrice())
                 .status(status)
-                .createdBy(createdBy)
+                .createdBy(claimUtil.getUserName())
                 .build();
     }
 
@@ -290,6 +343,30 @@ public class PancakeServiceImpl implements PosManagementService {
         }
         return orderItemEntities;
     }
+
+    public ProductVariantEntity convertToVariantEntity(String posId, PancakeProductResponse.ProductData apiProduct) {
+
+        Integer remainQuantity = Optional.ofNullable(apiProduct.getVariationsWarehouses())
+                .filter(list -> !list.isEmpty())
+                .map(list -> list.get(0))
+                .map(PancakeProductResponse.VariationWarehouse::getRemainQuantity)
+                .orElse(null);
+
+
+        return ProductVariantEntity.builder()
+                .variantId(apiProduct.getId())
+                .posId(posId)
+                .productId(String.valueOf(apiProduct.getProductId()))
+                .sku(apiProduct.getDisplayId())
+                .barcode(apiProduct.getBarcode())
+                .price(BigDecimal.valueOf(apiProduct.getRetailPrice()))
+                .inventoryQuantity(apiProduct.getRemainQuantity())
+                .fulfillableQuantity(remainQuantity)
+                .weight(apiProduct.getWeight())
+                .weightUnit(WeightUnit.GAM.getValue())
+                .build();
+    }
+
 
     public void saveAllOrdersSync(List<OrderEntity> orderEntities) {
         log.info("Saving {} Pancake orders synchronously", orderEntities.size());
@@ -346,10 +423,10 @@ public class PancakeServiceImpl implements PosManagementService {
             Map<String, String> configMap = objectMapper.readValue(
                     posEntity.getConfig(), new TypeReference<>() {
                     });
-            String shopId = configMap.get("shopId");
+            String shopId = configMap.get(PancakeConstatns.SHOP_ID);
             String accessToken = posEntity.getAccessToken();
 
-            if (shopId == null || accessToken == null) {
+            if (StringUtils.isEmpty(shopId) || StringUtils.isEmpty(accessToken)) {
                 syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.MISSING_CONFIG, false));
                 log.error("Missing required config for posId={}", posId);
                 return false;
@@ -399,7 +476,7 @@ public class PancakeServiceImpl implements PosManagementService {
                 List<OrderItemEntity> pageOrderItems = convertToOrderItemEntities(response.getData());
                 allOrderItems.addAll(pageOrderItems);
 
-                if (request.getPageNumber() > 2) {
+                if (ObjectUtils.isEmpty(response.getData())) {
                     log.info("No orders found with page number: {}", pageNumber);
                     break;
                 } else {
@@ -411,8 +488,7 @@ public class PancakeServiceImpl implements PosManagementService {
             saveAllOrderItemSync(allOrderItems);
 
             syncHistoryRepository.save(toSyncHistory(history, null, true));
-            log.info("Successfully synced {} orders from Pancake", allOrders.size());
-            log.info("Successfully synced {} order items from Pancake", allOrderItems.size());
+            log.info("Successfully synced {} order items  and {} orders from Pancake", allOrderItems.size(), allOrders.size());
             return true;
         } catch (Exception e) {
             log.error("Failed to sync Pancake orders - {}", e.getMessage(), e);

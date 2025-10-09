@@ -236,9 +236,8 @@ public class NhanhvnServiceImpl implements PosManagementService {
     public ProductEntity convertToProductEntity(String posId, NhanhvnProductResponse.ProductData apiProduct) {
         if (!(apiProduct.getParentId()).equals(NhanhvnConstants.PARENT_PRODUCT)) return null;
 
-        int statusCode = apiProduct.getStatus();
-        Map<Integer, String> mapping = nhanhvnConfig.getProduct().getStatus().getMapping();
-        String status = mapping.getOrDefault(statusCode, "unknown");
+
+        String status = nhanhvnConfig.getProductStatusMapping(apiProduct.getStatus());
 
         return ProductEntity.builder()
                 .posId(posId)
@@ -282,9 +281,8 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
     public OrderEntity convertToOrderEntity(String posId, NhanhvnOrderResponse.OrderData apiOrder) {
 
-        int statusCode = apiOrder.getInfo().getStatus();
-        Map<Integer, String> mapping = nhanhvnConfig.getOrder().getStatus().getMapping();
-        String status = mapping.getOrDefault(statusCode, "unknown");
+        String status = nhanhvnConfig.getOrderStatusMapping(apiOrder.getInfo().getStatus());
+        log.info("status of orderId {} is {}", apiOrder.getInfo().getId(), status);
 
 
         return OrderEntity.builder()

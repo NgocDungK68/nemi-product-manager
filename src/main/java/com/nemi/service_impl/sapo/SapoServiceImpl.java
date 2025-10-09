@@ -30,7 +30,11 @@ import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
+import org.apache.commons.lang3.ObjectUtils;
+import org.springframework.util.CollectionUtils;
+
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -79,7 +83,7 @@ public class SapoServiceImpl implements PosManagementService {
     @Override
     public PosConnectionResponse connectPos(PosConnectionRequest posConnectionRequest) {
         try {
-            String userId = claimUtil.getUserId();
+
 
             Map<String, String> configMap = new HashMap<>();
             configMap.put(SapoConstants.CLIENT_ID, posConnectionRequest.getClientId());
@@ -92,7 +96,7 @@ public class SapoServiceImpl implements PosManagementService {
                 log.error("Sapo response does not contain accessToken: {}", tokenResponse);
             }
 
-            PosEntity newPos = cretaeNewPos(tokenResponse, configMap);
+            PosEntity newPos = createNewPos(tokenResponse, configMap);
             PosConnectionResponse posConnectionResponse = PosConnectionResponse.toPosConnectionResponse(newPos);
 
             // Register webhooks
@@ -155,7 +159,7 @@ public class SapoServiceImpl implements PosManagementService {
 
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.CONNECTION_FAILED, false));
                     log.info("[SapoServiceImpl.syncProduct] No products found with paginator: {}", paginator);
-                    throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
+                    return false;
                 }
 
                 // Convert products and variants
@@ -360,8 +364,7 @@ public class SapoServiceImpl implements PosManagementService {
     }
 
     public OrderEntity convertToOrderEntity(String posId, SapoOrderResponse.Order order) {
-        Map<String, String> mapping = sapoConfig.getOrder().getStatus().getMapping();
-        String status = mapping.getOrDefault(order.getStatus(), "unknown");
+        String status = sapoConfig.getStatusMapping(order.getStatus());
 
         SapoOrderResponse.Fulfillment fulfillment = order.getFulfillments() != null && !order.getFulfillments().isEmpty()
                 ? order.getFulfillments().get(0)
@@ -402,7 +405,7 @@ public class SapoServiceImpl implements PosManagementService {
 
     public List<OrderItemEntity> convertToOrderItemEntity(SapoOrderResponse.Order apiOrder) {
         List<OrderItemEntity> orderItemEntities = new ArrayList<>();
-        if (apiOrder == null || apiOrder.getLineItems() == null || apiOrder.getLineItems().isEmpty()) {
+        if (ObjectUtils.isEmpty(apiOrder) || CollectionUtils.isEmpty(apiOrder.getLineItems())) {
             return orderItemEntities;
         }
 
@@ -493,7 +496,7 @@ public class SapoServiceImpl implements PosManagementService {
             String storeName = configMap.get(SapoConstants.STORE_NAME);
             String accessToken = posEntity.getAccessToken();
 
-            if (clientId == null || clientSecret == null || storeName == null || accessToken == null) {
+            if (StringUtils.isEmpty(clientId)|| StringUtils.isEmpty(clientSecret)   ||StringUtils.isEmpty(storeName)||StringUtils.isEmpty(accessToken)) {
                 syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.MISSING_CONFIG, false));
                 log.error("Missing required config for posId={}", posId);
                 return false;
@@ -559,7 +562,7 @@ public class SapoServiceImpl implements PosManagementService {
             return false;
         }
     }
-    private PosEntity cretaeNewPos(SapoAccessTokenResponse tokenResponse, Map<String, String> configMap) {
+    private PosEntity createNewPos(SapoAccessTokenResponse tokenResponse, Map<String, String> configMap) {
         PosEntity newPos = PosEntity.builder()
                 .posName(PosName.SAPO.getValue())
                 .accessToken(tokenResponse.getAccessToken())

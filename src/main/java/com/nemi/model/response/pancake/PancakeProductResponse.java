@@ -39,6 +39,7 @@ public class PancakeProductResponse {
         private String productId;
         @JsonProperty("display_id")
         private String displayId;
+        private Double weight;
         private String barcode;
         @JsonProperty("is_hidden")
         private Boolean isHidden;
