@@ -107,10 +107,9 @@ pancake:
         7: "CANCELLED"      # da xoa
   sync:
     order: 100
-    order-item: 200
+    orderItem: 200
     product: 100
-    page-start: 1
-    product-limit: 250
+    pageStart: 1
 
 
 
@@ -147,10 +146,10 @@ sapo:
         cancelled: "cancelled" # Các order bị hủy
   sync:
     order: 100
-    order-item: 200
+    orderItem: 200
     product: 100
-    page-start: 1
-    product-limit: 250
+    pageStart: 1
+    productLimit: 250
 
 
 secret:
