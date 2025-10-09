@@ -3,6 +3,8 @@ spring:
     name: nemi-product-manager
   profiles:
     active: dev
+  main:
+    allow-bean-definition-overriding: true
 
   config:
     import:
