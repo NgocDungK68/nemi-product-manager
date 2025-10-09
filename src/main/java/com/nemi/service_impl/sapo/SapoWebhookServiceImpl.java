@@ -161,7 +161,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
         try {
             Long productId = payload.getId();
 
-            if (productId == null || productId == 0) {
+            if (ObjectUtils.isEmpty(productId) || productId == 0) {
                 log.error("No product ID found in delete webhook payload");
                 return false;
             }

@@ -110,6 +110,7 @@ pancake:
     order-item: 200
     product: 100
     page-start: 1
+    page-limit: 250
 
 sapo:
   client-id: 4f7707502a2b4dabb25b2b08e4bf36ba
