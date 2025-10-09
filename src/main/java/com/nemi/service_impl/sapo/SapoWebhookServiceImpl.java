@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.apache.commons.lang3.ObjectUtils;
 
@@ -93,7 +94,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 case PRODUCT_DELETE -> processProductDeleteWebhook(posId, payloadProduct);
                 case ORDER_ADD -> processOrderAddWebhook(posId, payloadOrder);
                 case ORDER_UPDATED -> processOrderUpdatedWebhook(posId, payloadOrder);
-                case ORDER_FULFILLED -> processOrderFulfilledWebhook(posId, payloadOrder);
+                case ORDER_FULFILLED -> false;
                 case ORDER_UPDATE -> false;
                 case ORDER_DELETE -> processOrderDeleteWebhook(posId, payloadOrder);
             };
@@ -268,9 +269,9 @@ public class SapoWebhookServiceImpl implements WebhookService {
     }
 
     /**
-     * Process order create/update webhook with upsert logic
+     * Process order create webhook - prioritizes INSERT with race condition handling
      */
-    private boolean processOrderUpsertWebhook(String posId, SapoOrderResponse.Order payload) {
+    private boolean processOrderAddWebhook(String posId, SapoOrderResponse.Order payload) {
         try {
             String externalOrderId = payload.getId() != null ? payload.getId().toString() : null;
             if (externalOrderId == null) {
@@ -278,7 +279,9 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 return false;
             }
 
-            // Upsert order
+            log.info("Processing Sapo orders/create webhook for order: {}", externalOrderId);
+
+            // Upsert order (handles race condition)
             OrderEntity order = upsertOrder(posId, externalOrderId, payload);
             if (order == null) {
                 return false;
@@ -287,11 +290,42 @@ public class SapoWebhookServiceImpl implements WebhookService {
             // Sync order items
             syncOrderItems(order.getOrderId(), payload.getLineItems());
 
-            log.info("Successfully processed Sapo order: {} (Code: {})", order.getOrderId(), order.getOrderCode());
+            log.info("Successfully processed Sapo order create: {} (Code: {})", order.getOrderId(), order.getOrderCode());
             return true;
 
         } catch (Exception e) {
-            log.error("Failed to process order webhook: {}", e.getMessage(), e);
+            log.error("Failed to process order create webhook: {}", e.getMessage(), e);
+            return false;
+        }
+    }
+
+    /**
+     * Process order update webhook - prioritizes UPDATE with fallback to INSERT
+     */
+    private boolean processOrderUpdatedWebhook(String posId, SapoOrderResponse.Order payload) {
+        try {
+            String externalOrderId = payload.getId() != null ? payload.getId().toString() : null;
+            if (externalOrderId == null) {
+                log.error("No order ID found in webhook payload");
+                return false;
+            }
+
+            log.info("Processing Sapo orders/updated webhook for order: {}", externalOrderId);
+
+            // Upsert order (handles race condition and out-of-order webhooks)
+            OrderEntity order = upsertOrder(posId, externalOrderId, payload);
+            if (order == null) {
+                return false;
+            }
+
+            // Sync order items
+            syncOrderItems(order.getOrderId(), payload.getLineItems());
+
+            log.info("Successfully processed Sapo order update: {} (Code: {})", order.getOrderId(), order.getOrderCode());
+            return true;
+
+        } catch (Exception e) {
+            log.error("Failed to process order update webhook: {}", e.getMessage(), e);
             return false;
         }
     }
@@ -317,21 +351,36 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 orderRepository.saveAndFlush(order);
             } catch (DataIntegrityViolationException e) {
                 // Race condition: another thread inserted this order
-                log.warn("Duplicate key detected for order {}, retrying as update", externalOrderId);
-                
-                existingOrderOpt = orderRepository.findById(externalOrderId);
-                if (existingOrderOpt.isPresent()) {
-                    order = existingOrderOpt.get();
-                    updateOrderFromPayload(order, posId, payload);
-                    orderRepository.save(order);
-                } else {
-                    log.error("Order {} not found after duplicate key error", externalOrderId);
+                // Current transaction is aborted - need to retry in new transaction
+                log.warn("Duplicate key detected for order {}, retrying in new transaction", externalOrderId);
+                order = retryUpdateInNewTransaction(posId, externalOrderId, payload);
+                if (order == null) {
+                    log.error("Failed to retry update for order {} in new transaction", externalOrderId);
                     return null;
                 }
             }
         }
         
         return order;
+    }
+
+    /**
+     * Retry update in a new transaction after duplicate key error
+     * This is needed because the current transaction is aborted after DataIntegrityViolationException
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public OrderEntity retryUpdateInNewTransaction(String posId, String externalOrderId, SapoOrderResponse.Order payload) {
+        Optional<OrderEntity> existingOrderOpt = orderRepository.findById(externalOrderId);
+        if (existingOrderOpt.isPresent()) {
+            OrderEntity order = existingOrderOpt.get();
+            updateOrderFromPayload(order, posId, payload);
+            orderRepository.save(order);
+            log.info("Successfully retried update for Sapo order: {}", externalOrderId);
+            return order;
+        } else {
+            log.error("Order {} not found during retry", externalOrderId);
+            return null;
+        }
     }
 
     /**
@@ -364,17 +413,27 @@ public class SapoWebhookServiceImpl implements WebhookService {
         return processProductUpsertWebhook(posId, payload);
     }
 
-    private boolean processOrderAddWebhook(String posId, SapoOrderResponse.Order payload) {
-        return processOrderUpsertWebhook(posId, payload);
-    }
-
-    private boolean processOrderUpdatedWebhook(String posId, SapoOrderResponse.Order payload) {
-        return processOrderUpsertWebhook(posId, payload);
-    }
-
-    private boolean processOrderFulfilledWebhook(String posId, SapoOrderResponse.Order payload) {
-        return processOrderUpsertWebhook(posId, payload);
-    }
+//    private boolean processOrderFulfilledWebhook(String posId, SapoOrderResponse.Order payload) {
+//        log.info("Processing Sapo orders/fulfilled webhook for order: {}", payload.getId());
+//
+//        String externalOrderId = payload.getId() != null ? payload.getId().toString() : null;
+//        if (externalOrderId == null) {
+//            log.error("No order ID found in webhook payload");
+//            return false;
+//        }
+//
+//        // Upsert order (handles race condition)
+//        OrderEntity order = upsertOrder(posId, externalOrderId, payload);
+//        if (order == null) {
+//            return false;
+//        }
+//
+//        // Sync order items
+//        syncOrderItems(order.getOrderId(), payload.getLineItems());
+//
+//        log.info("Successfully processed Sapo order fulfilled: {} (Code: {})", order.getOrderId(), order.getOrderCode());
+//        return true;
+//    }
 
     /**
      * Process order delete webhook
