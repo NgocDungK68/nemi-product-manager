@@ -15,6 +15,7 @@ import com.nemi.enums.PosName;
 import com.nemi.enums.PosStatus;
 import com.nemi.enums.Status;
 import com.nemi.enums.SyncErrorMessage;
+import com.nemi.enums.SyncType;
 import com.nemi.enums.WeightUnit;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
@@ -123,6 +124,7 @@ public class PancakeServiceImpl implements PosManagementService {
                 .posId(posId)
                 .startTime(LocalDateTime.now())
                 .syncStatus(PosStatus.FAIL.name())
+                .syncType(SyncType.PRODUCT.getValue())
                 .build();
         try {
             PosEntity posEntity = generalPosService.getPos(posId);
@@ -152,7 +154,7 @@ public class PancakeServiceImpl implements PosManagementService {
 
             while (true) {
                 Optional<PancakeProductResponse> responseOpt = pancakeClient.getProducts(request);
-                if (responseOpt.isEmpty()) {
+                if (responseOpt.isEmpty()) { // handle tinh huonh nhu server loi
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.PRODUCT_CONNECTION_FAILED, false));
                     log.error("No response from Pancake API when fetching products, posId={}", posId);
                     saveAllProductsSync(allProducts);
@@ -160,11 +162,18 @@ public class PancakeServiceImpl implements PosManagementService {
                 }
 
                 PancakeProductResponse response = responseOpt.get();
-                if (!response.isSuccess()) {
+                if (!response.isSuccess()) { //hanle cac tinh huon call dc api nhung sai credentail
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.PRODUCT_INVALID_CREDENTIAL, false));
                     log.error("Invalid API key or shopId when fetching products, posId={}", posId);
                     saveAllProductsSync(allProducts);
                     return false;
+                }
+
+                if (ObjectUtils.isEmpty(response.getData())) {
+                    log.info("No products found with page number: {}", pageNumber);
+                    break;
+                } else {
+                    request.setPageNumber(request.getPageNumber() + 1);
                 }
 
                 List<ProductEntity> pageProducts = convertToProductEntities(posId, response.getData());
@@ -173,13 +182,6 @@ public class PancakeServiceImpl implements PosManagementService {
                 List<ProductVariantEntity> pageVariants = convertToVariantEntities(posId, response.getData());
                 allVariants.addAll(pageVariants);
 
-                if (ObjectUtils.isEmpty(response.getData())) {
-                    log.info("No products found with page number: {}", pageNumber);
-                    break;
-                } else {
-                    request.setPageNumber(request.getPageNumber() + 1);
-                }
-                log.info("Fetched {} products, total so far: {}", pageProducts.size(), allProducts.size());
             }
 
             syncHistoryRepository.save(toSyncHistory(history, null, true));
@@ -248,12 +250,34 @@ public class PancakeServiceImpl implements PosManagementService {
 
 
     private ProductEntity convertToProductEntity(String posId, PancakeProductResponse.ProductData apiProducts) {
-        ProductEntity product = new ProductEntity();
-        product.setPosId(posId);
-        product.setProductId(String.valueOf(apiProducts.getId()));
-        product.setCode(apiProducts.getProductId());
-        product.setName(apiProducts.getProduct().getName());
-        product.setProductId(apiProducts.getId());
+
+        String images = Optional.ofNullable(apiProducts.getImages())
+                .map(list -> list.stream()
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.joining(",")))
+                .orElse(null);
+
+        String categories = Optional.ofNullable(apiProducts.getProduct())
+                .map(p -> p.getCategories())
+                .map(list -> list.stream()
+                        .filter(Objects::nonNull)
+                        .map(PancakeProductResponse.Category::getName)
+                        .collect(Collectors.joining(",")))
+                .orElse(null);
+
+
+
+        ProductEntity product = ProductEntity.builder()
+                .posId(posId)
+                .productId(String.valueOf(apiProducts.getId()))
+                .code(apiProducts.getProduct().getDisplayId())
+                .name(apiProducts.getProduct().getName())
+                .productId(apiProducts.getProductId())
+                .description(apiProducts.getProduct().getNoteProduct())
+                .images(images)
+                .category(categories)
+                .build();
+
         if (apiProducts.getIsLocked()) {
             product.setStatus(Status.INACTIVE.getValue());
         } else {
@@ -333,7 +357,7 @@ public class PancakeServiceImpl implements PosManagementService {
                     .orderItemId(String.valueOf(product.getId()))
                     .orderId(String.valueOf(apiOrder.getId()))
                     .quantity(product.getQuantity())
-                    .sku(product.getVariationId())
+                    .sku(product.getVariationInfo().getDisplayId())
                     .variantName(product.getVariationInfo().getName())
                     .price(product.getVariationInfo().getRetailPrice())
                     .totalPrice(product.getVariationInfo().getRetailPrice().multiply(quantity))
@@ -416,6 +440,7 @@ public class PancakeServiceImpl implements PosManagementService {
                 .posId(posId)
                 .startTime(LocalDateTime.now())
                 .syncStatus(PosStatus.FAIL.name())
+                .syncType(SyncType.ORDER.getValue())
                 .build();
         try {
             PosEntity posEntity = generalPosService.getPos(posId);

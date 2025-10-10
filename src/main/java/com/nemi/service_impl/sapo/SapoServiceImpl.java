@@ -9,6 +9,7 @@ import com.nemi.entity.*;
 import com.nemi.enums.PosName;
 import com.nemi.enums.PosStatus;
 import com.nemi.enums.SyncErrorMessage;
+import com.nemi.enums.SyncType;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
@@ -121,6 +122,7 @@ public class SapoServiceImpl implements PosManagementService {
                 .posId(posId)
                 .startTime(LocalDateTime.now())
                 .syncStatus(PosStatus.FAIL.name())
+                .syncType(SyncType.PRODUCT.getValue())
                 .build();
         try {
             //B1 : Lay posentity va validate posName
@@ -497,6 +499,7 @@ public class SapoServiceImpl implements PosManagementService {
                 .posId(posId)
                 .startTime(LocalDateTime.now())
                 .syncStatus(PosStatus.FAIL.name())
+                .syncType(SyncType.ORDER.getValue())
                 .build();
         try {
             PosEntity posEntity = generalPosService.getPos(posId);
