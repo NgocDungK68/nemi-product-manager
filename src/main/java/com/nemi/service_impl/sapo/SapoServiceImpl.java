@@ -32,7 +32,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
-import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.util.CollectionUtils;
 
 
@@ -99,7 +98,7 @@ public class SapoServiceImpl implements PosManagementService {
             PosEntity newPos = createNewPos(tokenResponse, configMap);
             PosConnectionResponse posConnectionResponse = PosConnectionResponse.toPosConnectionResponse(newPos);
 
-            // Register webhooks
+            // Register webhooks for current POS
             List<SapoWebhookResponse> webhooks = sapoClient.registerWebhook(
                     posConnectionRequest.getStoreName(),
                     tokenResponse.getAccessToken(),
@@ -400,7 +399,6 @@ public class SapoServiceImpl implements PosManagementService {
     }
 
     private String buildShippingAddress(SapoOrderResponse.OriginAddress origin) {
-        if (origin == null) return null;
         return String.join(", ",
                 Stream.of(origin.getAddress1(), origin.getProvince(), origin.getCity())
                         .filter(Objects::nonNull)
@@ -408,9 +406,10 @@ public class SapoServiceImpl implements PosManagementService {
     }
 
     private String getFirstPaymentMethod(SapoOrderResponse.Order order) {
-        return order.getPaymentGatewayNames() != null && !order.getPaymentGatewayNames().isEmpty()
-                ? order.getPaymentGatewayNames().get(0)
-                : null;
+        return Optional.ofNullable(order.getPaymentGatewayNames())
+                .filter(list -> !list.isEmpty())
+                .map(list -> list.get(0))
+                .orElse(null);
     }
 
     private List<OrderItemEntity> convertToOrderItemEntities(List<SapoOrderResponse.Order> apiOrders) {
@@ -455,9 +454,8 @@ public class SapoServiceImpl implements PosManagementService {
             return;
         }
         try {
-            int batchSize = orderBatchSize;
-            for (int i = 0; i < orderEntities.size(); i += batchSize) {
-                int endIndex = Math.min(i + batchSize, orderEntities.size());
+            for (int i = 0; i < orderEntities.size(); i += orderBatchSize) {
+                int endIndex = Math.min(i + orderBatchSize, orderEntities.size());
                 List<OrderEntity> batch = orderEntities.subList(i, endIndex);
                 orderRepository.saveAll(batch);
                 log.info("Saved batch {}-{} of {} orders", i + 1, endIndex, orderEntities.size());
@@ -476,9 +474,8 @@ public class SapoServiceImpl implements PosManagementService {
             return;
         }
         try {
-            int batchSize = orderItemBatchSize;
-            for (int i = 0; i < orderItemEntities.size(); i += batchSize) {
-                int endIndex = Math.min(i + batchSize, orderItemEntities.size());
+            for (int i = 0; i < orderItemEntities.size(); i += orderItemBatchSize) {
+                int endIndex = Math.min(i + orderItemBatchSize, orderItemEntities.size());
                 List<OrderItemEntity> batch = orderItemEntities.subList(i, endIndex);
                 orderItemRepository.saveAll(batch);
                 log.info("Saved batch {}-{} of {} order items", i + 1, endIndex, orderItemEntities.size());
@@ -579,12 +576,13 @@ public class SapoServiceImpl implements PosManagementService {
     private PosEntity createNewPos(SapoAccessTokenResponse tokenResponse, Map<String, String> configMap) {
         PosEntity newPos = PosEntity.builder()
                 .posName(PosName.SAPO.getValue())
-                .accessToken(tokenResponse.getAccessToken())
+                .userId(claimUtil.getUserId())
                 .status(PosStatus.ACTIVE.name())
+                .accessToken(tokenResponse.getAccessToken())
                 .config(JsonUtils.toJson(configMap))
-                .companyId(claimUtil.getCompanyId() != null ? String.valueOf(claimUtil.getCompanyId()) : "default")
-                .userId(claimUtil.getUserId() != null ? claimUtil.getUserId() : "system")
-                .createdBy(claimUtil.getUserName() != null ? claimUtil.getUserName() : "system")
+                .expiredTime(null)
+                .companyId(String.valueOf(claimUtil.getCompanyId()))
+                .createdBy(claimUtil.getUserName())
                 .build();
 
         return posRepository.save(newPos);

@@ -489,7 +489,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 sapoOrder.getId(), sapoOrder.getName());
 
         return OrderEntity.builder()
-                .orderId(sapoOrder.getId() != null ? sapoOrder.getId().toString() : "NULL")
+                .orderId(sapoOrder.getId().toString())
                 .orderCode(sapoOrder.getName())
                 .posId(posId)
                 .customerName(extractOriginAddressName(originAddress))
