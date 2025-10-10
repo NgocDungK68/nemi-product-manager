@@ -99,6 +99,13 @@ public class SapoServiceImpl implements PosManagementService {
             PosEntity newPos = createNewPos(tokenResponse, configMap);
             PosConnectionResponse posConnectionResponse = PosConnectionResponse.toPosConnectionResponse(newPos);
 
+            // Delete old webhooks (posId khác) trước khi đăng ký mới
+            sapoClient.deleteWebhook(
+                    posConnectionRequest.getStoreName(),
+                    tokenResponse.getAccessToken(),
+                    newPos.getId()
+            );
+
             // Register webhooks for current POS
             List<SapoWebhookResponse> webhooks = sapoClient.registerWebhook(
                     posConnectionRequest.getStoreName(),

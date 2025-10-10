@@ -226,8 +226,7 @@ public class SapoClient {
      */
     private SapoWebhookResponse registerSingleWebhook(SapoWebhookRequest webhookRequest, String topic) {
         try {
-            String baseUrl = "https://" + webhookRequest.getStoreName() + ".mysapo.net";
-            String url = UriComponentsBuilder.fromHttpUrl(baseUrl)
+            String url = UriComponentsBuilder.fromHttpUrl(buildBaseUrl(webhookRequest.getStoreName()))
                     .path(sapoConfig.getPathWebhooks())
                     .toUriString();
 
@@ -243,9 +242,7 @@ public class SapoClient {
             Map<String, Object> requestBody = Map.of(SapoConstants.WEBHOOK, webhookData);
 
             // Set headers
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set(SapoConstants.X_SAPO_ACCESS_TOKEN, webhookRequest.getAccessToken());
+            HttpHeaders headers = buildHeaders(webhookRequest.getAccessToken());
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
             log.debug("[SapoClient.registerSingleWebhook] Request body: {}", JsonUtils.toJson(requestBody));
@@ -262,6 +259,120 @@ public class SapoClient {
             return response;
         } catch (Exception e) {
             log.error("[SapoClient.registerSingleWebhook] Failed to register webhook for topic {}: {}", topic, e.getMessage(), e);
+            return null;
+        }
+    }
+
+    // ----------------- Helpers & additional endpoints (refactor per sample) -----------------
+
+    private String buildBaseUrl(String storeName) {
+        return "https://" + storeName + ".mysapo.net";
+    }
+
+    private HttpHeaders buildHeaders(String accessToken) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(SapoConstants.X_SAPO_ACCESS_TOKEN, accessToken);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        return headers;
+    }
+
+    /**
+     * List all webhooks for store
+     */
+    public List<SapoWebhookResponse.Webhook> listWebhooks(String storeName, String accessToken) {
+        try {
+            String url = UriComponentsBuilder.fromHttpUrl(buildBaseUrl(storeName))
+                    .path(sapoConfig.getPathWebhooks())
+                    .toUriString();
+
+            HttpEntity<String> entity = new HttpEntity<>(buildHeaders(accessToken));
+            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+
+            if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
+                log.warn("[SapoClient.listWebhooks] Failed to list webhooks, status={}", resp.getStatusCode());
+                return List.of();
+            }
+
+            Map<?, ?> map = objectMapper.readValue(resp.getBody(), Map.class);
+            Object listObj = map.get("webhooks");
+            if (!(listObj instanceof List<?> rawList)) {
+                return List.of();
+            }
+            return rawList.stream()
+                    .map(item -> objectMapper.convertValue(item, SapoWebhookResponse.Webhook.class))
+                    .toList();
+        } catch (Exception e) {
+            log.error("[SapoClient.listWebhooks] Failed: {}", e.getMessage(), e);
+            return List.of();
+        }
+    }
+
+    /**
+     * Delete webhook by id
+     */
+    public void deleteWebhook(String storeName, String accessToken, Long webhookId) {
+        try {
+            String url = UriComponentsBuilder.fromHttpUrl(buildBaseUrl(storeName))
+                    .path(sapoConfig.getPathWebhooks().replace(".json", "/" + webhookId + ".json"))
+                    .toUriString();
+
+            HttpEntity<String> entity = new HttpEntity<>(buildHeaders(accessToken));
+            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.DELETE, entity, String.class);
+            if (!resp.getStatusCode().is2xxSuccessful()) {
+                log.warn("[SapoClient.deleteWebhook] Failed to delete webhook {}, status={}", webhookId, resp.getStatusCode());
+            } else {
+                log.info("[SapoClient.deleteWebhook] Deleted webhook id={}", webhookId);
+            }
+        } catch (Exception e) {
+            log.error("[SapoClient.deleteWebhook] Failed: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Delete webhooks not matching the provided posId (signature aligned with registerWebhook)
+     */
+    public void deleteWebhook(String storeName, String accessToken, String posId) {
+        try {
+            List<SapoWebhookResponse.Webhook> current = listWebhooks(storeName, accessToken);
+            if (current == null || current.isEmpty()) return;
+            for (SapoWebhookResponse.Webhook webhook : current) {
+                if (webhook == null || webhook.getId() == null) continue;
+                String address = webhook.getAddress();
+                if (address == null) continue;
+                if (!address.contains(posId)) {
+                    deleteWebhook(storeName, accessToken, webhook.getId());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("[SapoClient.deleteWebhook(posId)] Failed: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Register a single webhook for given address and topic (mirrors sample)
+     */
+    public SapoWebhookResponse registerWebhook(String storeName, String accessToken, String address, String topic) {
+        try {
+            String url = UriComponentsBuilder.fromHttpUrl(buildBaseUrl(storeName))
+                    .path(sapoConfig.getPathWebhooks())
+                    .toUriString();
+
+            Map<String, Object> webhookData = Map.of(
+                    SapoConstants.TOPIC, topic,
+                    SapoConstants.ADDRESS, address,
+                    SapoConstants.FORMAT, SapoConstants.JSON
+            );
+            Map<String, Object> requestBody = Map.of(SapoConstants.WEBHOOK, webhookData);
+
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, buildHeaders(accessToken));
+            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+            if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
+                log.error("[SapoClient.registerWebhook(single)] Failed, status={}", resp.getStatusCode());
+                return null;
+            }
+            return objectMapper.readValue(resp.getBody(), SapoWebhookResponse.class);
+        } catch (Exception e) {
+            log.error("[SapoClient.registerWebhook(single)] Failed: {}", e.getMessage(), e);
             return null;
         }
     }
