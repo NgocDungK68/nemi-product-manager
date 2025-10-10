@@ -58,5 +58,7 @@ public class PosManagementController {
         PosConnectionResponse posConnectionResponse = generalPosService.setPosStatus(changeStatusRequest);
         return ResponseEntity.ok(posConnectionResponse);
     }
+    // test pancake
+
 
 }

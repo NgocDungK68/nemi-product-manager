@@ -199,7 +199,7 @@ public class PancakeOrderResponse {
         @JsonProperty("product_id")
         private String productId;
         @JsonProperty("variation_id")
-        private String variationId;
+        private String  variationId;
         @JsonProperty("variation_info")
         private VariationInfo variationInfo;
     }
