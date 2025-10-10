@@ -148,22 +148,25 @@ public class SapoServiceImpl implements PosManagementService {
             while (true) {
                 Optional<SapoProductResponse> responseOpt = sapoClient.getProducts(request);
 
-                if (ObjectUtils.isEmpty(responseOpt)) {
-                    log.error("[SapoServiceImpl.syncData] response is empty");
+                // Check if API response is present
+                if (responseOpt.isEmpty()) {
+                    log.error("[SapoServiceImpl.syncProduct] API returned empty response");
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
                     return false;
                 }
 
+                // Extract products from response
                 SapoProductResponse response = responseOpt.get();
-                if (ObjectUtils.isEmpty(response.getProducts())) {
-
-                    syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.CONNECTION_FAILED, false));
-                    log.info("[SapoServiceImpl.syncProduct] No products found with paginator: {}", paginator);
-                    return false;
+                List<SapoProductResponse.Product> products = response.getProducts();
+                
+                // Đây là khi đã sync hết tất cả products (end of pagination)
+                if (ObjectUtils.isEmpty(products)) {
+                    log.info("[SapoServiceImpl.syncProduct] Reached end of pagination (page={})", paginator.getPage());
+                    break;
                 }
 
                 // Convert products and variants
-                for (SapoProductResponse.Product sapoProduct : response.getProducts()) {
+                for (SapoProductResponse.Product sapoProduct : products) {
                     ProductEntity productEntity = convertToProductEntity(posId, sapoProduct);
                     allProducts.add(productEntity);
 
@@ -173,10 +176,10 @@ public class SapoServiceImpl implements PosManagementService {
                         allVariants.addAll(variants);
                     }
                 }
-                log.info("Fetched {} products and {} variants", response.getProducts().size(), allVariants.size());
+                log.info("Fetched {} products and {} variants", products.size(), allVariants.size());
 
-                // xử lý next theo page: tăng page nếu vẫn còn đủ limit (== 250), ngược lại dừng
-                if (response.getProducts().size() >= productLimit) {
+                // Continue pagination if fetched full page
+                if (products.size() >= productLimit) {
                     pageStartNumber++;
                     paginator.setPage(pageStartNumber);
                 } else {
@@ -184,10 +187,11 @@ public class SapoServiceImpl implements PosManagementService {
                 }
             }
 
+            syncHistoryRepository.save(toSyncHistory(history, null, true));
             saveAllProductsSync(allProducts);
             saveAllVariantsSync(allVariants);
 
-            syncHistoryRepository.save(toSyncHistory(history, null, true));
+
             log.info("Successfully synced {} products and {} variants from Sapo", allProducts.size(), allVariants.size());
             return true;
         } catch (Exception e) {
@@ -365,34 +369,48 @@ public class SapoServiceImpl implements PosManagementService {
 
     public OrderEntity convertToOrderEntity(String posId, SapoOrderResponse.Order order) {
         String status = sapoConfig.getStatusMapping(order.getStatus());
-
-        SapoOrderResponse.Fulfillment fulfillment = order.getFulfillments() != null && !order.getFulfillments().isEmpty()
-                ? order.getFulfillments().get(0)
-                : null;
-        SapoOrderResponse.OriginAddress origin = fulfillment != null ? fulfillment.getOriginAddress() : null;
+        
+        // Lấy fulfillment và origin address một cách đơn giản
+        SapoOrderResponse.Fulfillment fulfillment = getFirstFulfillment(order);
+        SapoOrderResponse.OriginAddress origin = Optional.ofNullable(fulfillment)
+                .map(SapoOrderResponse.Fulfillment::getOriginAddress)
+                .orElse(null);
 
         return OrderEntity.builder()
                 .posId(posId)
                 .orderId(order.getId().toString())
                 .orderCode(order.getName())
-                .customerName(origin != null ? origin.getName() : null)
-                .customerPhone(origin != null ? origin.getPhone() : null)
-                .customerEmail(origin != null ? origin.getEmail() : null)
-                .shippingAddress(origin != null
-                        ? String.join(", ",
-                        Stream.of(origin.getAddress1(), origin.getProvince(), origin.getCity())
-                                .filter(Objects::nonNull)
-                                .toList())
-                        : null)
+                .customerName(Optional.ofNullable(origin).map(SapoOrderResponse.OriginAddress::getName).orElse(null))
+                .customerPhone(Optional.ofNullable(origin).map(SapoOrderResponse.OriginAddress::getPhone).orElse(null))
+                .customerEmail(Optional.ofNullable(origin).map(SapoOrderResponse.OriginAddress::getEmail).orElse(null))
+                .shippingAddress(buildShippingAddress(origin))
                 .status(status.toUpperCase())
-                .paymentMethod(order.getPaymentGatewayNames() != null && !order.getPaymentGatewayNames().isEmpty()
-                        ? order.getPaymentGatewayNames().get(0)
-                        : null)
-                .shippingMethod(fulfillment != null ? fulfillment.getDeliveryMethod() : null)
+                .paymentMethod(getFirstPaymentMethod(order))
+                .shippingMethod(Optional.ofNullable(fulfillment).map(SapoOrderResponse.Fulfillment::getDeliveryMethod).orElse(null))
                 .totalPrice(order.getTotalPrice())
                 .shippingFee(BigDecimal.ZERO)
-                .discountAmount(order.getTotalDiscounts() != null ? order.getTotalDiscounts().doubleValue() : 0.0)
+                .discountAmount(Optional.ofNullable(order.getTotalDiscounts()).map(BigDecimal::doubleValue).orElse(0.0))
                 .build();
+    }
+
+    private SapoOrderResponse.Fulfillment getFirstFulfillment(SapoOrderResponse.Order order) {
+        return order.getFulfillments() != null && !order.getFulfillments().isEmpty() 
+                ? order.getFulfillments().get(0) 
+                : null;
+    }
+
+    private String buildShippingAddress(SapoOrderResponse.OriginAddress origin) {
+        if (origin == null) return null;
+        return String.join(", ",
+                Stream.of(origin.getAddress1(), origin.getProvince(), origin.getCity())
+                        .filter(Objects::nonNull)
+                        .toList());
+    }
+
+    private String getFirstPaymentMethod(SapoOrderResponse.Order order) {
+        return order.getPaymentGatewayNames() != null && !order.getPaymentGatewayNames().isEmpty()
+                ? order.getPaymentGatewayNames().get(0)
+                : null;
     }
 
     private List<OrderItemEntity> convertToOrderItemEntities(List<SapoOrderResponse.Order> apiOrders) {
@@ -414,18 +432,14 @@ public class SapoServiceImpl implements PosManagementService {
                 continue;
             }
 
-            BigDecimal price = product.getPrice();
-            int quantity = product.getQuantity();
-            BigDecimal totalPrice = price.multiply(BigDecimal.valueOf(quantity));
-
             orderItemEntities.add(OrderItemEntity.builder()
                     .orderItemId(String.valueOf(product.getId()))
                     .orderId(String.valueOf(apiOrder.getId()))
-                    .quantity(quantity)
+                    .quantity(product.getQuantity())
                     .sku(product.getSku())
                     .variantName(product.getVariantTitle())
-                    .price(price)
-                    .totalPrice(totalPrice)
+                    .price(product.getPrice())
+                    .totalPrice(product.getPrice().multiply(BigDecimal.valueOf(product.getQuantity())))
                     .productName(product.getName())
                     .fulfillableQuantity(product.getCurrentQuantity())
                     .createdBy(claimUtil.getUserName())

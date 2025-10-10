@@ -511,19 +511,15 @@ public class SapoWebhookServiceImpl implements WebhookService {
      * Convert SapoLineItem to OrderItemEntity
      */
     private OrderItemEntity convertToOrderItemEntity(SapoOrderResponse.LineItem sapoLineItem, String orderId) {
-        BigDecimal price = sapoLineItem.getPrice();
-        int quantity = sapoLineItem.getQuantity();
-        BigDecimal totalPrice = price.multiply(BigDecimal.valueOf(quantity));
-
         return OrderItemEntity.builder()
                 .orderId(orderId)
                 .orderItemId(sapoLineItem.getId().toString())
                 .sku(sapoLineItem.getSku())
                 .productName(sapoLineItem.getTitle())
                 .variantName(sapoLineItem.getVariantTitle())
-                .quantity(quantity)
-                .price(price)
-                .totalPrice(totalPrice)
+                .quantity(sapoLineItem.getQuantity())
+                .price(sapoLineItem.getPrice())
+                .totalPrice(sapoLineItem.getPrice().multiply(BigDecimal.valueOf(sapoLineItem.getQuantity())))
                 .fulfillableQuantity(sapoLineItem.getCurrentQuantity())
                 .createdAt(LocalDateTime.now())
                 .build();
