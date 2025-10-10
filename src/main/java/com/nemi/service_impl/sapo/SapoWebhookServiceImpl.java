@@ -92,8 +92,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 case PRODUCT_DELETE -> processProductDeleteWebhook(posId, payloadProduct);
                 case ORDER_ADD -> processOrderCreateWebhook(posId, payloadOrder);
                 case ORDER_UPDATED -> processOrderUpdateWebhook(posId, payloadOrder);
-                case ORDER_FULFILLED ->  false;
-                case ORDER_UPDATE -> false;
+                case ORDER_FULFILLED, ORDER_UPDATE ->  false;
                 case ORDER_DELETE -> processOrderDeleteWebhook(posId, payloadOrder);
             };
 
@@ -321,7 +320,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
 
             // Tìm order đã tồn tại
             Optional<OrderEntity> existingOrderOpt = orderRepository.findById(externalOrderId);
-            if (!existingOrderOpt.isPresent()) {
+            if (existingOrderOpt.isEmpty()) {
                 log.warn("Order {} not found for update, skipping update webhook", externalOrderId);
                 return true; // Coi như thành công vì có thể order chưa được tạo
             }
@@ -340,44 +339,6 @@ public class SapoWebhookServiceImpl implements WebhookService {
 
         } catch (Exception e) {
             log.error("Failed to process order update webhook: {}", e.getMessage(), e);
-            return false;
-        }
-    }
-
-    /**
-     * Process order fulfilled webhook - chỉ UPDATE order đã tồn tại
-     */
-    private boolean processOrderFulfilledWebhook(String posId, SapoOrderResponse.Order payload) {
-        try {
-            if (ObjectUtils.isEmpty(payload.getId())) {
-                log.error("No order ID found in webhook payload");
-                return false;
-            }
-            String externalOrderId = payload.getId().toString();
-
-            log.info("Processing Sapo orders/fulfilled webhook for order: {}", externalOrderId);
-
-            // Tìm order đã tồn tại
-            Optional<OrderEntity> existingOrderOpt = orderRepository.findById(externalOrderId);
-            if (!existingOrderOpt.isPresent()) {
-                log.warn("Order {} not found for fulfilled update, skipping fulfilled webhook", externalOrderId);
-                return true; // Coi như thành công vì có thể order chưa được tạo
-            }
-
-            // Update order đã tồn tại với trạng thái fulfilled
-            OrderEntity order = existingOrderOpt.get();
-            updateOrderFromPayload(order, posId, payload);
-            log.info("Updating existing Sapo order to fulfilled: {}", externalOrderId);
-            orderRepository.save(order);
-
-            // Sync items
-            syncOrderItems(order.getOrderId(), payload.getLineItems());
-
-            log.info("Successfully processed Sapo order fulfilled: {} (Code: {})", externalOrderId, payload.getName());
-            return true;
-
-        } catch (Exception e) {
-            log.error("Failed to process order fulfilled webhook: {}", e.getMessage(), e);
             return false;
         }
     }
