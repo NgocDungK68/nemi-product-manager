@@ -335,45 +335,16 @@ public class SapoClient {
         try {
             List<SapoWebhookResponse.Webhook> current = listWebhooks(storeName, accessToken);
             if (current == null || current.isEmpty()) return;
-            for (SapoWebhookResponse.Webhook webhook : current) {
-                if (webhook == null || webhook.getId() == null) continue;
-                String address = webhook.getAddress();
+            for (SapoWebhookResponse.Webhook wh : current) {
+                if (wh == null || wh.getId() == null) continue;
+                String address = wh.getAddress();
                 if (address == null) continue;
                 if (!address.contains(posId)) {
-                    deleteWebhook(storeName, accessToken, webhook.getId());
+                    deleteWebhook(storeName, accessToken, wh.getId());
                 }
             }
         } catch (Exception e) {
             log.warn("[SapoClient.deleteWebhook(posId)] Failed: {}", e.getMessage());
-        }
-    }
-
-    /**
-     * Register a single webhook for given address and topic (mirrors sample)
-     */
-    public SapoWebhookResponse registerWebhook(String storeName, String accessToken, String address, String topic) {
-        try {
-            String url = UriComponentsBuilder.fromHttpUrl(buildBaseUrl(storeName))
-                    .path(sapoConfig.getPathWebhooks())
-                    .toUriString();
-
-            Map<String, Object> webhookData = Map.of(
-                    SapoConstants.TOPIC, topic,
-                    SapoConstants.ADDRESS, address,
-                    SapoConstants.FORMAT, SapoConstants.JSON
-            );
-            Map<String, Object> requestBody = Map.of(SapoConstants.WEBHOOK, webhookData);
-
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, buildHeaders(accessToken));
-            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
-            if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
-                log.error("[SapoClient.registerWebhook(single)] Failed, status={}", resp.getStatusCode());
-                return null;
-            }
-            return objectMapper.readValue(resp.getBody(), SapoWebhookResponse.class);
-        } catch (Exception e) {
-            log.error("[SapoClient.registerWebhook(single)] Failed: {}", e.getMessage(), e);
-            return null;
         }
     }
 }

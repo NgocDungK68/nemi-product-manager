@@ -92,8 +92,8 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 case PRODUCT_DELETE -> processProductDeleteWebhook(posId, payloadProduct);
                 case ORDER_ADD -> processOrderCreateWebhook(posId, payloadOrder);
                 case ORDER_UPDATED -> processOrderUpdateWebhook(posId, payloadOrder);
-                case ORDER_FULFILLED -> processOrderFulfilledWebhook(posId, payloadOrder);
-                case ORDER_UPDATE -> processOrderUpdateWebhook(posId, payloadOrder);
+                case ORDER_FULFILLED ->  false;
+                case ORDER_UPDATE -> false;
                 case ORDER_DELETE -> processOrderDeleteWebhook(posId, payloadOrder);
             };
 
