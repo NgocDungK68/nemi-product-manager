@@ -25,7 +25,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -484,13 +483,13 @@ public class SapoWebhookServiceImpl implements WebhookService {
         SapoOrderResponse.OriginAddress originAddress = extractOriginAddress(sapoOrder);
 
         Map<String, String> mapping = sapoConfig.getOrder().getStatus().getMapping();
-        String status = mapping.getOrDefault(sapoOrder.getStatus(), "unknown");
+        String status = mapping.getOrDefault(sapoOrder.getStatus(), "NULL");
 
         log.info("Converting SapoOrder to OrderEntity - ID: {}, Name: {}",
                 sapoOrder.getId(), sapoOrder.getName());
 
         return OrderEntity.builder()
-                .orderId(sapoOrder.getId() != null ? sapoOrder.getId().toString() : "UNKNOWN")
+                .orderId(sapoOrder.getId() != null ? sapoOrder.getId().toString() : "NULL")
                 .orderCode(sapoOrder.getName())
                 .posId(posId)
                 .customerName(extractOriginAddressName(originAddress))
@@ -595,7 +594,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
     private void updateOrderFromPayload(OrderEntity order, String posId, SapoOrderResponse.Order payload) {
         SapoOrderResponse.OriginAddress originAddress = extractOriginAddress(payload);
         Map<String, String> mapping = sapoConfig.getOrder().getStatus().getMapping();
-        String status = mapping.getOrDefault(payload.getStatus(), "unknown");
+        String status = mapping.getOrDefault(payload.getStatus(), "NULL");
 
         order.setOrderCode(payload.getName());
         order.setPosId(posId);
