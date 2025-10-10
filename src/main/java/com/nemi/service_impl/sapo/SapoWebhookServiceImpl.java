@@ -25,7 +25,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -162,7 +161,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
         try {
             Long productId = payload.getId();
 
-            if (ObjectUtils.isEmpty(productId) || productId == 0) {
+            if (ObjectUtils.isEmpty(productId)) {
                 log.error("No product ID found in delete webhook payload");
                 return false;
             }
@@ -212,7 +211,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
         product.setCategory(payload.getProductType());
         product.setBrand(payload.getVendor());
         // Handle null images
-        if (!ObjectUtils.isEmpty(payload.getImages())) {
+        if (ObjectUtils.isNotEmpty(payload.getImages())) {
             product.setImages(JsonUtils.toJson(payload.getImages().stream()
                     .map(SapoProductResponse.Image::getSrc) // Dùng method reference
                     .collect(Collectors.toList())));
@@ -237,7 +236,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
         product.setCategory(payload.getProductType());
         product.setBrand(payload.getVendor());
         
-        if (!ObjectUtils.isEmpty(payload.getImages())) {
+        if (ObjectUtils.isNotEmpty(payload.getImages())) {
             product.setImages(JsonUtils.toJson(payload.getImages().stream()
                     .map(SapoProductResponse.Image::getSrc)
                     .collect(Collectors.toList())));
@@ -273,18 +272,18 @@ public class SapoWebhookServiceImpl implements WebhookService {
      */
     private boolean processOrderAddWebhook(String posId, SapoOrderResponse.Order payload) {
         try {
-            String externalOrderId = payload.getId() != null ? payload.getId().toString() : null;
-            if (externalOrderId == null) {
+            if (ObjectUtils.isEmpty(payload.getId())) {
                 log.error("No order ID found in webhook payload");
                 return false;
             }
+            String externalOrderId = payload.getId().toString();
 
             log.info("Processing Sapo orders/create webhook for order: {}", externalOrderId);
 
             // Upsert order (handles race condition and syncs items)
             boolean success = upsertOrderAndSyncItems(posId, externalOrderId, payload, payload.getLineItems());
             if (!success) {
-                return false;
+                return false;//that bai
             }
 
             log.info("Successfully processed Sapo order create: {} (Code: {})", externalOrderId, payload.getName());
@@ -301,18 +300,19 @@ public class SapoWebhookServiceImpl implements WebhookService {
      */
     private boolean processOrderUpdatedWebhook(String posId, SapoOrderResponse.Order payload) {
         try {
-            String externalOrderId = payload.getId() != null ? payload.getId().toString() : null;
-            if (externalOrderId == null) {
+
+            if (ObjectUtils.isEmpty(payload.getId())) {
                 log.error("No order ID found in webhook payload");
                 return false;
             }
+            String externalOrderId = payload.getId().toString();
 
             log.info("Processing Sapo orders/updated webhook for order: {}", externalOrderId);
 
             // Upsert order (handles race condition and syncs items)
             boolean success = upsertOrderAndSyncItems(posId, externalOrderId, payload, payload.getLineItems());
             if (!success) {
-                return false;
+                return false; //that bai
             }
 
             log.info("Successfully processed Sapo order update: {} (Code: {})", externalOrderId, payload.getName());
@@ -483,13 +483,13 @@ public class SapoWebhookServiceImpl implements WebhookService {
         SapoOrderResponse.OriginAddress originAddress = extractOriginAddress(sapoOrder);
 
         Map<String, String> mapping = sapoConfig.getOrder().getStatus().getMapping();
-        String status = mapping.getOrDefault(sapoOrder.getStatus(), "unknown");
+        String status = mapping.getOrDefault(sapoOrder.getStatus(), "NULL");
 
         log.info("Converting SapoOrder to OrderEntity - ID: {}, Name: {}",
                 sapoOrder.getId(), sapoOrder.getName());
 
         return OrderEntity.builder()
-                .orderId(sapoOrder.getId() != null ? sapoOrder.getId().toString() : "UNKNOWN")
+                .orderId(sapoOrder.getId() != null ? sapoOrder.getId().toString() : "NULL")
                 .orderCode(sapoOrder.getName())
                 .posId(posId)
                 .customerName(extractOriginAddressName(originAddress))
@@ -511,20 +511,16 @@ public class SapoWebhookServiceImpl implements WebhookService {
      * Convert SapoLineItem to OrderItemEntity
      */
     private OrderItemEntity convertToOrderItemEntity(SapoOrderResponse.LineItem sapoLineItem, String orderId) {
-        BigDecimal price = sapoLineItem.getPrice() != null ? sapoLineItem.getPrice() : BigDecimal.ZERO;
-        int quantity = sapoLineItem.getQuantity() != null ? sapoLineItem.getQuantity() : 0;
-        BigDecimal totalPrice = price.multiply(BigDecimal.valueOf(quantity));
-
         return OrderItemEntity.builder()
                 .orderId(orderId)
-                .orderItemId(sapoLineItem.getId() != null ? String.valueOf(sapoLineItem.getId()) : UUID.randomUUID().toString())
+                .orderItemId(sapoLineItem.getId().toString())
                 .sku(sapoLineItem.getSku())
-                .productName(sapoLineItem.getTitle() != null ? sapoLineItem.getTitle() : null)
-                .variantName(sapoLineItem.getVariantTitle() != null ? sapoLineItem.getVariantTitle() : null)
-                .quantity(quantity)
-                .price(price)
-                .totalPrice(totalPrice)
-                .fulfillableQuantity(sapoLineItem.getCurrentQuantity() != null ? sapoLineItem.getCurrentQuantity() : 0)
+                .productName(sapoLineItem.getTitle())
+                .variantName(sapoLineItem.getVariantTitle())
+                .quantity(sapoLineItem.getQuantity())
+                .price(sapoLineItem.getPrice())
+                .totalPrice(sapoLineItem.getPrice().multiply(BigDecimal.valueOf(sapoLineItem.getQuantity())))
+                .fulfillableQuantity(sapoLineItem.getCurrentQuantity())
                 .createdAt(LocalDateTime.now())
                 .build();
     }
@@ -594,7 +590,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
     private void updateOrderFromPayload(OrderEntity order, String posId, SapoOrderResponse.Order payload) {
         SapoOrderResponse.OriginAddress originAddress = extractOriginAddress(payload);
         Map<String, String> mapping = sapoConfig.getOrder().getStatus().getMapping();
-        String status = mapping.getOrDefault(payload.getStatus(), "unknown");
+        String status = mapping.getOrDefault(payload.getStatus(), "NULL");
 
         order.setOrderCode(payload.getName());
         order.setPosId(posId);
