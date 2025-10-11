@@ -9,6 +9,7 @@ import com.nemi.entity.*;
 import com.nemi.enums.PosName;
 import com.nemi.enums.PosStatus;
 import com.nemi.enums.SyncErrorMessage;
+import com.nemi.enums.SyncType;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
@@ -30,7 +31,10 @@ import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
+
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -79,7 +83,7 @@ public class SapoServiceImpl implements PosManagementService {
     @Override
     public PosConnectionResponse connectPos(PosConnectionRequest posConnectionRequest) {
         try {
-            String userId = claimUtil.getUserId();
+
 
             Map<String, String> configMap = new HashMap<>();
             configMap.put(SapoConstants.CLIENT_ID, posConnectionRequest.getClientId());
@@ -92,10 +96,17 @@ public class SapoServiceImpl implements PosManagementService {
                 log.error("Sapo response does not contain accessToken: {}", tokenResponse);
             }
 
-            PosEntity newPos = cretaeNewPos(tokenResponse, configMap);
+            PosEntity newPos = createNewPos(tokenResponse, configMap);
             PosConnectionResponse posConnectionResponse = PosConnectionResponse.toPosConnectionResponse(newPos);
 
-            // Register webhooks
+            // Delete old webhooks (posId khác) trước khi đăng ký mới
+            sapoClient.deleteWebhook(
+                    posConnectionRequest.getStoreName(),
+                    tokenResponse.getAccessToken(),
+                    newPos.getId()
+            );
+
+            // Register webhooks for current POS
             List<SapoWebhookResponse> webhooks = sapoClient.registerWebhook(
                     posConnectionRequest.getStoreName(),
                     tokenResponse.getAccessToken(),
@@ -117,6 +128,7 @@ public class SapoServiceImpl implements PosManagementService {
                 .posId(posId)
                 .startTime(LocalDateTime.now())
                 .syncStatus(PosStatus.FAIL.name())
+                .syncType(SyncType.PRODUCT.getValue())
                 .build();
         try {
             //B1 : Lay posentity va validate posName
@@ -144,22 +156,25 @@ public class SapoServiceImpl implements PosManagementService {
             while (true) {
                 Optional<SapoProductResponse> responseOpt = sapoClient.getProducts(request);
 
-                if (ObjectUtils.isEmpty(responseOpt)) {
-                    log.error("[SapoServiceImpl.syncData] response is empty");
+                // Check if API response is present
+                if (responseOpt.isEmpty()) {
+                    log.error("[SapoServiceImpl.syncProduct] API returned empty response");
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
                     return false;
                 }
 
+                // Extract products from response
                 SapoProductResponse response = responseOpt.get();
-                if (ObjectUtils.isEmpty(response.getProducts())) {
-
-                    syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.CONNECTION_FAILED, false));
-                    log.info("[SapoServiceImpl.syncProduct] No products found with paginator: {}", paginator);
-                    throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
+                List<SapoProductResponse.Product> products = response.getProducts();
+                
+                // Đây là khi đã sync hết tất cả products (end of pagination)
+                if (ObjectUtils.isEmpty(products)) {
+                    log.info("[SapoServiceImpl.syncProduct] Reached end of pagination (page={})", paginator.getPage());
+                    break;
                 }
 
                 // Convert products and variants
-                for (SapoProductResponse.Product sapoProduct : response.getProducts()) {
+                for (SapoProductResponse.Product sapoProduct : products) {
                     ProductEntity productEntity = convertToProductEntity(posId, sapoProduct);
                     allProducts.add(productEntity);
 
@@ -169,10 +184,10 @@ public class SapoServiceImpl implements PosManagementService {
                         allVariants.addAll(variants);
                     }
                 }
-                log.info("Fetched {} products and {} variants", response.getProducts().size(), allVariants.size());
+                log.info("Fetched {} products and {} variants", products.size(), allVariants.size());
 
-                // xử lý next theo page: tăng page nếu vẫn còn đủ limit (== 250), ngược lại dừng
-                if (response.getProducts().size() >= productLimit) {
+                // Continue pagination if fetched full page
+                if (products.size() >= productLimit) {
                     pageStartNumber++;
                     paginator.setPage(pageStartNumber);
                 } else {
@@ -180,10 +195,11 @@ public class SapoServiceImpl implements PosManagementService {
                 }
             }
 
+            syncHistoryRepository.save(toSyncHistory(history, null, true));
             saveAllProductsSync(allProducts);
             saveAllVariantsSync(allVariants);
 
-            syncHistoryRepository.save(toSyncHistory(history, null, true));
+
             log.info("Successfully synced {} products and {} variants from Sapo", allProducts.size(), allVariants.size());
             return true;
         } catch (Exception e) {
@@ -360,36 +376,49 @@ public class SapoServiceImpl implements PosManagementService {
     }
 
     public OrderEntity convertToOrderEntity(String posId, SapoOrderResponse.Order order) {
-        Map<String, String> mapping = sapoConfig.getOrder().getStatus().getMapping();
-        String status = mapping.getOrDefault(order.getStatus(), "unknown");
-
-        SapoOrderResponse.Fulfillment fulfillment = order.getFulfillments() != null && !order.getFulfillments().isEmpty()
-                ? order.getFulfillments().get(0)
-                : null;
-        SapoOrderResponse.OriginAddress origin = fulfillment != null ? fulfillment.getOriginAddress() : null;
+        String status = sapoConfig.getStatusMapping(order.getStatus());
+        
+        // Lấy fulfillment và origin address một cách đơn giản
+        SapoOrderResponse.Fulfillment fulfillment = getFirstFulfillment(order);
+        SapoOrderResponse.OriginAddress origin = Optional.ofNullable(fulfillment)
+                .map(SapoOrderResponse.Fulfillment::getOriginAddress)
+                .orElse(null);
 
         return OrderEntity.builder()
                 .posId(posId)
                 .orderId(order.getId().toString())
                 .orderCode(order.getName())
-                .customerName(origin != null ? origin.getName() : null)
-                .customerPhone(origin != null ? origin.getPhone() : null)
-                .customerEmail(origin != null ? origin.getEmail() : null)
-                .shippingAddress(origin != null
-                        ? String.join(", ",
-                        Stream.of(origin.getAddress1(), origin.getProvince(), origin.getCity())
-                                .filter(Objects::nonNull)
-                                .toList())
-                        : null)
+                .customerName(Optional.ofNullable(origin).map(SapoOrderResponse.OriginAddress::getName).orElse(null))
+                .customerPhone(Optional.ofNullable(origin).map(SapoOrderResponse.OriginAddress::getPhone).orElse(null))
+                .customerEmail(Optional.ofNullable(origin).map(SapoOrderResponse.OriginAddress::getEmail).orElse(null))
+                .shippingAddress(buildShippingAddress(origin))
                 .status(status.toUpperCase())
-                .paymentMethod(order.getPaymentGatewayNames() != null && !order.getPaymentGatewayNames().isEmpty()
-                        ? order.getPaymentGatewayNames().get(0)
-                        : null)
-                .shippingMethod(fulfillment != null ? fulfillment.getDeliveryMethod() : null)
+                .paymentMethod(getFirstPaymentMethod(order))
+                .shippingMethod(Optional.ofNullable(fulfillment).map(SapoOrderResponse.Fulfillment::getDeliveryMethod).orElse(null))
                 .totalPrice(order.getTotalPrice())
                 .shippingFee(BigDecimal.ZERO)
-                .discountAmount(order.getTotalDiscounts() != null ? order.getTotalDiscounts().doubleValue() : 0.0)
+                .discountAmount(Optional.ofNullable(order.getTotalDiscounts()).map(BigDecimal::doubleValue).orElse(0.0))
                 .build();
+    }
+
+    private SapoOrderResponse.Fulfillment getFirstFulfillment(SapoOrderResponse.Order order) {
+        return order.getFulfillments() != null && !order.getFulfillments().isEmpty() 
+                ? order.getFulfillments().get(0) 
+                : null;
+    }
+
+    private String buildShippingAddress(SapoOrderResponse.OriginAddress origin) {
+        return String.join(", ",
+                Stream.of(origin.getAddress1(), origin.getProvince(), origin.getCity())
+                        .filter(Objects::nonNull)
+                        .toList());
+    }
+
+    private String getFirstPaymentMethod(SapoOrderResponse.Order order) {
+        return Optional.ofNullable(order.getPaymentGatewayNames())
+                .filter(list -> !list.isEmpty())
+                .map(list -> list.get(0))
+                .orElse(null);
     }
 
     private List<OrderItemEntity> convertToOrderItemEntities(List<SapoOrderResponse.Order> apiOrders) {
@@ -402,27 +431,23 @@ public class SapoServiceImpl implements PosManagementService {
 
     public List<OrderItemEntity> convertToOrderItemEntity(SapoOrderResponse.Order apiOrder) {
         List<OrderItemEntity> orderItemEntities = new ArrayList<>();
-        if (apiOrder == null || apiOrder.getLineItems() == null || apiOrder.getLineItems().isEmpty()) {
+        if (ObjectUtils.isEmpty(apiOrder) || CollectionUtils.isEmpty(apiOrder.getLineItems())) {
             return orderItemEntities;
         }
 
         for (SapoOrderResponse.LineItem product : apiOrder.getLineItems()) {
-            if (product == null) {
+            if (ObjectUtils.isEmpty(product)) {
                 continue;
             }
-
-            BigDecimal price = product.getPrice();
-            int quantity = product.getQuantity();
-            BigDecimal totalPrice = price.multiply(BigDecimal.valueOf(quantity));
 
             orderItemEntities.add(OrderItemEntity.builder()
                     .orderItemId(String.valueOf(product.getId()))
                     .orderId(String.valueOf(apiOrder.getId()))
-                    .quantity(quantity)
+                    .quantity(product.getQuantity())
                     .sku(product.getSku())
                     .variantName(product.getVariantTitle())
-                    .price(price)
-                    .totalPrice(totalPrice)
+                    .price(product.getPrice())
+                    .totalPrice(product.getPrice().multiply(BigDecimal.valueOf(product.getQuantity())))
                     .productName(product.getName())
                     .fulfillableQuantity(product.getCurrentQuantity())
                     .createdBy(claimUtil.getUserName())
@@ -438,9 +463,8 @@ public class SapoServiceImpl implements PosManagementService {
             return;
         }
         try {
-            int batchSize = orderBatchSize;
-            for (int i = 0; i < orderEntities.size(); i += batchSize) {
-                int endIndex = Math.min(i + batchSize, orderEntities.size());
+            for (int i = 0; i < orderEntities.size(); i += orderBatchSize) {
+                int endIndex = Math.min(i + orderBatchSize, orderEntities.size());
                 List<OrderEntity> batch = orderEntities.subList(i, endIndex);
                 orderRepository.saveAll(batch);
                 log.info("Saved batch {}-{} of {} orders", i + 1, endIndex, orderEntities.size());
@@ -459,9 +483,8 @@ public class SapoServiceImpl implements PosManagementService {
             return;
         }
         try {
-            int batchSize = orderItemBatchSize;
-            for (int i = 0; i < orderItemEntities.size(); i += batchSize) {
-                int endIndex = Math.min(i + batchSize, orderItemEntities.size());
+            for (int i = 0; i < orderItemEntities.size(); i += orderItemBatchSize) {
+                int endIndex = Math.min(i + orderItemBatchSize, orderItemEntities.size());
                 List<OrderItemEntity> batch = orderItemEntities.subList(i, endIndex);
                 orderItemRepository.saveAll(batch);
                 log.info("Saved batch {}-{} of {} order items", i + 1, endIndex, orderItemEntities.size());
@@ -480,6 +503,7 @@ public class SapoServiceImpl implements PosManagementService {
                 .posId(posId)
                 .startTime(LocalDateTime.now())
                 .syncStatus(PosStatus.FAIL.name())
+                .syncType(SyncType.ORDER.getValue())
                 .build();
         try {
             PosEntity posEntity = generalPosService.getPos(posId);
@@ -493,7 +517,7 @@ public class SapoServiceImpl implements PosManagementService {
             String storeName = configMap.get(SapoConstants.STORE_NAME);
             String accessToken = posEntity.getAccessToken();
 
-            if (clientId == null || clientSecret == null || storeName == null || accessToken == null) {
+            if (StringUtils.isEmpty(clientId)|| StringUtils.isEmpty(clientSecret)   ||StringUtils.isEmpty(storeName)||StringUtils.isEmpty(accessToken)) {
                 syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.MISSING_CONFIG, false));
                 log.error("Missing required config for posId={}", posId);
                 return false;
@@ -542,10 +566,10 @@ public class SapoServiceImpl implements PosManagementService {
                 }
             }
 
-            if (!allOrders.isEmpty()) {
+            if (ObjectUtils.isNotEmpty(allOrders)) {
                 saveAllOrdersSync(allOrders);
             }
-            if (!allOrderItems.isEmpty()) {
+            if (ObjectUtils.isNotEmpty(allOrderItems)) {
                 saveAllOrderItemSync(allOrderItems);
             }
 
@@ -559,15 +583,16 @@ public class SapoServiceImpl implements PosManagementService {
             return false;
         }
     }
-    private PosEntity cretaeNewPos(SapoAccessTokenResponse tokenResponse, Map<String, String> configMap) {
+    private PosEntity createNewPos(SapoAccessTokenResponse tokenResponse, Map<String, String> configMap) {
         PosEntity newPos = PosEntity.builder()
                 .posName(PosName.SAPO.getValue())
-                .accessToken(tokenResponse.getAccessToken())
+                .userId(claimUtil.getUserId())
                 .status(PosStatus.ACTIVE.name())
+                .accessToken(tokenResponse.getAccessToken())
                 .config(JsonUtils.toJson(configMap))
-                .companyId(claimUtil.getCompanyId() != null ? String.valueOf(claimUtil.getCompanyId()) : "default")
-                .userId(claimUtil.getUserId() != null ? claimUtil.getUserId() : "system")
-                .createdBy(claimUtil.getUserName() != null ? claimUtil.getUserName() : "system")
+                .expiredTime(null)
+                .companyId(String.valueOf(claimUtil.getCompanyId()))
+                .createdBy(claimUtil.getUserName())
                 .build();
 
         return posRepository.save(newPos);

@@ -1,11 +1,10 @@
 package com.nemi.configuration;
 
-import com.nemi.constant.NhanhvnConstants;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
-import java.util.Map;
+import java.util.HashMap;
 import java.util.Optional;
 
 @Data
@@ -38,7 +37,22 @@ public class NhanhvnConfig {
 
     @Data
     public static class StatusConfig {
-        private Map<Integer, String> mapping;
+        private HashMap<Integer, String> mapping;
+    }
+    public String getOrderStatusMapping(Integer key) {
+
+        return Optional.ofNullable(key)
+                .map(code -> this.getOrder().getStatus().getMapping()
+                        .get(code))
+                .orElse(null);
+    }
+
+    public String getProductStatusMapping(Integer key) {
+
+        return Optional.ofNullable(key)
+                .map(code -> this.getProduct().getStatus().getMapping()
+                        .get(code))
+                .orElse(null);
     }
 
     @Data
@@ -52,21 +66,5 @@ public class NhanhvnConfig {
         private int order;
         private int orderItem;
         private int product;
-    }
-
-    public String getProductStatus(Integer statusCode) {
-        return Optional.ofNullable(product)
-                .map(ProductConfig::getStatus)
-                .map(StatusConfig::getMapping)
-                .map(m -> m.getOrDefault(statusCode, NhanhvnConstants.UNKNOWN))
-                .orElse(NhanhvnConstants.UNKNOWN);
-    }
-
-    public String getOrderStatus(Integer statusCode) {
-        return Optional.ofNullable(order)
-                .map(OrderConfig::getStatus)
-                .map(StatusConfig::getMapping)
-                .map(m -> m.getOrDefault(statusCode, NhanhvnConstants.UNKNOWN))
-                .orElse(NhanhvnConstants.UNKNOWN);
     }
 }

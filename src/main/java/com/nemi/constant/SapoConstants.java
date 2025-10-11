@@ -9,6 +9,14 @@ public class SapoConstants {
     public static final String TOPIC_ORDERS = "orders";
     public static final String TOPIC_PRODUCTS = "products";
     public static final String STORE_NAME = "store_name";
+    public static final String JSON = "json";
+    
+    // Webhook constants
+    public static final String TOPIC = "topic";
+    public static final String ADDRESS = "address";
+    public static final String FORMAT = "format";
+    public static final String WEBHOOK = "webhook";
+
     // URL paths
 
 }

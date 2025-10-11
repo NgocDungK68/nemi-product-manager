@@ -167,19 +167,18 @@ public class PancakeWebhookServiceImpl implements WebhookService {
 
 
     public OrderEntity convertToOrderEntity(String posId, PancakeOrderResponse.DataItem apiOrders) {
-        String status = Optional.ofNullable(apiOrders.getStatus())
-                .map(code -> pancakeConfig.getOrder().getStatus().getMapping()
-                        .getOrDefault(code, Status.UNKNOWN.getValue()))
-                .orElse(apiOrders.getStatusName());
+
+        String status = pancakeConfig.getStatusMapping(apiOrders.getStatus(),apiOrders.getStatusName());
+        log.info("status of orderId {} is {}", apiOrders.getId(), status);
 
         String paymentMethod = Optional.ofNullable(apiOrders.getPaymentPurchaseHistories())
                 .filter(histories -> !histories.isEmpty())
                 .map(histories -> histories.get(0).getType())
-                .orElse(Status.UNKNOWN.getValue());
+                .orElse(null);
 
         String orderCode = Optional.ofNullable(apiOrders.getPartner())
                 .map(PancakeOrderResponse.Partner::getExtendCode)
-                .orElse(Status.UNKNOWN.getValue());
+                .orElse(null);
 
         return OrderEntity.builder()
                 .posId(posId)

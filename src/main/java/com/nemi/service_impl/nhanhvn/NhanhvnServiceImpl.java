@@ -9,6 +9,7 @@ import com.nemi.entity.*;
 import com.nemi.enums.PosName;
 import com.nemi.enums.PosStatus;
 import com.nemi.enums.SyncErrorMessage;
+import com.nemi.enums.SyncType;
 import com.nemi.enums.WeightUnit;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
@@ -102,6 +103,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 .posId(posId)
                 .startTime(LocalDateTime.now())
                 .syncStatus(PosStatus.FAIL.name())
+                .syncType(SyncType.PRODUCT.getValue())
                 .build();
         try {
             // lấy PosEntity và validate posName
@@ -235,7 +237,8 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
     public ProductEntity convertToProductEntity(String posId, NhanhvnProductResponse.ProductData apiProduct) {
         if (!(apiProduct.getParentId()).equals(NhanhvnConstants.PARENT_PRODUCT)) return null;
-        String status = nhanhvnConfig.getProductStatus(apiProduct.getStatus());
+
+        String status = nhanhvnConfig.getProductStatusMapping(apiProduct.getStatus());
 
         return ProductEntity.builder()
                 .posId(posId)
@@ -278,7 +281,9 @@ public class NhanhvnServiceImpl implements PosManagementService {
     }
 
     public OrderEntity convertToOrderEntity(String posId, NhanhvnOrderResponse.OrderData apiOrder) {
-        String status = nhanhvnConfig.getOrderStatus(apiOrder.getInfo().getStatus());
+        String status = nhanhvnConfig.getOrderStatusMapping(apiOrder.getInfo().getStatus());
+        log.info("status of orderId {} is {}", apiOrder.getInfo().getId(), status);
+
 
         return OrderEntity.builder()
                 .posId(posId)
@@ -402,6 +407,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 .posId(posId)
                 .startTime(LocalDateTime.now())
                 .syncStatus(PosStatus.FAIL.name())
+                .syncType(SyncType.ORDER.getValue())
                 .build();
         try {
             // lấy PosEntity và validate posName
