@@ -294,7 +294,7 @@ public class SapoClient {
             }
 
             Map<?, ?> map = objectMapper.readValue(resp.getBody(), Map.class);
-            Object listObj = map.get("webhooks");
+            Object listObj = map.get(SapoConstants.WEBHOOKS);
             if (!(listObj instanceof List<?> rawList)) {
                 return List.of();
             }
@@ -335,12 +335,12 @@ public class SapoClient {
         try {
             List<SapoWebhookResponse.Webhook> current = listWebhooks(storeName, accessToken);
             if (current == null || current.isEmpty()) return;
-            for (SapoWebhookResponse.Webhook wh : current) {
-                if (wh == null || wh.getId() == null) continue;
-                String address = wh.getAddress();
+            for (SapoWebhookResponse.Webhook webhook : current) {
+                if (webhook == null || webhook.getId() == null) continue;
+                String address = webhook.getAddress();
                 if (address == null) continue;
                 if (!address.contains(posId)) {
-                    deleteWebhook(storeName, accessToken, wh.getId());
+                    deleteWebhook(storeName, accessToken, webhook.getId());
                 }
             }
         } catch (Exception e) {
