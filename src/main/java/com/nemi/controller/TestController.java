@@ -2,9 +2,11 @@ package com.nemi.controller;
 
 import com.nemi.entity.PosEntity;
 import com.nemi.repository.PosRepository;
+import com.nemi.service.PosManagementService;
 import com.nemi.service.PosReAuthService;
 import com.nemi.service_impl.pancake.PancakeServiceImpl;
 import lombok.RequiredArgsConstructor;
+import org.mapstruct.Qualifier;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,7 +18,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class TestController {
     private final PosReAuthService posReAuthService;
     private final PosRepository posRepository;
-    private final PancakeServiceImpl pancakeService;
+
+    private final PosManagementService pancakeService;
 
 
     @GetMapping("/test")
@@ -44,7 +47,7 @@ public class TestController {
     public ResponseEntity<String> connectPos(@PathVariable String posId) {
 
         pancakeService.syncProduct(posId);
-        pancakeService.syncOrder(posId);
+//        pancakeService.syncOrder(posId);
         return ResponseEntity.ok("xong");
 
     }
