@@ -121,7 +121,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
             }
 
             Optional<ProductEntity> existingProductOpt = productRepository.findById(new ProductId(String.valueOf(productId), posId));
-            
+
             ProductEntity product;
             if (existingProductOpt.isPresent()) {
                 product = existingProductOpt.get();
@@ -131,7 +131,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 product = convertToProductEntity(posId, payload);
                 log.info("Creating new Sapo product: {}", productId);
             }
-            
+
             productRepository.save(product);
 
             if (!ObjectUtils.isEmpty(payload.getVariants())) {
@@ -233,7 +233,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
         product.setStatus(payload.getStatus().toUpperCase());
         product.setCategory(payload.getProductType());
         product.setBrand(payload.getVendor());
-        
+
         if (ObjectUtils.isNotEmpty(payload.getImages())) {
             product.setImages(JsonUtils.toJson(payload.getImages().stream()
                     .map(SapoProductResponse.Image::getSrc)
@@ -241,7 +241,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
         } else {
             product.setImages(null);
         }
-        
+
         product.setUpdatedAt(PosUtils.parseDateTime(payload.getModifiedOn()));
     }
 
@@ -354,13 +354,13 @@ public class SapoWebhookServiceImpl implements WebhookService {
 
         // Delete old items
         orderItemRepository.deleteByOrderId(orderId);
-        
+
         // Insert new items
         for (SapoOrderResponse.LineItem lineItem : lineItems) {
             OrderItemEntity orderItem = convertToOrderItemEntity(lineItem, orderId);
             orderItemRepository.save(orderItem);
         }
-        
+
         log.info("Successfully synced {} order items for orderId={}", lineItems.size(), orderId);
     }
 

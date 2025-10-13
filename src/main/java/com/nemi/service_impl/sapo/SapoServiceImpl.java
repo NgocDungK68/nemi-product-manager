@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.client.SapoClient;
 import com.nemi.configuration.SapoConfig;
+import com.nemi.constant.PosConstants;
 import com.nemi.constant.SapoConstants;
 import com.nemi.entity.*;
 import com.nemi.enums.PosName;
@@ -35,10 +36,10 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -52,26 +53,23 @@ public class SapoServiceImpl implements PosManagementService {
     private final SapoClient sapoClient;
     private final ProductRepository productRepository;
     private final PosRepository posRepository;
-    private final ProductVariantRepository productVariantRepository;
+    private final ProductVariantRepository variantRepository;
     private final SyncHistoryRepository syncHistoryRepository;
     private final ObjectMapper objectMapper;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final SapoConfig sapoConfig;
     private final GeneralPosService generalPosService;
-    private int orderBatchSize;
-    private int orderItemBatchSize;
-    private int productBatchSize;
+
     private int pageStartNumber;
     private int productLimit;
+    private int batchSize;
 
     @PostConstruct
     public void init() {
-        orderBatchSize = sapoConfig.getSync().getOrder();
-        orderItemBatchSize = sapoConfig.getSync().getOrderItem();
-        productBatchSize = sapoConfig.getSync().getProduct();
         pageStartNumber = sapoConfig.getSync().getPageStart();
         productLimit = sapoConfig.getSync().getProductLimit();
+        batchSize = sapoConfig.getSync().getBatchSize();
     }
 
 
@@ -123,7 +121,7 @@ public class SapoServiceImpl implements PosManagementService {
     }
 
     @Override
-    public boolean syncProduct(String posId) {
+    public void syncProduct(String posId) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
                 .startTime(LocalDateTime.now())
@@ -139,7 +137,7 @@ public class SapoServiceImpl implements PosManagementService {
             if (isInvalidRequest(request)) {
                 syncHistoryRepository.save(toSyncHistory(history, (SyncErrorMessage.MISSING_CONFIG), false));
                 log.error("[NhanhvnServiceImpl.syncProduct] Missing required config for posId={}", posId);
-                return false;
+                return;
             }
 
 
@@ -160,13 +158,13 @@ public class SapoServiceImpl implements PosManagementService {
                 if (responseOpt.isEmpty()) {
                     log.error("[SapoServiceImpl.syncProduct] API returned empty response");
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
-                    return false;
+                    return;
                 }
 
                 // Extract products from response
                 SapoProductResponse response = responseOpt.get();
                 List<SapoProductResponse.Product> products = response.getProducts();
-                
+
                 // Đây là khi đã sync hết tất cả products (end of pagination)
                 if (ObjectUtils.isEmpty(products)) {
                     log.info("[SapoServiceImpl.syncProduct] Reached end of pagination (page={})", paginator.getPage());
@@ -195,17 +193,21 @@ public class SapoServiceImpl implements PosManagementService {
                 }
             }
 
-            syncHistoryRepository.save(toSyncHistory(history, null, true));
-            saveAllProductsSync(allProducts);
-            saveAllVariantsSync(allVariants);
+            // Lưu song song product và variant
+            CompletableFuture<Void> saveProductsFuture =
+                    generalPosService.saveAllAsync(allProducts, batchSize, productRepository, PosConstants.PRODUCT);
 
+            CompletableFuture<Void> saveVariantsFuture =
+                    generalPosService.saveAllAsync(allVariants, batchSize, variantRepository, PosConstants.VARIANT);
+
+            // Chờ cả hai xong
+            CompletableFuture.allOf(saveProductsFuture, saveVariantsFuture).join();
+            syncHistoryRepository.save(toSyncHistory(history, null, true));
 
             log.info("Successfully synced {} products and {} variants from Sapo", allProducts.size(), allVariants.size());
-            return true;
         } catch (Exception e) {
             log.error("Failed to sync Sapo data - {}", e.getMessage(), e);
             syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
-            return false;
         }
     }
 
@@ -303,59 +305,6 @@ public class SapoServiceImpl implements PosManagementService {
         return attributes;
     }
 
-    public void saveAllProductsSync(List<ProductEntity> products) {
-        log.info("Saving {} Sapo products synchronously", products.size());
-
-        //Vì danh sách rỗng là trường hợp hợp lệ, không phải lỗi. Khi phân trang, trang cuối cùng có thể trả về 0 sản phẩm; ta
-        // chỉ no-op thay vì fail toàn bộ sync.
-        //Nếu ném exception ở đây, cả quy trình đồng bộ sẽ bị đánh dấu lỗi dù hệ thống hoạt động đúng (không còn dữ liệu để lưu).
-        if (ObjectUtils.isEmpty(products)) {
-            return;
-        }
-
-        try {
-            int batchSize = productBatchSize;
-            for (int i = 0; i < products.size(); i += batchSize) {
-                int endIndex = Math.min(i + batchSize, products.size());
-                List<ProductEntity> batch = products.subList(i, endIndex);
-
-                productRepository.saveAll(batch);
-                log.info("Saved batch {}-{} of {} products",
-                        i + 1, endIndex, products.size());
-            }
-
-            log.info("Successfully saved all {} Sapo products", products.size());
-        } catch (Exception e) {
-            log.error("Failed to save Sapo products synchronously: {}", e.getMessage(), e);
-            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_PERSISTENCE_ERROR));
-        }
-    }
-
-    public void saveAllVariantsSync(List<ProductVariantEntity> variants) {
-        log.info("Saving {} Sapo variants synchronously", variants.size());
-
-        if (ObjectUtils.isEmpty(variants)) {
-            return;
-        }
-
-        try {
-            int batchSize = productBatchSize;
-            for (int i = 0; i < variants.size(); i += batchSize) {
-                int endIndex = Math.min(i + batchSize, variants.size());
-                List<ProductVariantEntity> batch = variants.subList(i, endIndex);
-
-                productVariantRepository.saveAll(batch);
-                log.info("Saved batch {}-{} of {} variants",
-                        i + 1, endIndex, variants.size());
-            }
-
-            log.info("Successfully saved all {} Sapo variants", variants.size());
-        } catch (Exception e) {
-            log.error("Failed to save Sapo variants synchronously: {}", e.getMessage(), e);
-            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_PERSISTENCE_ERROR));
-        }
-    }
-
     private SyncHistoryEntity toSyncHistory(SyncHistoryEntity syncHistoryEntity, SyncErrorMessage syncErrorMessage, Boolean isSyncSuccess) {
         if (Boolean.FALSE.equals(isSyncSuccess)) {
             syncHistoryEntity.setEndTime(LocalDateTime.now());
@@ -377,7 +326,7 @@ public class SapoServiceImpl implements PosManagementService {
 
     public OrderEntity convertToOrderEntity(String posId, SapoOrderResponse.Order order) {
         String status = sapoConfig.getStatusMapping(order.getStatus());
-        
+
         // Lấy fulfillment và origin address một cách đơn giản
         SapoOrderResponse.Fulfillment fulfillment = getFirstFulfillment(order);
         SapoOrderResponse.OriginAddress origin = Optional.ofNullable(fulfillment)
@@ -402,8 +351,8 @@ public class SapoServiceImpl implements PosManagementService {
     }
 
     private SapoOrderResponse.Fulfillment getFirstFulfillment(SapoOrderResponse.Order order) {
-        return order.getFulfillments() != null && !order.getFulfillments().isEmpty() 
-                ? order.getFulfillments().get(0) 
+        return order.getFulfillments() != null && !order.getFulfillments().isEmpty()
+                ? order.getFulfillments().get(0)
                 : null;
     }
 
@@ -456,49 +405,8 @@ public class SapoServiceImpl implements PosManagementService {
         return orderItemEntities;
     }
 
-    public void saveAllOrdersSync(List<OrderEntity> orderEntities) {
-        log.info("Saving {} Pancake orders synchronously", orderEntities.size());
-        if (orderEntities.isEmpty()) {
-            log.info("No orders to save.");
-            return;
-        }
-        try {
-            for (int i = 0; i < orderEntities.size(); i += orderBatchSize) {
-                int endIndex = Math.min(i + orderBatchSize, orderEntities.size());
-                List<OrderEntity> batch = orderEntities.subList(i, endIndex);
-                orderRepository.saveAll(batch);
-                log.info("Saved batch {}-{} of {} orders", i + 1, endIndex, orderEntities.size());
-            }
-            log.info("Successfully saved all {} Pancake orders", orderEntities.size());
-        } catch (Exception e) {
-            log.error("Failed to save Pancake orders synchronously: {}", e.getMessage(), e);
-            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_PERSISTENCE_ERROR));
-        }
-    }
-
-    public void saveAllOrderItemSync(List<OrderItemEntity> orderItemEntities) {
-        log.info("Saving {} Pancake order items synchronously", orderItemEntities.size());
-        if (orderItemEntities.isEmpty()) {
-            log.info("No order items to save.");
-            return;
-        }
-        try {
-            for (int i = 0; i < orderItemEntities.size(); i += orderItemBatchSize) {
-                int endIndex = Math.min(i + orderItemBatchSize, orderItemEntities.size());
-                List<OrderItemEntity> batch = orderItemEntities.subList(i, endIndex);
-                orderItemRepository.saveAll(batch);
-                log.info("Saved batch {}-{} of {} order items", i + 1, endIndex, orderItemEntities.size());
-            }
-            log.info("Successfully saved all {} Pancake order items", orderItemEntities.size());
-        } catch (Exception e) {
-            log.error("Failed to save Pancake order items synchronously: {}", e.getMessage(), e);
-            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_PERSISTENCE_ERROR));
-        }
-    }
-
-
     @Override
-    public boolean syncOrder(String posId) {
+    public void syncOrder(String posId) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
                 .startTime(LocalDateTime.now())
@@ -517,10 +425,10 @@ public class SapoServiceImpl implements PosManagementService {
             String storeName = configMap.get(SapoConstants.STORE_NAME);
             String accessToken = posEntity.getAccessToken();
 
-            if (StringUtils.isEmpty(clientId)|| StringUtils.isEmpty(clientSecret)   ||StringUtils.isEmpty(storeName)||StringUtils.isEmpty(accessToken)) {
+            if (StringUtils.isEmpty(clientId) || StringUtils.isEmpty(clientSecret) || StringUtils.isEmpty(storeName) || StringUtils.isEmpty(accessToken)) {
                 syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.MISSING_CONFIG, false));
                 log.error("Missing required config for posId={}", posId);
-                return false;
+                return;
             }
 
             int pageNumber = pageStartNumber;
@@ -566,23 +474,23 @@ public class SapoServiceImpl implements PosManagementService {
                 }
             }
 
-            if (ObjectUtils.isNotEmpty(allOrders)) {
-                saveAllOrdersSync(allOrders);
-            }
-            if (ObjectUtils.isNotEmpty(allOrderItems)) {
-                saveAllOrderItemSync(allOrderItems);
-            }
+            CompletableFuture<Void> saveOrdersFuture =
+                    generalPosService.saveAllAsync(allOrders, batchSize, orderRepository, PosConstants.ORDER);
 
+            CompletableFuture<Void> saveOrderItemsFuture =
+                    generalPosService.saveAllAsync(allOrderItems, batchSize, orderItemRepository, PosConstants.ORDER_ITEM);
+
+            CompletableFuture.allOf(saveOrdersFuture, saveOrderItemsFuture).join();
             syncHistoryRepository.save(toSyncHistory(history, null, true));
+
             log.info("Successfully synced {} orders from Pancake", allOrders.size());
             log.info("Successfully synced {} order items from Pancake", allOrderItems.size());
-            return true;
         } catch (Exception e) {
             log.error("Failed to sync Pancake orders - {}", e.getMessage(), e);
             syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.ORDER_TECHNICAL_ERROR, false));
-            return false;
         }
     }
+
     private PosEntity createNewPos(SapoAccessTokenResponse tokenResponse, Map<String, String> configMap) {
         PosEntity newPos = PosEntity.builder()
                 .posName(PosName.SAPO.getValue())

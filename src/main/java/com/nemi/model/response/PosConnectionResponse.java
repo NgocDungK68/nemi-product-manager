@@ -18,7 +18,6 @@ import java.time.LocalDateTime;
 public class PosConnectionResponse {
     private String id;
     private String posName;
-    private String config;
     private String status;
     private String reAuthLink;
     private LocalDateTime expiredTime;
@@ -33,7 +32,6 @@ public class PosConnectionResponse {
         return PosConnectionResponse.builder()
                 .id(pos.getId())
                 .posName(pos.getPosName())
-                .config(pos.getConfig())
                 .status(pos.getStatus())
                 .expiredTime(pos.getExpiredTime())
                 .createdAt(pos.getCreatedAt())
@@ -45,7 +43,6 @@ public class PosConnectionResponse {
         return PosConnectionResponse.builder()
                 .id(entity.getId())
                 .posName(entity.getPosName())
-                .config(entity.getConfig())
                 .status(PosStatus.EXPIRED.name())
                 .reAuthLink(reAuthLink)
                 .expiredTime(entity.getExpiredTime())

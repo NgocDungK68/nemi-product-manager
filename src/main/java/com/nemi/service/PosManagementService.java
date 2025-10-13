@@ -8,12 +8,9 @@ public interface PosManagementService {
 
     /**
      * get accessCode + exchange accesstoken + sync + save db
-     * @return
      */
     PosConnectionResponse connectPos(PosConnectionRequest posConnectionRequest);
 
-    boolean syncProduct(String posId);
-
-    boolean syncOrder(String posId);
-
+    void syncProduct(String posId);
+    void syncOrder(String posId);
 }

@@ -20,7 +20,7 @@ spring:
     properties:
       hibernate:
         jdbc:
-          batch_size: 1000
+          batch_size: 50
           order_inserts: true
           order_updates: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
@@ -30,6 +30,16 @@ server:
   port: 5200
   error:
     include-stacktrace: never
+
+async:
+  sync:
+    core-pool-size: 10
+    max-pool-size: 20
+    queue-capacity: 200
+  batch:
+    core-pool-size: 10
+    max-pool-size: 20
+    queue-capacity: 500
 
 nhanhvn:
   base-url: https://nhanh.vn
@@ -71,11 +81,8 @@ nhanhvn:
         73: "RETURNED"      # Đổi kho xuất hàng
         74: "RETURNED"      # Xác nhận hoàn
   sync:
-    batch:
-      order: 50
-      order-item: 50
-      product: 50
-    page-size: 50
+    batch-size: 100
+    page-size: 100
 pancake:
   secret: elqsF9ERiFWGacWQO9Gg5XC4kXojot
   base-url: https://pos.pages.fm/api/v1
@@ -101,7 +108,7 @@ pancake:
         3: "DELIVERED"      # Đã nhận
         16: "DELIVERED"      # Đã thu tiền
         4: "RETURNED"       # Đang hoàn
-        15: "RETURNED"       # Hoàn một phần (⚠️ partial return – note riêng nếu cần)
+        15: "RETURNED"       # Hoàn một phần (partial return – note riêng nếu cần)
         5: "RETURNED" # Đã hoàn
         6: "CANCELLED"      # Đã hủy
         7: "CANCELLED"      # da xoa
@@ -143,12 +150,9 @@ sapo:
         closed: "delivered"    # Các order đã lưu trữ
         cancelled: "cancelled" # Các order bị hủy
   sync:
-    order: 100
-    order-item: 200
-    product: 100
     page-start: 1
     product-limit: 250
-
+    batch-size: 100
 
 secret:
   jwt-public-key: "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArh1qU7sGe0uiquAuZo9+T4RTLZoG5NdtHtPCxcFp04EaTJFF+EmN/hwC0v3BXjNbvHYOPfUkmZ98QGeGXE6Q8xp3RGJafrmg6IAOzcWVSaVS4X0hlZjUNs5gW197ojhCCPRuWUSdSmAJG1i+CLQPn+pCBK7Wy2sJ6JTVtnuvs6LaUeqL9B7yE4LaMgEJo9ubi/TCrkD6dI4mxrqsVQVDpaHxau+sZbBsbGD/V4rWfFv7XqAbqWbam3gF/Qr2q/321sLkYjoSEG5sLxaDLgrDPk2moZ1PyLtuDpeF1DWygcK7XRsZjD3j4LkV2K4Ubi+P2wQCI+oZfM1XVlslzKKnVQIDAQAB"

@@ -1,12 +1,10 @@
 package com.nemi.configuration;
 
-import com.nemi.enums.Status;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
 
 @Data
@@ -59,14 +57,7 @@ public class NhanhvnConfig {
 
     @Data
     public static class SyncConfig {
-        private BatchConfig batch;
+        private int batchSize;
         private int pageSize;
-    }
-
-    @Data
-    public static class BatchConfig {
-        private int order;
-        private int orderItem;
-        private int product;
     }
 }
