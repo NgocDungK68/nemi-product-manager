@@ -57,14 +57,7 @@ public class NhanhvnConfig {
 
     @Data
     public static class SyncConfig {
-        private BatchConfig batch;
+        private int batchSize;
         private int pageSize;
-    }
-
-    @Data
-    public static class BatchConfig {
-        private int order;
-        private int orderItem;
-        private int product;
     }
 }

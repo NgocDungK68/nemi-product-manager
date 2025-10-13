@@ -2,19 +2,14 @@ package com.nemi.utils;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nemi.configuration.NhanhvnConfig;
-import com.nemi.constant.NhanhvnConstants;
-import com.nemi.entity.PosEntity;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
-import io.jsonwebtoken.lang.Objects;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ObjectUtils;
-import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -27,8 +22,7 @@ import java.util.TreeMap;
 @RequiredArgsConstructor
 @Component
 public class PosUtils {
-    private final NhanhvnConfig nhanhvnConfig;
-    private final ObjectMapper objectMapper;
+    private static final ObjectMapper mapper = new ObjectMapper();
 
     public static Map<String, String> extractHeaders(HttpServletRequest request) {
         Map<String, String> headers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
@@ -57,6 +51,18 @@ public class PosUtils {
         } catch (Exception e) {
             log.warn("Failed to parse date time '{}'. Error: {}", dateTimeString, e.getMessage());
             return null;
+        }
+    }
+
+    public static Map<String, String> convertToConfigMap(String config) {
+        try {
+            return mapper.readValue(
+                    config,
+                    new TypeReference<>() {}
+            );
+        } catch (Exception e) {
+            log.error("Failed to convert to Config Map: {}", e.getMessage(), e);
+            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.JSON_PARSE_ERROR));
         }
     }
 }

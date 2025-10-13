@@ -1,4 +1,4 @@
-package com.nemi.service_impl.pancake;
+package com.nemi.mapper;
 
 import com.nemi.entity.ProductEntity;
 import com.nemi.entity.ProductVariantEntity;

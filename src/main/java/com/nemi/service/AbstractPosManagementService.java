@@ -1,8 +1,8 @@
 package com.nemi.service;
 
-import com.nemi.enums.PosStatus;
 import com.nemi.entity.PosEntity;
 import com.nemi.entity.SyncHistoryEntity;
+import com.nemi.enums.PosStatus;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
@@ -14,8 +14,11 @@ import com.nemi.repository.SyncHistoryRepository;
 import com.nemi.util.ClaimUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 
@@ -91,6 +94,61 @@ public abstract class AbstractPosManagementService {
                     log.error("Error not found posId: {}", posId);
                     return new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATA_INVALID));
                 });
+    }
+
+    public <T> void saveAll(List<T> entities, int batchSize, JpaRepository<T, ?> repository, String entityName) {
+        log.info("Saving {} {}s asynchronously on thread: {}",
+                entities.size(), entityName, Thread.currentThread().getName());
+
+        if (entities.isEmpty()) {
+            log.info("No {} to save.", entityName);
+        }
+
+        try {
+            for (int i = 0; i < entities.size(); i += batchSize) {
+                int endIndex = Math.min(i + batchSize, entities.size());
+                List<T> batch = entities.subList(i, endIndex);
+
+                repository.saveAll(batch);
+                log.info("Saved batch {}-{} of {} {}s (Thread: {})",
+                        i + 1, endIndex, entities.size(), entityName, Thread.currentThread().getName());
+            }
+
+            log.info("Successfully saved all {} {}s", entities.size(), entityName);
+        } catch (Exception e) {
+            log.error("Failed to save {}: {}", entityName, e.getMessage(), e);
+        }
+    }
+
+    public <T> CompletableFuture<Void> saveAllAsync(List<T> entities, int batchSize, JpaRepository<T, ?> repository, String entityName) {
+        log.debug("Saving {} {}s asynchronously on thread: {}", entities.size(), entityName, Thread.currentThread().getName());
+
+        if (entities.isEmpty()) {
+            log.debug("No {} to save.", entityName);
+            return CompletableFuture.completedFuture(null);
+        }
+
+        // Danh sách các CompletableFuture đại diện cho từng batch
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
+
+        try {
+            for (int i = 0; i < entities.size(); i += batchSize) {
+                int endIndex = Math.min(i + batchSize, entities.size());
+                List<T> batch = entities.subList(i, endIndex);
+
+                repository.saveAll(batch);
+                log.debug("Saved batch {}-{} of {} {}s (Thread: {})",
+                        i + 1, endIndex, entities.size(), entityName, Thread.currentThread().getName());
+            }
+
+            log.info("Successfully saved all {} {}s", entities.size(), entityName);
+        } catch (Exception e) {
+            log.error("Failed to save {}: {}", entityName, e.getMessage(), e);
+        }
+
+        // Chờ tất cả batch hoàn tất
+        return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                .thenRun(() -> log.info("Successfully saved all {} {}s", entities.size(), entityName));
     }
 }
 

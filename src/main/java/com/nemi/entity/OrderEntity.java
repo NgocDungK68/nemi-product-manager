@@ -24,7 +24,7 @@ public class OrderEntity extends BaseEntity {
     @Id
 //    @GeneratedValue(strategy = GenerationType.UUID)
     @JsonProperty("order_id")
-    private String  orderId;
+    private String orderId;
 
     @JsonProperty("order_code")
     private String orderCode;

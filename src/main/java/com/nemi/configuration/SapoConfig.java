@@ -32,11 +32,9 @@ public class SapoConfig {
     }
     @Data
     public static class BatchConfig {
-        private int order;
-        private int orderItem;
-        private int product;
         private int pageStart;
         private int productLimit;
+        private int batchSize;
     }
     private String baseUrl;
     private String storeName;
