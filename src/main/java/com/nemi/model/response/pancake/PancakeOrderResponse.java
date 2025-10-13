@@ -82,6 +82,8 @@ public class PancakeOrderResponse {
         @JsonProperty("system_id")
         private Long systemId;
         private String note;
+        @JsonProperty("bill_email")
+        private String billEmail;
         private Integer status;
         @JsonProperty("status_name")
         private String statusName;

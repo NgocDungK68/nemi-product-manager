@@ -28,17 +28,17 @@ public class PosManagementController {
     private final GeneralPosService generalPosService;
 
     // POS-specific endpoints (require posName)
-    @PostMapping("/{posName}/pos")
-    public ResponseEntity<PosConnectionResponse> connectPos(@PathVariable String posName,
-                                                            @RequestBody PosConnectionRequest posConnectionRequest) {
-        PosManagementService posManagementService = posManagementFactory.getPosName(posName);
-        PosConnectionResponse posConnectionResponse = posManagementService.connectPos(posConnectionRequest);
-        if (posManagementService.syncProduct(posConnectionResponse.getId())) {
-            posManagementService.syncOrder(posConnectionResponse.getId());
-        }
-
-        return ResponseEntity.ok(posConnectionResponse);
-    }
+//    @PostMapping("/{posName}/pos")
+//    public ResponseEntity<PosConnectionResponse> connectPos(@PathVariable String posName,
+//                                                            @RequestBody PosConnectionRequest posConnectionRequest) {
+//        PosManagementService posManagementService = posManagementFactory.getPosName(posName);
+//        PosConnectionResponse posConnectionResponse = posManagementService.connectPos(posConnectionRequest);
+//        if (posManagementService.syncProduct(posConnectionResponse.getId())) {
+//            posManagementService.syncOrder(posConnectionResponse.getId());
+//        }
+//
+//        return ResponseEntity.ok(posConnectionResponse);
+//    }
 
     // Common endpoints (no posName needed - cleaner API)
     @GetMapping("/pos")
