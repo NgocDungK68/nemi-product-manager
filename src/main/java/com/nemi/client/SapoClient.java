@@ -9,10 +9,7 @@ import com.nemi.exception.pojo.AlertMessages;
 import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.request.sapo.SapoRequest;
 import com.nemi.model.request.sapo.SapoWebhookRequest;
-import com.nemi.model.response.sapo.SapoAccessTokenResponse;
-import com.nemi.model.response.sapo.SapoOrderResponse;
-import com.nemi.model.response.sapo.SapoProductResponse;
-import com.nemi.model.response.sapo.SapoWebhookResponse;
+import com.nemi.model.response.sapo.*;
 import com.nemi.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -263,7 +261,7 @@ public class SapoClient {
         }
     }
 
-    // ----------------- Helpers & additional endpoints (refactor per sample) -----------------
+    // ----------------- Helpers & additional endpoints (refactor per sample) --------------------------x`
 
     private String buildBaseUrl(String storeName) {
         return "https://" + storeName + ".mysapo.net";
@@ -280,27 +278,27 @@ public class SapoClient {
      * List all webhooks for store
      */
     public List<SapoWebhookResponse.Webhook> listWebhooks(String storeName, String accessToken) {
-        try {
+
             String url = UriComponentsBuilder.fromHttpUrl(buildBaseUrl(storeName))
                     .path(sapoConfig.getPathWebhooks())
                     .toUriString();
 
             HttpEntity<String> entity = new HttpEntity<>(buildHeaders(accessToken));
+
+             try {
             ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
 
             if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
                 log.warn("[SapoClient.listWebhooks] Failed to list webhooks, status={}", resp.getStatusCode());
-                return List.of();
+                return Collections.emptyList();
             }
 
-            Map<?, ?> map = objectMapper.readValue(resp.getBody(), Map.class);
-            Object listObj = map.get(SapoConstants.WEBHOOKS);
-            if (!(listObj instanceof List<?> rawList)) {
-                return List.of();
-            }
-            return rawList.stream()
-                    .map(item -> objectMapper.convertValue(item, SapoWebhookResponse.Webhook.class))
-                    .toList();
+            SapoWebhookListResponse webhookListResponse = JsonUtils.fromJson(resp.getBody(), SapoWebhookListResponse.class);
+
+            return Optional.ofNullable(webhookListResponse)
+                    .map(SapoWebhookListResponse::getWebhooks)
+                    .orElse(List.of());
+
         } catch (Exception e) {
             log.error("[SapoClient.listWebhooks] Failed: {}", e.getMessage(), e);
             return List.of();
@@ -334,15 +332,21 @@ public class SapoClient {
     public void deleteWebhook(String storeName, String accessToken, String posId) {
         try {
             List<SapoWebhookResponse.Webhook> current = listWebhooks(storeName, accessToken);
-            if (current == null || current.isEmpty()) return;
-            for (SapoWebhookResponse.Webhook webhook : current) {
-                if (webhook == null || webhook.getId() == null) continue;
-                String address = webhook.getAddress();
-                if (address == null) continue;
-                if (!address.contains(posId)) {
-                    deleteWebhook(storeName, accessToken, webhook.getId());
-                }
+            if (ObjectUtils.isEmpty(current)) {
+                log.debug("[SapoClient.deleteWebhook(posId)] No webhooks found for posId={}", posId);
+                return;
             }
+
+            current.stream()
+                    .filter(webhook -> ObjectUtils.isNotEmpty(webhook) 
+                            && ObjectUtils.isNotEmpty(webhook.getId()) 
+                            && ObjectUtils.isNotEmpty(webhook.getAddress()))
+                    .filter(webhook -> !webhook.getAddress().contains(posId))
+                    .forEach(webhook -> {
+                        log.info("[SapoClient.deleteWebhook(posId)] Deleting webhook id={} not matching posId={}", 
+                                webhook.getId(), posId);
+                        deleteWebhook(storeName, accessToken, webhook.getId());
+                    });
         } catch (Exception e) {
             log.warn("[SapoClient.deleteWebhook(posId)] Failed: {}", e.getMessage());
         }
