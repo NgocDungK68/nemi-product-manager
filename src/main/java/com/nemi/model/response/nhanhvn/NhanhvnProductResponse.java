@@ -4,10 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.nemi.configuration.deserializer.BrandDeserializer;
-import com.nemi.configuration.deserializer.CategoryDeserializer;
-import com.nemi.configuration.deserializer.TypeDeserializer;
-import com.nemi.configuration.deserializer.WarrantyDeserializer;
+import com.nemi.configuration.deserializer.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -154,6 +151,7 @@ public class NhanhvnProductResponse {
         private Integer damaged;
         private Integer holding;
         private Integer available;
+        @JsonDeserialize(using = WarrantyInventoryDeserializer.class)
         private WarrantyInventory warranty;
         private List<Depot> depots;
     }
@@ -172,6 +170,8 @@ public class NhanhvnProductResponse {
         private Integer damaged;
         private Integer holding;
         private Integer available;
+
+        @JsonDeserialize(using = WarrantyInventoryDeserializer.class)
         private WarrantyInventory warranty;
     }
 
