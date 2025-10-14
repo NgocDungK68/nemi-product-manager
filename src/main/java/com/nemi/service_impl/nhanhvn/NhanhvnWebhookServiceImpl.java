@@ -19,7 +19,6 @@ import com.nemi.model.response.nhanhvn.NhanhvnOrderResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
 import com.nemi.repository.*;
 import com.nemi.service.WebhookService;
-import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,7 +45,6 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
     private final OrderItemRepository orderItemRepository;
     private final WebhookHistoryRepository webhookHistoryRepository;
     private final NhanhvnMapper nhanhvnMapper;
-    private final ClaimUtil claimUtil;
 
     @Override
     public String getPosName() {
@@ -150,7 +148,8 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
                     return false;
                 }
 
-                ProductEntity parentEntity = nhanhvnMapper.convertToProductEntity(posId, parentOfVariant, claimUtil.getUserName());
+                ProductEntity parentEntity = nhanhvnMapper.convertToProductEntity(posId, parentOfVariant, PosName.WEBHOOK.getValue());
+                parentEntity.setCreatedBy(parentOfVariantEntity.get().getCreatedBy());
                 productRepository.save(parentEntity);
                 log.info("[NhanhvnWebhookServiceImpl.handleProductAdd] Converted variant with id={} to product", parentEntity.getProductId());
 
@@ -159,7 +158,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
             }
         }
 
-        ProductVariantEntity variantEntity = nhanhvnMapper.convertToVariantEntity(posId, newVariant, claimUtil.getUserName());
+        ProductVariantEntity variantEntity = nhanhvnMapper.convertToVariantEntity(posId, newVariant, PosName.WEBHOOK.getValue());
         variantRepository.save(variantEntity);
         log.info("[NhanhvnWebhookServiceImpl.handleProductAdd] Successfully add 1 variant with id={}", variantEntity.getVariantId());
 
@@ -181,7 +180,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
         }
 
         if ((productData.getParentId()).equals(NhanhvnConstants.PARENT_PRODUCT)) {   // Trường hợp call về body sản phẩm cha
-            ProductEntity productEntity = nhanhvnMapper.convertToProductEntity(posId, productData, claimUtil.getUserName());
+            ProductEntity productEntity = nhanhvnMapper.convertToProductEntity(posId, productData, PosName.WEBHOOK.getValue());
             productRepository.save(productEntity);
             log.info("[NhanhvnWebhookServiceImpl.handleProductUpdate] Successfully update 1 product with id={}", productEntity.getProductId());
             return true;
@@ -221,11 +220,13 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
             if (parentOfVariantEntity.isPresent()) {
                 // thêm sản phẩm cha vào bảng products
                 NhanhvnProductResponse.ProductData parentProduct = getProductById(posId, String.valueOf(productData.getParentId()));
-                if (ObjectUtils.isEmpty(parentProduct) || parentProduct.getParentId() != -2) {
+                if (ObjectUtils.isEmpty(parentProduct) || !(parentProduct.getParentId()).equals(NhanhvnConstants.PARENT_PRODUCT)) {
                     log.warn("[NhanhvnWebhookServiceImpl.handleProductUpdate] Failed to find parent product with id={}", productData.getParentId());
                     return false;
                 }
-                ProductEntity parentProductEntity = nhanhvnMapper.convertToProductEntity(posId, parentProduct, claimUtil.getUserName());
+
+                ProductEntity parentProductEntity = nhanhvnMapper.convertToProductEntity(posId, parentProduct, PosName.WEBHOOK.getValue());
+                parentProductEntity.setCreatedBy(parentOfVariantEntity.get().getCreatedBy());
                 productRepository.save(parentProductEntity);
                 log.info("[NhanhvnWebhookServiceImpl.handleProductUpdate] Converted variant with id={} to product", parentProductEntity.getProductId());
 
@@ -237,7 +238,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
         }
 
         // Cập nhật sản phẩm con hoặc sản phẩm độc lập vào product_variant
-        ProductVariantEntity variantEntity = nhanhvnMapper.convertToVariantEntity(posId, productData, claimUtil.getUserName());
+        ProductVariantEntity variantEntity = nhanhvnMapper.convertToVariantEntity(posId, productData, PosName.WEBHOOK.getValue());
         variantRepository.save(variantEntity);
         log.info("[NhanhvnWebhookServiceImpl.handleProductUpdate] Successfully update 1 product variant with id={}", variantEntity.getVariantId());
 
@@ -286,7 +287,8 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
                 productRepository.deleteById(new ProductId(parentId, posId));
                 log.info("[NhanhvnWebhookServiceImpl.handleProductDelete] Deleted product with id={} because it is now a variant", parentId);
 
-                ProductVariantEntity variant = nhanhvnMapper.convertToVariantEntity(posId, parentProduct, claimUtil.getUserName());
+                ProductVariantEntity variant = nhanhvnMapper.convertToVariantEntity(posId, parentProduct, PosName.WEBHOOK.getValue());
+                variant.setCreatedBy(productEntity.get().getCreatedBy());
                 variantRepository.save(variant);
                 log.info("[NhanhvnWebhookServiceImpl.handleProductDelete] Converted product with id={} to variant", variant.getVariantId());
             }
@@ -311,7 +313,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
         }
 
         // Convert OrderEntity
-        OrderEntity orderEntity = nhanhvnMapper.convertToOrderEntity(posId, orderData, claimUtil.getUserName());
+        OrderEntity orderEntity = nhanhvnMapper.convertToOrderEntity(posId, orderData, PosName.WEBHOOK.getValue());
         if (ObjectUtils.isEmpty(orderEntity)) {
             log.error("[NhanhvnWebhookServiceImpl.handleOrderAdd] Failed to convert orderData={} to OrderEntity", orderData.getInfo().getId());
             return false;
@@ -323,7 +325,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
                 orderEntity.getOrderId(), orderEntity.getOrderCode());
 
         // Convert OrderItemEntities
-        List<OrderItemEntity> orderItemEntities = nhanhvnMapper.convertToOrderItemEntity(orderData, claimUtil.getUserName());
+        List<OrderItemEntity> orderItemEntities = nhanhvnMapper.convertToOrderItemEntity(orderData, PosName.WEBHOOK.getValue());
         if (orderItemEntities.isEmpty()) {
             log.warn("[NhanhvnWebhookServiceImpl.handleOrderAdd] Order id={} has no products", orderEntity.getOrderId());
         } else {
@@ -347,7 +349,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
         }
 
         // Convert OrderEntity
-        OrderEntity orderEntity = nhanhvnMapper.convertToOrderEntity(posId, orderData, claimUtil.getUserName());
+        OrderEntity orderEntity = nhanhvnMapper.convertToOrderEntity(posId, orderData, PosName.WEBHOOK.getValue());
         if (ObjectUtils.isEmpty(orderEntity)) {
             log.error("[NhanhvnWebhookServiceImpl.handleOrderUpdate] Failed to convert orderData={} to OrderEntity", orderData.getInfo().getId());
             return false;
@@ -359,7 +361,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
                 orderEntity.getOrderId(), orderEntity.getOrderCode());
 
         // Sync OrderItems
-        List<OrderItemEntity> orderItemEntities = nhanhvnMapper.convertToOrderItemEntity(orderData, claimUtil.getUserName());
+        List<OrderItemEntity> orderItemEntities = nhanhvnMapper.convertToOrderItemEntity(orderData, PosName.WEBHOOK.getValue());
         if (orderItemEntities.isEmpty()) {
             log.warn("[NhanhvnWebhookServiceImpl.handleOrderUpdate] Order id={} has no products", orderEntity.getOrderId());
             return false;
