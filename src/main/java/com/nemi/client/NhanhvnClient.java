@@ -15,6 +15,7 @@ import com.nemi.util.JsonUtils;
 import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -76,10 +77,10 @@ public class NhanhvnClient {
 
             // build request body
             Map<String, Object> requestBody = new HashMap<>();
-            if (request.getPaginator() != null) {
+            if (ObjectUtils.isNotEmpty(request.getPaginator())) {
                 requestBody.put(NhanhvnConstants.PAGINATOR, request.getPaginator());
             }
-            if (request.getFilters() != null && !request.getFilters().isEmpty()) {
+            if (ObjectUtils.isNotEmpty(request.getFilters())) {
                 requestBody.put(NhanhvnConstants.FILTERS, request.getFilters());
             }
 
@@ -124,10 +125,10 @@ public class NhanhvnClient {
 
             // build request body
             Map<String, Object> requestBody = new HashMap<>();
-            if (request.getPaginator() != null) {
+            if (ObjectUtils.isNotEmpty(request.getPaginator())) {
                 requestBody.put(NhanhvnConstants.PAGINATOR, request.getPaginator());
             }
-            if (request.getFilters() != null && !request.getFilters().isEmpty()) {
+            if (ObjectUtils.isNotEmpty(request.getFilters())) {
                 requestBody.put(NhanhvnConstants.FILTERS, request.getFilters());
             }
 

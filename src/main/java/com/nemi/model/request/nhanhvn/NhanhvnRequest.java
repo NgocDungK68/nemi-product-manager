@@ -1,6 +1,9 @@
 package com.nemi.model.request.nhanhvn;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.nemi.constant.NhanhvnConstants;
+import com.nemi.entity.PosEntity;
+import com.nemi.utils.PosUtils;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -25,5 +28,19 @@ public class NhanhvnRequest {
         private int size;
         private Object sort;
         private Object next;
+    }
+
+    public static NhanhvnRequest buildRequest(PosEntity posEntity) {
+        Map<String, String> configMap = PosUtils.convertToConfigMap(posEntity.getConfig());
+
+        String appId = configMap.get(NhanhvnConstants.APP_ID);
+        String businessId = configMap.get(NhanhvnConstants.BUSINESS_ID);
+        String accessToken = posEntity.getAccessToken();
+
+        return NhanhvnRequest.builder()
+                .appId(appId)
+                .businessId(businessId)
+                .accessToken(accessToken)
+                .build();
     }
 }

@@ -20,7 +20,7 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class NhanhvnProductResponse {
-    private int code;
+    private Integer code;
     private Paginator paginator;
     private List<ProductData> data;
 

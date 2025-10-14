@@ -18,16 +18,13 @@ import com.nemi.enums.SyncType;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
+import com.nemi.mapper.PancakeMapper;
 import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.request.pancake.PancakeRequest;
 import com.nemi.model.response.PosConnectionResponse;
 import com.nemi.model.response.pancake.PancakeOrderResponse;
 import com.nemi.model.response.pancake.PancakeProductResponse;
-import com.nemi.repository.OrderItemRepository;
-import com.nemi.repository.OrderRepository;
 import com.nemi.repository.PosRepository;
-import com.nemi.repository.ProductRepository;
-import com.nemi.repository.ProductVariantRepository;
 import com.nemi.repository.SyncHistoryRepository;
 import com.nemi.repository.jdbc.OrderItemJdbcRepository;
 import com.nemi.repository.jdbc.OrderJdbcRepository;
@@ -61,14 +58,10 @@ public class PancakeServiceImpl implements PosManagementService {
     private final PancakeClient pancakeClient;
     private final ObjectMapper objectMapper;
     private final PosRepository posRepository;
-    private final ProductRepository productRepository;
-    private final OrderRepository orderRepository;
     private final SyncHistoryRepository syncHistoryRepository;
-    private final OrderItemRepository orderItemRepository;
     private final PancakeConfig pancakeConfig;
-    private final ProductVariantRepository productVariantRepository;
     private final GeneralPosService generalPosService;
-    private final PancakeAsyncService pancakeAsyncService;
+    private final PancakeMapper pancakeMapper;
     private final ProductJdbcRepository productJdbcRepository;
     private final ProductVariantJdbcRepository productVariantJdbcRepository;
     private final OrderJdbcRepository orderJdbcRepository;
@@ -126,7 +119,7 @@ public class PancakeServiceImpl implements PosManagementService {
 
     @Override
     @Async("syncExecutor")
-    public CompletableFuture<Boolean> syncProduct(String posId) {
+    public void syncProduct(String posId) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
                 .startTime(LocalDateTime.now())
@@ -165,7 +158,7 @@ public class PancakeServiceImpl implements PosManagementService {
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.PRODUCT_CONNECTION_FAILED, false));
                     log.error("No response from Pancake API when fetching products, posId={}", posId);
                     productJdbcRepository.insertProductsVariantParallel(allProducts);
-                    return CompletableFuture.completedFuture(false);
+
                 }
 
                 PancakeProductResponse response = responseOpt.get();
@@ -183,16 +176,12 @@ public class PancakeServiceImpl implements PosManagementService {
                     request.setPageNumber(request.getPageNumber() + 1);
                 }
 
-                CompletableFuture<List<ProductEntity>> pageProducts = pancakeAsyncService.convertToProductEntities(posId, response.getData());
-                CompletableFuture<List<ProductVariantEntity>> pageVariants = pancakeAsyncService.convertToVariantEntities(posId, response.getData());
+                List<ProductEntity> pageProducts = pancakeMapper.convertToProductEntities(posId, response.getData());
+                List<ProductVariantEntity> pageVariants = pancakeMapper.convertToVariantEntities(posId, response.getData());
 
-                CompletableFuture.allOf(pageProducts, pageVariants).join();
 
-                List<ProductEntity> productEntityList = pageProducts.join();
-                List<ProductVariantEntity> productVariantEntityList = pageVariants.join();
-
-                allProducts.addAll(productEntityList);
-                allVariants.addAll(productVariantEntityList);
+                allProducts.addAll(pageProducts);
+                allVariants.addAll(pageVariants);
 
             }
             Long startDate = System.currentTimeMillis();
@@ -203,11 +192,11 @@ public class PancakeServiceImpl implements PosManagementService {
             Long endDate = System.currentTimeMillis();
             log.info("End date {}", endDate);
             log.info("Successfully synced {} products from Pancake", allProducts.size());
-            return CompletableFuture.completedFuture(true);
+
         } catch (Exception e) {
             log.error("Failed to sync Pancake products - {}", e.getMessage(), e);
             syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.PRODUCT_TECHNICAL_ERROR, false));
-            return CompletableFuture.completedFuture(false);
+
         }
     }
 
@@ -224,7 +213,8 @@ public class PancakeServiceImpl implements PosManagementService {
 
 
     @Override
-    public boolean syncOrder(String posId) {
+    @Async("syncExecutor")
+    public void syncOrder(String posId) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
                 .startTime(LocalDateTime.now())
@@ -243,7 +233,7 @@ public class PancakeServiceImpl implements PosManagementService {
             if (StringUtils.isEmpty(shopId) || StringUtils.isEmpty(accessToken)) {
                 syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.MISSING_CONFIG, false));
                 log.error("Missing required config for posId={}", posId);
-                return false;
+
             }
 
             int pageNumber = pageStartNumber;
@@ -268,7 +258,6 @@ public class PancakeServiceImpl implements PosManagementService {
                     if (!allOrderItems.isEmpty()) {
                         orderItemJdbcRepositoryl.insertOrderItemParallel(allOrderItems);
                     }
-                    return false;
                 }
 
                 PancakeOrderResponse response = responseOpt.get();
@@ -281,7 +270,6 @@ public class PancakeServiceImpl implements PosManagementService {
                     if (!allOrderItems.isEmpty()) {
                         orderItemJdbcRepositoryl.insertOrderItemParallel(allOrderItems);
                     }
-                    return false;
                 }
 
                 if (ObjectUtils.isEmpty(response.getData())) {
@@ -291,15 +279,11 @@ public class PancakeServiceImpl implements PosManagementService {
                     request.setPageNumber(request.getPageNumber() + 1);
                 }
 
-                CompletableFuture<List<OrderEntity>> pageOrders = pancakeAsyncService.convertToOrderEntities(posId, response.getData(), userName);
-                CompletableFuture<List<OrderItemEntity>> pageOrderItems = pancakeAsyncService.convertToOrderItemEntities(response.getData(), userName);
+                List<OrderEntity> pageOrders = pancakeMapper.convertToOrderEntities(posId, response.getData(), userName);
+                List<OrderItemEntity> pageOrderItems = pancakeMapper.convertToOrderItemEntities(response.getData(), userName);
 
-                CompletableFuture.allOf(pageOrders, pageOrderItems).join();
-                List<OrderEntity> pageOrderList = pageOrders.join();
-                List<OrderItemEntity> pageOrderItemList = pageOrderItems.join();
-
-                allOrders.addAll(pageOrderList);
-                allOrderItems.addAll(pageOrderItemList);
+                allOrders.addAll(pageOrders);
+                allOrderItems.addAll(pageOrderItems);
 
 
             }
@@ -309,11 +293,11 @@ public class PancakeServiceImpl implements PosManagementService {
 
             syncHistoryRepository.save(toSyncHistory(history, null, true));
             log.info("Successfully synced {} order items  and {} orders from Pancake", allOrderItems.size(), allOrders.size());
-            return true;
+
         } catch (Exception e) {
             log.error("Failed to sync Pancake orders - {}", e.getMessage(), e);
             syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.ORDER_TECHNICAL_ERROR, false));
-            return false;
+
         }
     }
 }

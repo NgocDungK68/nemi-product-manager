@@ -10,7 +10,7 @@ public class NhanhvnConstants {
     public static final String VERSION = "version";
     public static final String IDS = "ids";
 
-    public static final int SUCCESS_CODE = 1;
+    public static final Integer SUCCESS_CODE = 1;
     public static final Integer PARENT_PRODUCT = -2;
     public static final Integer STANDALONE_PRODUCT = -1;
 

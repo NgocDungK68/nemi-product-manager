@@ -1,4 +1,4 @@
-package com.nemi.service_impl.pancake;
+package com.nemi.mapper;
 
 import com.nemi.configuration.PancakeConfig;
 import com.nemi.entity.OrderEntity;
@@ -26,21 +26,20 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 @RequiredArgsConstructor
-public class PancakeAsyncService {
+public class PancakeMapper {
     private final PancakeConfig pancakeConfig;
     private final ClaimUtil claimUtil;
     @Async("syncExecutor")
-    protected CompletableFuture<List<ProductEntity>> convertToProductEntities( // return btg
+    public List<ProductEntity> convertToProductEntities( // return btg
             String posId,
             List<PancakeProductResponse.ProductData> apiProducts
     ) {
-        List<ProductEntity> result = apiProducts.stream()  // hoặc parallelStream()
+        return apiProducts.stream()  // hoặc parallelStream()
                 .map(apiProduct -> convertToProductEntity(posId, apiProduct))
                 .collect(Collectors.toList());
-        return CompletableFuture.completedFuture(result);
     }
 
-    protected ProductEntity convertToProductEntity(String posId, PancakeProductResponse.ProductData apiProducts) {
+    public ProductEntity convertToProductEntity(String posId, PancakeProductResponse.ProductData apiProducts) {
 
         String images = Optional.ofNullable(apiProducts.getImages())
                 .map(list -> list.stream()
@@ -77,14 +76,13 @@ public class PancakeAsyncService {
     }
 
     @Async("syncExecutor")
-    protected CompletableFuture<List<ProductVariantEntity>> convertToVariantEntities(
+    public List<ProductVariantEntity> convertToVariantEntities(
             String posId,
             List<PancakeProductResponse.ProductData> apiProducts
     ) {
-        List<ProductVariantEntity> result = apiProducts.stream()  // can nhac paralle stream
+        return apiProducts.stream()  // can nhac paralle stream
                 .map(apiProduct -> convertToVariantEntity(posId, apiProduct))
                 .collect(Collectors.toList());
-        return CompletableFuture.completedFuture(result);
     }
 
 
@@ -113,12 +111,11 @@ public class PancakeAsyncService {
     }
 
     @Async("syncExecutor")
-    protected CompletableFuture<List<OrderEntity>> convertToOrderEntities(String posId, List<PancakeOrderResponse.DataItem> apiOrders,String userName) {
-         List<OrderEntity> orderEntities =   apiOrders.stream()
+    public List<OrderEntity> convertToOrderEntities(String posId, List<PancakeOrderResponse.DataItem> apiOrders,String userName) {
+        return   apiOrders.stream()
                 .map(orders -> convertToOrderEntity(posId, orders,userName))
                 .filter(Objects::nonNull)
                 .toList();
-         return CompletableFuture.completedFuture(orderEntities);
     }
 
     public OrderEntity convertToOrderEntity(String posId, PancakeOrderResponse.DataItem apiOrders,String userName) {
@@ -152,12 +149,12 @@ public class PancakeAsyncService {
     }
 
     @Async("syncExecutor")
-    CompletableFuture<List<OrderItemEntity>> convertToOrderItemEntities(List<PancakeOrderResponse.DataItem> apiOrders,String userName) {
+    public List<OrderItemEntity> convertToOrderItemEntities(List<PancakeOrderResponse.DataItem> apiOrders,String userName) {
         List<OrderItemEntity> orderItemEntities = new ArrayList<>();
         for (PancakeOrderResponse.DataItem orderData : apiOrders) {
             orderItemEntities.addAll(convertToOrderItemEntity(orderData,userName));
         }
-        return  CompletableFuture.completedFuture(orderItemEntities);
+        return orderItemEntities;
     }
 
     public List<OrderItemEntity> convertToOrderItemEntity(PancakeOrderResponse.DataItem apiOrder,String userName) {

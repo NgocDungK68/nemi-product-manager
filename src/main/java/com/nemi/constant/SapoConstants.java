@@ -16,6 +16,7 @@ public class SapoConstants {
     public static final String ADDRESS = "address";
     public static final String FORMAT = "format";
     public static final String WEBHOOK = "webhook";
+    public static final String WEBHOOKS = "webhooks";
 
     // URL paths
 
