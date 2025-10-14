@@ -30,6 +30,7 @@ import com.nemi.repository.jdbc.OrderItemJdbcRepository;
 import com.nemi.repository.jdbc.OrderJdbcRepository;
 import com.nemi.repository.jdbc.ProductJdbcRepository;
 import com.nemi.repository.jdbc.ProductVariantJdbcRepository;
+import com.nemi.service.EncryptionService;
 import com.nemi.service.GeneralPosService;
 import com.nemi.service.PosManagementService;
 import com.nemi.util.ClaimUtil;
@@ -66,6 +67,7 @@ public class PancakeServiceImpl implements PosManagementService {
     private final ProductVariantJdbcRepository productVariantJdbcRepository;
     private final OrderJdbcRepository orderJdbcRepository;
     private final OrderItemJdbcRepository orderItemJdbcRepositoryl;
+    private final EncryptionService encryptionService;
 
     private int orderBatchSize;
     private int orderItemBatchSize;
@@ -99,7 +101,7 @@ public class PancakeServiceImpl implements PosManagementService {
                     .posName(PosName.PANCAKE.name())
                     .userId(userId)
                     .status(PosStatus.ACTIVE.name())
-                    .accessToken(posConnectionRequest.getApiKey())
+                    .accessToken(encryptionService.encrypt(posConnectionRequest.getApiKey()))
                     .config(JsonUtils.toJson(configMap))
                     .expiredTime(expiredTime)
                     .companyId(String.valueOf(claimUtil.getCompanyId()))
@@ -129,7 +131,13 @@ public class PancakeServiceImpl implements PosManagementService {
         try {
             PosEntity posEntity = generalPosService.getPos(posId);
 
-            PancakeRequest request = PancakeRequest.buildRequest(posEntity,pageStartNumber, productBatchSize);
+           String decryptedToken = encryptionService.decrypt(posEntity.getAccessToken());
+
+            PancakeRequest request = PancakeRequest.buildRequest
+                    (posEntity.getConfig(),
+                            decryptedToken,
+                            pageStartNumber,
+                            productBatchSize);
 
             List<ProductEntity> allProducts = new ArrayList<>();
             List<ProductVariantEntity> allVariants = new ArrayList<>();
@@ -205,8 +213,9 @@ public class PancakeServiceImpl implements PosManagementService {
                 .build();
         try {
             PosEntity posEntity = generalPosService.getPos(posId);
+            String decryptedToken = encryptionService.decrypt(posEntity.getAccessToken());
 
-            PancakeRequest request = PancakeRequest.buildRequest(posEntity,pageStartNumber, productBatchSize);
+            PancakeRequest request = PancakeRequest.buildRequest(posEntity.getConfig(),decryptedToken,pageStartNumber, productBatchSize);
 
             List<OrderEntity> allOrders = new ArrayList<>();
             List<OrderItemEntity> allOrderItems = new ArrayList<>();

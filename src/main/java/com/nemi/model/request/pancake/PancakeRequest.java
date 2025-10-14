@@ -58,17 +58,16 @@ public class PancakeRequest {
 //
 //    private String includedComposite; // parent / children
 //    private List<String> variationIds; // chỉ lấy các variation cụ thể
-    public static PancakeRequest buildRequest(PosEntity posEntity,int pageStartNumber, int productBatchSize) {
+    public static PancakeRequest buildRequest(String config, String accesToken,int pageStartNumber, int productBatchSize) {
 
-        Map<String, String> configMap = PosUtils.convertToConfigMap(posEntity.getConfig());
+        Map<String, String> configMap = PosUtils.convertToConfigMap(config);
 
         String shopId = configMap.get(PancakeConstatns.SHOP_ID);
-        String accessToken = posEntity.getAccessToken();
 
         int pageNumber = pageStartNumber;
 
         return PancakeRequest.builder()
-                .apiKey(posEntity.getAccessToken())
+                .apiKey(accesToken)
                 .pageNumber(pageNumber)
                 .pageSize(productBatchSize)
                 .shopId(shopId)
