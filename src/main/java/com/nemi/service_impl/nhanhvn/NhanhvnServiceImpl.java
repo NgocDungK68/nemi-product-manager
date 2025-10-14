@@ -93,7 +93,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
     }
 
     @Override
-    @Async("syncExecuter")
+    @Async("syncExecutor")
     public void syncProduct(String posId) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
@@ -180,6 +180,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
     //------------------------------------------------------------------------------------------
 
     @Override
+    @Async("syncExecutor")
     public void syncOrder(String posId) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
