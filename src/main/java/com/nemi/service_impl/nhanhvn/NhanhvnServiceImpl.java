@@ -20,6 +20,7 @@ import com.nemi.model.response.nhanhvn.NhanhvnAccessTokenResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnOrderResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
 import com.nemi.repository.*;
+import com.nemi.service.EncryptionService;
 import com.nemi.service.GeneralPosService;
 import com.nemi.service.PosManagementService;
 import com.nemi.util.ClaimUtil;
@@ -53,6 +54,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
     private final NhanhvnConfig nhanhvnConfig;
     private final GeneralPosService generalPosService;
     private final NhanhvnMapper nhanhvnMapper;
+    private final EncryptionService encryptionService;
 
     private int batchSize;
     private int pageSize;
@@ -106,9 +108,13 @@ public class NhanhvnServiceImpl implements PosManagementService {
             String username = claimUtil.getUserName();
             // lấy PosEntity và validate posName
             PosEntity posEntity = generalPosService.getPos(posId);
+            
+            // Decrypt access token before using for API calls
+            String decryptedToken = encryptionService.decrypt(posEntity.getAccessToken());
+            
             NhanhvnRequest request = NhanhvnRequest.buildRequest(
                     posEntity.getConfig(),
-                    posEntity.getAccessToken(),
+                    decryptedToken,
                     posEntity.getCreatedAt().toInstant(ZoneOffset.UTC).getEpochSecond()
             );
 
@@ -198,9 +204,13 @@ public class NhanhvnServiceImpl implements PosManagementService {
             String username = claimUtil.getUserName();
             // lấy PosEntity và validate posName
             PosEntity posEntity = generalPosService.getPos(posId);
+            
+            // Decrypt access token before using for API calls
+            String decryptedToken = encryptionService.decrypt(posEntity.getAccessToken());
+            
             NhanhvnRequest request = NhanhvnRequest.buildRequest(
                     posEntity.getConfig(),
-                    posEntity.getAccessToken(),
+                    decryptedToken,
                     posEntity.getCreatedAt().toInstant(ZoneOffset.UTC).getEpochSecond()
             );
 
@@ -288,11 +298,14 @@ public class NhanhvnServiceImpl implements PosManagementService {
     private PosEntity createNewPos(NhanhvnAccessTokenResponse tokenResponse,
                                    Map<String, String> configMap,
                                    LocalDateTime expiredTime) {
-        PosEntity newPos = PosEntity.builder()
+            // Encrypt access token before storing
+            String encryptedToken = encryptionService.encrypt(tokenResponse.getData().getAccessToken());
+            
+            PosEntity newPos = PosEntity.builder()
                 .posName(PosName.NHANHVN.getValue())
                 .userId(claimUtil.getUserId())
                 .status(PosStatus.ACTIVE.name())
-                .accessToken(tokenResponse.getData().getAccessToken())
+                .accessToken(encryptedToken)
                 .config(JsonUtils.toJson(configMap))
                 .expiredTime(expiredTime)
                 .companyId(String.valueOf(claimUtil.getCompanyId()))

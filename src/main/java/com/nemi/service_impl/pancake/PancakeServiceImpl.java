@@ -30,6 +30,7 @@ import com.nemi.repository.jdbc.OrderItemJdbcRepository;
 import com.nemi.repository.jdbc.OrderJdbcRepository;
 import com.nemi.repository.jdbc.ProductJdbcRepository;
 import com.nemi.repository.jdbc.ProductVariantJdbcRepository;
+import com.nemi.service.EncryptionService;
 import com.nemi.service.GeneralPosService;
 import com.nemi.service.PosManagementService;
 import com.nemi.util.ClaimUtil;
@@ -66,6 +67,7 @@ public class PancakeServiceImpl implements PosManagementService {
     private final ProductVariantJdbcRepository productVariantJdbcRepository;
     private final OrderJdbcRepository orderJdbcRepository;
     private final OrderItemJdbcRepository orderItemJdbcRepositoryl;
+    private final EncryptionService encryptionService;
 
     private int orderBatchSize;
     private int orderItemBatchSize;
@@ -99,7 +101,7 @@ public class PancakeServiceImpl implements PosManagementService {
                     .posName(PosName.PANCAKE.name())
                     .userId(userId)
                     .status(PosStatus.ACTIVE.name())
-                    .accessToken(posConnectionRequest.getApiKey())
+                    .accessToken(encryptionService.encrypt(posConnectionRequest.getApiKey()))
                     .config(JsonUtils.toJson(configMap))
                     .expiredTime(expiredTime)
                     .companyId(String.valueOf(claimUtil.getCompanyId()))
@@ -133,7 +135,8 @@ public class PancakeServiceImpl implements PosManagementService {
                     posEntity.getConfig(), new TypeReference<>() {
                     });
             String shopId = configMap.get(PancakeConstatns.SHOP_ID);
-            String accessToken = posEntity.getAccessToken();
+            String accessToken = encryptionService.decrypt(posEntity.getAccessToken());
+
 
             if (StringUtils.isEmpty(shopId) || StringUtils.isEmpty(accessToken)) {
                 syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.MISSING_CONFIG, false));
@@ -228,7 +231,7 @@ public class PancakeServiceImpl implements PosManagementService {
                     posEntity.getConfig(), new TypeReference<>() {
                     });
             String shopId = configMap.get(PancakeConstatns.SHOP_ID);
-            String accessToken = posEntity.getAccessToken();
+            String accessToken = encryptionService.decrypt(posEntity.getAccessToken());
 
             if (StringUtils.isEmpty(shopId) || StringUtils.isEmpty(accessToken)) {
                 syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.MISSING_CONFIG, false));
