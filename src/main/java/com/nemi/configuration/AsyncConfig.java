@@ -26,13 +26,13 @@ public class AsyncConfig {
     }
 
     @Bean(name = "batchExecutor")
-    public AsyncTaskExecutor batchExecutor() {
+    public ThreadPoolTaskExecutor batchExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(asyncProperties.getBatch().getCorePoolSize());
         executor.setMaxPoolSize(asyncProperties.getBatch().getMaxPoolSize());
         executor.setQueueCapacity(asyncProperties.getBatch().getQueueCapacity());
         executor.setThreadNamePrefix("BatchExecutor-");
         executor.initialize();
-        return new DelegatingSecurityContextAsyncTaskExecutor(executor);
+        return executor;
     }
 }
