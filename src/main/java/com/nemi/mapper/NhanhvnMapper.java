@@ -26,7 +26,11 @@ public class NhanhvnMapper {
 
     public List<ProductEntity> convertToProductEntities(String posId, List<NhanhvnProductResponse.ProductData> apiProducts, String username) {
         return apiProducts.stream()
-                .map(apiProduct -> convertToProductEntity(posId, apiProduct,  username))
+                .map(apiProduct -> {
+                    ProductEntity productEntity = convertToProductEntity(posId, apiProduct,  username);
+                    if (ObjectUtils.isNotEmpty(productEntity)) productEntity.setCreatedBy(username);
+                    return productEntity;
+                })
                 .filter(Objects::nonNull)
                 .toList();
     }
@@ -42,7 +46,7 @@ public class NhanhvnMapper {
                 .code(apiProduct.getCode())
                 .name(apiProduct.getName())
                 .status(status)
-                .createdBy(username)
+                .updatedBy(username)
                 .build();
     }
 
@@ -50,7 +54,11 @@ public class NhanhvnMapper {
                                                                 List<NhanhvnProductResponse.ProductData> apiProducts,
                                                                 String username) {
         return apiProducts.stream()
-                .map(apiProduct -> convertToVariantEntity(posId, apiProduct, username))
+                .map(apiProduct -> {
+                    ProductVariantEntity variantEntity = convertToVariantEntity(posId, apiProduct,  username);
+                    if (ObjectUtils.isNotEmpty(variantEntity)) variantEntity.setCreatedBy(username);
+                    return variantEntity;
+                })
                 .filter(Objects::nonNull)
                 .toList();
     }
@@ -70,7 +78,7 @@ public class NhanhvnMapper {
                 .fulfillableQuantity(apiProduct.getInventory().getAvailable())
                 .weight(apiProduct.getShipping().getWeight())
                 .weightUnit(WeightUnit.GAM.getValue())
-                .createdBy(username)
+                .updatedBy(username)
                 .build();
     }
 
@@ -78,8 +86,11 @@ public class NhanhvnMapper {
                                                      List<NhanhvnOrderResponse.OrderData> apiOrders,
                                                      String username) {
         return apiOrders.stream()
-                .map(apiOrder -> convertToOrderEntity(posId, apiOrder, username))
-                .filter(Objects::nonNull)
+                .map(apiOrder -> {
+                    OrderEntity entity = convertToOrderEntity(posId, apiOrder, username);
+                    entity.setCreatedBy(username);
+                    return entity;
+                })
                 .toList();
     }
 
@@ -99,16 +110,15 @@ public class NhanhvnMapper {
                 .shippingFee(apiOrder.getCarrier().getShipFee())
                 .totalPrice(totalProductPrice(apiOrder))
                 .status(status)
-                .createdBy(username)
+                .updatedBy(username)
                 .build();
     }
 
     public List<OrderItemEntity> convertToOrderItemEntities(List<NhanhvnOrderResponse.OrderData> apiOrders, String username) {
-        List<OrderItemEntity> orderItemEntities = new ArrayList<>();
-        for (NhanhvnOrderResponse.OrderData orderData : apiOrders) {
-            orderItemEntities.addAll(convertToOrderItemEntity(orderData, username));
-        }
-        return orderItemEntities;
+        return apiOrders.stream()
+                .flatMap(apiOrder -> convertToOrderItemEntity(apiOrder, username).stream())
+                .peek(entity -> entity.setCreatedBy(username))
+                .toList();
     }
 
     public List<OrderItemEntity> convertToOrderItemEntity(NhanhvnOrderResponse.OrderData apiOrder, String username) {
@@ -123,7 +133,7 @@ public class NhanhvnMapper {
                     .price(product.getPrice())
                     .totalPrice(product.getPrice().multiply(quantity))
                     .productName(product.getName())
-                    .createdBy(username)   // claim
+                    .updatedBy(username)
                     .build());
         }
 
