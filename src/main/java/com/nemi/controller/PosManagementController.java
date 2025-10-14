@@ -52,7 +52,7 @@ public class PosManagementController {
         return ResponseEntity.ok(posConnectionResponse);
     }
 
-    @PostMapping("/{posId}")
+    @PostMapping("/pos/{posId}/sync")
     public ResponseEntity<PosConnectionResponse> manualSync(@PathVariable String posId) {
         PosEntity posEntity = generalPosService.getPos(posId);
         PosManagementService posManagementService = posManagementFactory.getPosName(posEntity.getPosName());
