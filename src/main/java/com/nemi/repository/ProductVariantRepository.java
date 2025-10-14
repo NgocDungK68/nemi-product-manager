@@ -14,7 +14,6 @@ import java.util.Optional;
 public interface ProductVariantRepository extends JpaRepository<ProductVariantEntity, VariantId> {
     
     List<ProductVariantEntity> findByProductId(String productId);
-    
 
     Optional<ProductVariantEntity> findByVariantId(String variantId);
 

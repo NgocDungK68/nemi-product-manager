@@ -15,6 +15,7 @@ import com.nemi.exception.pojo.AlertMessages;
 import com.nemi.mapper.NhanhvnMapper;
 import com.nemi.model.request.nhanhvn.NhanhvnRequest;
 import com.nemi.model.request.nhanhvn.NhanhvnWebhookRequest;
+import com.nemi.model.response.nhanhvn.NhanhvnInventoryResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnOrderResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
 import com.nemi.repository.*;
@@ -110,6 +111,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
             case ORDER_ADD -> handleOrderAdd(posId, data);
             case ORDER_UPDATE -> handleOrderUpdate(posId, data);
             case ORDER_DELETE -> handleOrderDelete(posId, data);
+            case INVENTORY_CHANGE -> handleInventoryChange(posId, data);
             default -> {
                 log.warn("[NhanhvnWebhookServiceImpl.handleEvent] Unhandled event: {}", event);
                 yield false;
@@ -257,48 +259,50 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
             return false;
         }
 
-        String id = ids.get(0);
-        VariantId variantId = new VariantId(id, posId);
-        Optional<ProductVariantEntity> variantEntity = variantRepository.findById(variantId);
-        if (variantEntity.isEmpty()) {
-            log.warn("[NhanhvnWebhookServiceImpl.handleProductDelete] Failed to find variant with id={}", id);
-            return false;
-        }
-
-        // Kiểm tra xem data có phải sản phẩm con không
-        if (!variantEntity.get().getProductId().equals(String.valueOf(NhanhvnConstants.STANDALONE_PRODUCT))) {
-            String parentId = variantEntity.get().getProductId();
-            Optional<ProductEntity> productEntity = productRepository.findById(
-                    new ProductId(parentId, posId)
-            );
-
-            if (productEntity.isEmpty()) {
-                log.warn("[NhanhvnWebhookServiceImpl.handleProductDelete] Failed to find parent product with id={} in database", parentId);
+        for (String id: ids) {
+            VariantId variantId = new VariantId(id, posId);
+            Optional<ProductVariantEntity> variantEntity = variantRepository.findById(variantId);
+            if (variantEntity.isEmpty()) {
+                log.warn("[NhanhvnWebhookServiceImpl.handleProductDelete] Failed to find variant with id={}", id);
                 return false;
             }
 
-            // Kiểm tra xem sản phẩm cha có còn sản phẩm con không
-            NhanhvnProductResponse.ProductData parentProduct = getProductById(posId, parentId);
-            if (ObjectUtils.isEmpty(parentProduct)) {
-                log.warn("[NhanhvnWebhookServiceImpl.handleProductDelete] Failed to find parent product with id={}", parentId);
-                return false;
+            // Kiểm tra xem data có phải sản phẩm con không
+            if (!variantEntity.get().getProductId().equals(String.valueOf(NhanhvnConstants.STANDALONE_PRODUCT))) {
+                String parentId = variantEntity.get().getProductId();
+                Optional<ProductEntity> productEntity = productRepository.findById(
+                        new ProductId(parentId, posId)
+                );
+
+                if (productEntity.isEmpty()) {
+                    log.warn("[NhanhvnWebhookServiceImpl.handleProductDelete] Failed to find parent product with id={} in database", parentId);
+                    return false;
+                }
+
+                // Kiểm tra xem sản phẩm cha có còn sản phẩm con không
+                NhanhvnProductResponse.ProductData parentProduct = getProductById(posId, parentId);
+                if (ObjectUtils.isEmpty(parentProduct)) {
+                    log.warn("[NhanhvnWebhookServiceImpl.handleProductDelete] Failed to find parent product with id={}", parentId);
+                    return false;
+                }
+
+                if (!(parentProduct.getParentId()).equals(NhanhvnConstants.PARENT_PRODUCT)) {
+                    productRepository.deleteById(new ProductId(parentId, posId));
+                    log.info("[NhanhvnWebhookServiceImpl.handleProductDelete] Deleted product with id={} because it is now a variant", parentId);
+
+                    ProductVariantEntity variant = nhanhvnMapper.convertToVariantEntity(posId, parentProduct, PosName.WEBHOOK.getValue());
+                    variant.setCreatedBy(productEntity.get().getCreatedBy());
+                    variantRepository.save(variant);
+                    log.info("[NhanhvnWebhookServiceImpl.handleProductDelete] Converted product with id={} to variant", variant.getVariantId());
+                }
+
+                log.info("[NhanhvnWebhookServiceImpl.handleProductDelete] Parent of variant with id={} is still parent product", variantEntity.get().getVariantId());
             }
 
-            if (!(parentProduct.getParentId()).equals(NhanhvnConstants.PARENT_PRODUCT)) {
-                productRepository.deleteById(new ProductId(parentId, posId));
-                log.info("[NhanhvnWebhookServiceImpl.handleProductDelete] Deleted product with id={} because it is now a variant", parentId);
-
-                ProductVariantEntity variant = nhanhvnMapper.convertToVariantEntity(posId, parentProduct, PosName.WEBHOOK.getValue());
-                variant.setCreatedBy(productEntity.get().getCreatedBy());
-                variantRepository.save(variant);
-                log.info("[NhanhvnWebhookServiceImpl.handleProductDelete] Converted product with id={} to variant", variant.getVariantId());
-            }
-
-            log.info("[NhanhvnWebhookServiceImpl.handleProductDelete] Parent of variant with id={} is still parent product", variantEntity.get().getVariantId());
+            variantRepository.deleteById(variantId);
+            log.info("[NhanhvnWebhookServiceImpl.handleProductDelete] Deleted variant with id={} from posId={}", id, posId);
         }
 
-        variantRepository.deleteById(variantId);
-        log.info("[NhanhvnWebhookServiceImpl.handleProductDelete] Deleted variant with id={} from posId={}", id, posId);
         return true;
     }
 
@@ -379,7 +383,6 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
         return true;
     }
 
-
     private boolean handleOrderDelete(String posId, Object data) {
         List<String> ids = objectMapper.convertValue(data, new TypeReference<>() {
         });
@@ -388,24 +391,50 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
             return false;
         }
 
-        String orderId = ids.get(0);
+        for (String orderId : ids) {
+            Optional<OrderEntity> orderEntity = orderRepository.findById(orderId);
+            if (orderEntity.isEmpty()) {
+                log.warn("[NhanhvnWebhookServiceImpl.handleOrderDelete] Failed to find order with id={}", orderId);
+                return false;
+            }
 
-        Optional<OrderEntity> orderEntity = orderRepository.findById(orderId);
-        if (orderEntity.isEmpty()) {
-            log.warn("[NhanhvnWebhookServiceImpl.handleOrderDelete] Failed to find order with id={}", orderId);
-            return false;
+            // Nếu xóa cả orderItem liên quan, làm trước khi xóa order
+            List<OrderItemEntity> orderItems = orderItemRepository.findByOrderId(orderId);
+            if (!orderItems.isEmpty()) {
+                orderItemRepository.deleteAll(orderItems);
+                log.info("[NhanhvnWebhookServiceImpl.handleOrderDelete] Deleted {} order items for orderId={}", orderItems.size(), orderId);
+            }
+
+            orderRepository.deleteById(orderId);
+            log.info("[NhanhvnWebhookServiceImpl.handleOrderDelete] Deleted order with id={} from posId={}", orderId, posId);
         }
 
-        // Nếu xóa cả orderItem liên quan, làm trước khi xóa order
-        List<OrderItemEntity> orderItems = orderItemRepository.findByOrderId(orderId);
-        if (!orderItems.isEmpty()) {
-            orderItemRepository.deleteAll(orderItems);
-            log.info("[NhanhvnWebhookServiceImpl.handleOrderDelete] Deleted {} order items for orderId={}", orderItems.size(), orderId);
+        return true;
+    }
+
+    private boolean handleInventoryChange(String posId, Object data) {
+        List<NhanhvnInventoryResponse> nhanhvnInventoryResponses = objectMapper.convertValue(
+                data,
+                new TypeReference<>() {
+                }
+        );
+
+        for (NhanhvnInventoryResponse inventoryResponse : nhanhvnInventoryResponses) {
+            VariantId variantId = new VariantId(String.valueOf(inventoryResponse.getId()), posId);
+            Optional<ProductVariantEntity> variantEntity = variantRepository.findById(variantId);
+            if (variantEntity.isEmpty()) {
+                log.warn("[NhanhvnWebhookServiceImpl.handleInventoryChange] Failed to find variant with id={}", inventoryResponse.getId());
+                return false;
+            }
+
+            ProductVariantEntity variant = variantEntity.get();
+            variant.setInventoryQuantity(inventoryResponse.getRemain());
+            variant.setFulfillableQuantity(inventoryResponse.getAvailable());
+            variantRepository.save(variant);
+
+            log.info("[NhanhvnWebhookServiceImpl.handleInventoryChange] Updated inventory for variantId={} posId={} inventoryQuantity={} fulfillableQuantity={}",
+                    variant.getProductId(), posId, inventoryResponse.getRemain(), inventoryResponse.getAvailable());
         }
-
-        orderRepository.deleteById(orderId);
-        log.info("[NhanhvnWebhookServiceImpl.handleOrderDelete] Deleted order with id={} from posId={}", orderId, posId);
-
         return true;
     }
 

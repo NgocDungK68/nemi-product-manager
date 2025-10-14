@@ -8,6 +8,5 @@ import java.util.Optional;
 
 @Repository
 public interface OrderRepository extends JpaRepository<OrderEntity,String> {
-    
     Optional<OrderEntity> findByOrderIdAndPosId(String orderId, String posId);
 }
