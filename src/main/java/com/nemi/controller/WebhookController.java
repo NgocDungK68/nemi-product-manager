@@ -70,7 +70,7 @@ public class WebhookController {
         }
         log.info("🟣 [TestWebhook] Headers: {}", headers);
 
-        // 🔍 Log query parameters
+        // 🔍Log query parameters
         Map<String, String[]> parameterMap = request.getParameterMap();
         if (!parameterMap.isEmpty()) {
             Map<String, Object> queryParams = new HashMap<>();

@@ -9,6 +9,7 @@ import com.nemi.enums.SapoEvent;
 import com.nemi.model.response.sapo.SapoOrderResponse;
 import com.nemi.model.response.sapo.SapoProductResponse;
 import com.nemi.repository.*;
+import com.nemi.mapper.SapoMapper;
 import com.nemi.service.WebhookService;
 import com.nemi.util.JsonUtils;
 import com.nemi.utils.PosUtils;
@@ -35,6 +36,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final SapoConfig sapoConfig;
+    private final SapoMapper sapoMapper;
     private final WebhookHistoryRepository webhookHistoryRepository;
 
     @Override
@@ -286,7 +288,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
             }
 
             // Tạo order mới
-            OrderEntity order = convertToOrderEntity(posId, payload);
+            OrderEntity order = sapoMapper.convertToOrderEntity(posId, payload, "webhook");
             log.info("Creating new Sapo order: {}", externalOrderId);
             orderRepository.save(order);
 

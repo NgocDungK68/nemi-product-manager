@@ -29,7 +29,6 @@ import java.util.stream.Collectors;
 public class PancakeMapper {
     private final PancakeConfig pancakeConfig;
     private final ClaimUtil claimUtil;
-    @Async("syncExecutor")
     public List<ProductEntity> convertToProductEntities( // return btg
             String posId,
             List<PancakeProductResponse.ProductData> apiProducts
@@ -75,7 +74,6 @@ public class PancakeMapper {
         return product;
     }
 
-    @Async("syncExecutor")
     public List<ProductVariantEntity> convertToVariantEntities(
             String posId,
             List<PancakeProductResponse.ProductData> apiProducts
@@ -110,7 +108,6 @@ public class PancakeMapper {
                 .build();
     }
 
-    @Async("syncExecutor")
     public List<OrderEntity> convertToOrderEntities(String posId, List<PancakeOrderResponse.DataItem> apiOrders,String userName) {
         return   apiOrders.stream()
                 .map(orders -> convertToOrderEntity(posId, orders,userName))
@@ -148,7 +145,6 @@ public class PancakeMapper {
                 .build();
     }
 
-    @Async("syncExecutor")
     public List<OrderItemEntity> convertToOrderItemEntities(List<PancakeOrderResponse.DataItem> apiOrders,String userName) {
         List<OrderItemEntity> orderItemEntities = new ArrayList<>();
         for (PancakeOrderResponse.DataItem orderData : apiOrders) {
@@ -175,6 +171,4 @@ public class PancakeMapper {
         }
         return orderItemEntities;
     }
-
-
 }

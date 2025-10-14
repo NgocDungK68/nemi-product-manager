@@ -80,26 +80,20 @@ public class PancakeClient {
         }
     }
 
-    public Optional<PancakeOrderResponse> getOrders(PancakeRequest request) {
+    public Optional<PancakeOrderResponse> getOrders(PancakeRequest request, LocalDateTime posStartDate) {
         log.debug("[Pancake.getOrders] with pagesize {} and page number", request.getPageSize(),request.getPageNumber());
 
         try {
-
-                        LocalDate firstDay = LocalDate.now().withDayOfMonth(1);
-            LocalDateTime startOfDay = firstDay.atStartOfDay();
-            long startUnix = startOfDay.toEpochSecond(ZoneOffset.of("+07:00"));
-            // hoặc ZoneOffset.of("+07:00")
-
-            // Thời điểm hiện tại
-            LocalDateTime end = LocalDateTime.now();
-            long endUnix = end.toEpochSecond(ZoneOffset.of("+07:00"));
+            LocalDateTime posEndDate = posStartDate.plusDays(30);
+            long startUnix = posStartDate.toEpochSecond(ZoneOffset.of("+07:00"));
+            long endUnix = posEndDate.toEpochSecond(ZoneOffset.of("+07:00"));
 
             String relativeUri = UriComponentsBuilder.fromPath(request.getShopId() + "/orders")
                     .queryParam(PancakeConstatns.API_KEY, request.getApiKey())
                     .queryParam(PancakeConstatns.PAGE_SIZE, request.getPageSize())
                     .queryParam(PancakeConstatns.PAGE_NUMBER, request.getPageNumber())
-                    .queryParam("startDateTime", startUnix)
-                    .queryParam("endDateTime", endUnix)
+                    .queryParam(PancakeConstatns.START_DATE_TIME, startUnix)
+                    .queryParam(PancakeConstatns.END_DATE_TIME, endUnix)
                     .toUriString();
 
             log.debug("[Pancake.getProducts] Calling relative URI: {}", relativeUri);
