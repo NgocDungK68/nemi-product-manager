@@ -14,6 +14,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.Optional;
 
@@ -30,12 +33,21 @@ public class PancakeClient {
 
         try {
 
+//            LocalDate firstDay = LocalDate.now().withDayOfMonth(1);
+//            LocalDateTime startOfDay = firstDay.atStartOfDay();
+//            long startUnix = startOfDay.toEpochSecond(ZoneOffset.UTC);  // hoặc ZoneOffset.of("+07:00")
+//
+//            // Thời điểm hiện tại
+//            LocalDateTime end = LocalDateTime.now();
+//            long endUnix = end.toEpochSecond(ZoneOffset.UTC);
 
             String relativeUri = UriComponentsBuilder.fromPath(request.getShopId() + "/products/variations")
                     .queryParam(PancakeConstatns.API_KEY, request.getApiKey())
                     .queryParam(PancakeConstatns.PAGE_SIZE, request.getPageSize())
-                    .queryParam(PancakeConstatns.PAGE_NUMBER, request.getPageNumber())
-                    .toUriString();
+                    .queryParam(PancakeConstatns.PAGE_NUMBER, request.getPageNumber()).toUriString();
+//                    .queryParam("startDateTime", startUnix)
+//                    .queryParam("endDateTime", endUnix)
+
 
             log.debug("[Pancake.getProducts] Calling relative URI: {}", relativeUri);
             // build request body
@@ -73,10 +85,21 @@ public class PancakeClient {
 
         try {
 
+                        LocalDate firstDay = LocalDate.now().withDayOfMonth(1);
+            LocalDateTime startOfDay = firstDay.atStartOfDay();
+            long startUnix = startOfDay.toEpochSecond(ZoneOffset.of("+07:00"));
+            // hoặc ZoneOffset.of("+07:00")
+
+            // Thời điểm hiện tại
+            LocalDateTime end = LocalDateTime.now();
+            long endUnix = end.toEpochSecond(ZoneOffset.of("+07:00"));
+
             String relativeUri = UriComponentsBuilder.fromPath(request.getShopId() + "/orders")
                     .queryParam(PancakeConstatns.API_KEY, request.getApiKey())
                     .queryParam(PancakeConstatns.PAGE_SIZE, request.getPageSize())
                     .queryParam(PancakeConstatns.PAGE_NUMBER, request.getPageNumber())
+                    .queryParam("startDateTime", startUnix)
+                    .queryParam("endDateTime", endUnix)
                     .toUriString();
 
             log.debug("[Pancake.getProducts] Calling relative URI: {}", relativeUri);

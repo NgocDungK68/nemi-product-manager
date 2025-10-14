@@ -51,6 +51,7 @@ public class PosManagementController {
         PosConnectionResponse posConnectionResponse = generalPosService.setPosStatus(changeStatusRequest);
         return ResponseEntity.ok(posConnectionResponse);
     }
+    // test pancake
 
     @PostMapping("/pos/{posId}/sync")
     public ResponseEntity<PosConnectionResponse> manualSync(@PathVariable String posId) {
