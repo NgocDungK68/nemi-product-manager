@@ -12,7 +12,7 @@ import java.util.Optional;
 @Data
 @Configuration
 @ConfigurationProperties("pancake")
-public class PancakeConfig {
+public  class PancakeConfig {
     private String baseUrl;
     private String apiKey;
     private String shopId;
