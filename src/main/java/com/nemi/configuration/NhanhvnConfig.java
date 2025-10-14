@@ -1,6 +1,8 @@
 package com.nemi.configuration;
 
+import jakarta.annotation.PostConstruct;
 import lombok.Data;
+import lombok.Getter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
@@ -24,6 +26,19 @@ public class NhanhvnConfig {
     private ProductConfig product;
     private OrderConfig order;
     private SyncConfig sync;
+    private Integer recentDays;
+
+    @Getter
+    private static NhanhvnConfig instance;
+
+    @PostConstruct
+    public void init() {
+        instance = this;
+    }
+
+    public static Integer getRecentDaysStatic() {
+        return instance.recentDays;
+    }
 
     @Data
     public static class ProductConfig {
@@ -39,8 +54,8 @@ public class NhanhvnConfig {
     public static class StatusConfig {
         private HashMap<Integer, String> mapping;
     }
-    public String getOrderStatusMapping(Integer key) {
 
+    public String getOrderStatusMapping(Integer key) {
         return Optional.ofNullable(key)
                 .map(code -> this.getOrder().getStatus().getMapping()
                         .get(code))
@@ -48,7 +63,6 @@ public class NhanhvnConfig {
     }
 
     public String getProductStatusMapping(Integer key) {
-
         return Optional.ofNullable(key)
                 .map(code -> this.getProduct().getStatus().getMapping()
                         .get(code))

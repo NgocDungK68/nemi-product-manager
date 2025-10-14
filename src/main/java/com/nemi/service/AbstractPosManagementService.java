@@ -1,5 +1,9 @@
 package com.nemi.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nemi.configuration.NhanhvnConfig;
+import com.nemi.constant.NhanhvnConstants;
 import com.nemi.entity.PosEntity;
 import com.nemi.entity.SyncHistoryEntity;
 import com.nemi.enums.PosStatus;
@@ -12,12 +16,16 @@ import com.nemi.model.response.StatusResponse;
 import com.nemi.repository.PosRepository;
 import com.nemi.repository.SyncHistoryRepository;
 import com.nemi.util.ClaimUtil;
+import io.jsonwebtoken.lang.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
@@ -28,7 +36,8 @@ public abstract class AbstractPosManagementService {
     protected final PosRepository posRepository;
     protected final ClaimUtil claimUtil;
     protected final SyncHistoryRepository syncHistoryRepository;
-    protected final PosReAuthService posReAuthService;
+    protected final ObjectMapper objectMapper;
+    protected final NhanhvnConfig  nhanhvnConfig;
 
     /**
      * Get POS status by ID
@@ -68,14 +77,14 @@ public abstract class AbstractPosManagementService {
         return posEntities.stream()
                 .map(pos -> {
                     // Check token hết hạn
-                    if (posReAuthService.isAccessTokenExpired(pos)) {
+                    if (isAccessTokenExpired(pos)) {
                         if (!PosStatus.EXPIRED.name().equals(pos.getStatus())) {
                             pos.setStatus(PosStatus.EXPIRED.name());
                             posRepository.save(pos);
                             log.info("POS expired for userId={}, posId={}", userId, pos.getId());
                         }
 
-                        String reAuthLink = posReAuthService.buildReAuthLink(pos);
+                        String reAuthLink = buildReAuthLink(pos);
                         return PosConnectionResponse.expired(pos, reAuthLink);
                     }
 
@@ -140,8 +149,6 @@ public abstract class AbstractPosManagementService {
                 log.debug("Saved batch {}-{} of {} {}s (Thread: {})",
                         i + 1, endIndex, entities.size(), entityName, Thread.currentThread().getName());
             }
-
-            log.info("Successfully saved all {} {}s", entities.size(), entityName);
         } catch (Exception e) {
             log.error("Failed to save {}: {}", entityName, e.getMessage(), e);
         }
@@ -150,6 +157,42 @@ public abstract class AbstractPosManagementService {
         return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
                 .thenRun(() -> log.info("Successfully saved all {} {}s", entities.size(), entityName));
     }
+
+    /**
+     * Kiểm tra accessToken của POS đã hết hạn chưa
+     */
+    private boolean isAccessTokenExpired(PosEntity posEntity) {
+        if (Objects.isEmpty(posEntity.getExpiredTime())) {
+            return false;
+        }
+        return posEntity.getExpiredTime().isBefore(LocalDateTime.now());
+    }
+
+    public String buildReAuthLink(PosEntity posEntity) {
+        try {
+            Map<String, String> configMap = objectMapper.readValue(
+                    posEntity.getConfig(),
+                    new TypeReference<>() {
+                    }
+            );
+
+            String appId = configMap.get(NhanhvnConstants.APP_ID);
+            String businessId = configMap.get(NhanhvnConstants.BUSINESS_ID);
+            if (org.springframework.util.ObjectUtils.isEmpty(appId) || org.springframework.util.ObjectUtils.isEmpty(businessId)) {
+                log.warn("AppId or BusinessId is empty, AppId: {}, BusinessId: {}", appId, businessId);
+                return null;
+            }
+
+            return UriComponentsBuilder.fromHttpUrl(nhanhvnConfig.getBaseUrl())
+                    .pathSegment(nhanhvnConfig.getUrlOauth())
+                    .queryParam(NhanhvnConstants.VERSION, nhanhvnConfig.getApiVersion())
+                    .queryParam(NhanhvnConstants.APP_ID, appId)
+                    .queryParam(NhanhvnConstants.BUSINESS_ID, businessId)
+                    .queryParam(NhanhvnConstants.RETURN_LINK, nhanhvnConfig.getReturnLink())
+                    .toUriString();
+        } catch (Exception e) {
+            log.error("Build Nhanh.vn reAuth link failed: {}", e.getMessage(), e);
+            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.JSON_PARSE_ERROR));
+        }
+    }
 }
-
-

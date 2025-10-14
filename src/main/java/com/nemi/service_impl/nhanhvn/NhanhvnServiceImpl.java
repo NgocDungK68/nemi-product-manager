@@ -34,6 +34,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
@@ -93,7 +94,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
     }
 
     @Override
-    @Async("syncExecuter")
+    @Async("syncExecutor")
     public void syncProduct(String posId) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
@@ -102,9 +103,14 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 .syncType(SyncType.PRODUCT.getValue())
                 .build();
         try {
+            String username = claimUtil.getUserName();
             // lấy PosEntity và validate posName
             PosEntity posEntity = generalPosService.getPos(posId);
-            NhanhvnRequest request = NhanhvnRequest.buildRequest(posEntity);
+            NhanhvnRequest request = NhanhvnRequest.buildRequest(
+                    posEntity.getConfig(),
+                    posEntity.getAccessToken(),
+                    posEntity.getCreatedAt().toInstant(ZoneOffset.UTC).getEpochSecond()
+            );
 
             if (isInvalidRequest(request)) {
                 syncHistoryRepository.save(toSyncHistory(history, (SyncErrorMessage.MISSING_CONFIG), false));
@@ -142,12 +148,12 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 }
 
                 // product
-                List<ProductEntity> pageProducts = nhanhvnMapper.convertToProductEntities(posId, response.getData(), claimUtil.getUserName());
+                List<ProductEntity> pageProducts = nhanhvnMapper.convertToProductEntities(posId, response.getData(), username);
                 allProducts.addAll(pageProducts);
                 log.info("[NhanhvnServiceImpl.syncProduct] Fetched {} products, total so far: {}", pageProducts.size(), allProducts.size());
 
                 // variant
-                List<ProductVariantEntity> pageVariants = nhanhvnMapper.convertToVariantEntities(posId, response.getData(), claimUtil.getUserName());
+                List<ProductVariantEntity> pageVariants = nhanhvnMapper.convertToVariantEntities(posId, response.getData(), username);
                 allVariants.addAll(pageVariants);
                 log.info("[NhanhvnServiceImpl.syncProduct] Fetched {} variants, total so far: {}", pageVariants.size(), allVariants.size());
 
@@ -180,6 +186,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
     //------------------------------------------------------------------------------------------
 
     @Override
+    @Async("syncExecutor")
     public void syncOrder(String posId) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
@@ -188,9 +195,14 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 .syncType(SyncType.ORDER.getValue())
                 .build();
         try {
+            String username = claimUtil.getUserName();
             // lấy PosEntity và validate posName
             PosEntity posEntity = generalPosService.getPos(posId);
-            NhanhvnRequest request = NhanhvnRequest.buildRequest(posEntity);
+            NhanhvnRequest request = NhanhvnRequest.buildRequest(
+                    posEntity.getConfig(),
+                    posEntity.getAccessToken(),
+                    posEntity.getCreatedAt().toInstant(ZoneOffset.UTC).getEpochSecond()
+            );
 
             if (isInvalidRequest(request)) {
                 syncHistoryRepository.save(toSyncHistory(history, (SyncErrorMessage.MISSING_CONFIG), false));
@@ -228,12 +240,12 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 }
 
                 // order
-                List<OrderEntity> pageOrders = nhanhvnMapper.convertToOrderEntities(posId, response.getData(), claimUtil.getUserName());
+                List<OrderEntity> pageOrders = nhanhvnMapper.convertToOrderEntities(posId, response.getData(), username);
                 allOrders.addAll(pageOrders);
                 log.info("[NhanhvnServiceImpl.syncOrder] Fetched {} orders, total so far: {}", pageOrders.size(), pageOrders.size());
 
 
-                List<OrderItemEntity> pageOrderItem = nhanhvnMapper.convertToOrderItemEntities(response.getData(), claimUtil.getUserName());
+                List<OrderItemEntity> pageOrderItem = nhanhvnMapper.convertToOrderItemEntities(response.getData(), username);
                 allOrderItems.addAll(pageOrderItem);
                 log.info("[NhanhvnServiceImpl.syncOrder] Fetched {} order items, total so far: {}", pageOrderItem.size(), pageOrderItem.size());
 
