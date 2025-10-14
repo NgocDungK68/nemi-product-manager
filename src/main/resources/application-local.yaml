@@ -53,6 +53,7 @@ nhanhvn:
   url-orders: order/list
   verify-token: nemiWebhook123!@#
   secret-key: NHdyJR8NKO2v8Md7Nwb06o1n0nOAW5YcLBeQs4DdyoLmoXJK8jz6Hf3nQcadBx2m5Ys9kGydcKs0g3Kn94rVgXyU1nhmDtQSZipWJjiHo5A6ffCamfsL81DXUSm9n3AT
+  recent-days: 30 # số ngày gần nhất để lấy sản phẩm
   product:
     status:
       mapping:
