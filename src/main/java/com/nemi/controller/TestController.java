@@ -2,6 +2,7 @@ package com.nemi.controller;
 
 import com.nemi.entity.PosEntity;
 import com.nemi.repository.PosRepository;
+import com.nemi.service.GeneralPosService;
 import com.nemi.service.PosReAuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -13,8 +14,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 public class TestController {
-    private final PosReAuthService posReAuthService;
     private final PosRepository posRepository;
+    private final GeneralPosService generalPosService;
 
 //    private final PosManagementService pancakeService;
 
@@ -36,7 +37,7 @@ public class TestController {
     @PostMapping("/public-api/testReAuth/{posId}")
     public String testReAuth(@PathVariable String posId) {
         PosEntity posEntity = posRepository.findById(posId).orElse(null);
-        return posReAuthService.buildReAuthLink(posEntity);
+        return generalPosService.buildReAuthLink(posEntity);
     }
 
     @PostMapping("/public-api/pancake/{posId}")

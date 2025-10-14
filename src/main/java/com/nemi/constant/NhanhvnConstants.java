@@ -14,6 +14,9 @@ public class NhanhvnConstants {
     public static final Integer PARENT_PRODUCT = -2;
     public static final Integer STANDALONE_PRODUCT = -1;
 
+    public static final String UPDATED_AT_FROM = "updatedAtFrom";
+    public static final String UPDATED_AT_TO = "updatedAtTo";
+
     private NhanhvnConstants() {
     }
 }
