@@ -1,16 +1,22 @@
 package com.nemi.service_impl.pancake;
 
+import com.nemi.configuration.PancakeConfig;
+import com.nemi.entity.OrderEntity;
+import com.nemi.entity.OrderItemEntity;
 import com.nemi.entity.ProductEntity;
 import com.nemi.entity.ProductVariantEntity;
 import com.nemi.enums.Status;
 import com.nemi.enums.WeightUnit;
+import com.nemi.model.response.pancake.PancakeOrderResponse;
 import com.nemi.model.response.pancake.PancakeProductResponse;
+import com.nemi.util.ClaimUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -21,8 +27,10 @@ import java.util.stream.Collectors;
 @Slf4j
 @RequiredArgsConstructor
 public class PancakeAsyncService {
+    private final PancakeConfig pancakeConfig;
+    private final ClaimUtil claimUtil;
     @Async("syncExecutor")
-    protected CompletableFuture<List<ProductEntity>> convertToProductEntities(
+    protected CompletableFuture<List<ProductEntity>> convertToProductEntities( // return btg
             String posId,
             List<PancakeProductResponse.ProductData> apiProducts
     ) {
@@ -103,4 +111,73 @@ public class PancakeAsyncService {
                 .weightUnit(WeightUnit.GAM.getValue())
                 .build();
     }
+
+    @Async("syncExecutor")
+    protected CompletableFuture<List<OrderEntity>> convertToOrderEntities(String posId, List<PancakeOrderResponse.DataItem> apiOrders,String userName) {
+         List<OrderEntity> orderEntities =   apiOrders.stream()
+                .map(orders -> convertToOrderEntity(posId, orders,userName))
+                .filter(Objects::nonNull)
+                .toList();
+         return CompletableFuture.completedFuture(orderEntities);
+    }
+
+    public OrderEntity convertToOrderEntity(String posId, PancakeOrderResponse.DataItem apiOrders,String userName) {
+        String status = pancakeConfig.getStatusMapping(apiOrders.getStatus(), apiOrders.getStatusName());
+        log.info("status of orderId {} is {}", apiOrders.getId(), status);
+
+        String paymentMethod = Optional.ofNullable(apiOrders.getPaymentPurchaseHistories())
+                .filter(histories -> !histories.isEmpty())
+                .map(histories -> histories.get(0).getType())
+                .orElse(null);
+
+        String orderCode = Optional.ofNullable(apiOrders.getPartner())
+                .map(PancakeOrderResponse.Partner::getExtendCode)
+                .orElse(null);
+
+
+        return OrderEntity.builder()
+                .posId(posId)
+                .orderId(String.valueOf(apiOrders.getId()))
+                .orderCode(orderCode)
+                .customerName(apiOrders.getShippingAddress().getFullName())
+                .customerPhone(apiOrders.getShippingAddress().getPhoneNumber())
+                .shippingAddress(apiOrders.getShippingAddress().getFullAddress())
+                .paymentMethod(paymentMethod)
+                .shippingFee(apiOrders.getShippingFee())
+                .totalPrice(apiOrders.getTotalPrice())
+                .customerEmail(apiOrders.getBillEmail())
+                .status(status)
+                .createdBy(userName)
+                .build();
+    }
+
+    @Async("syncExecutor")
+    CompletableFuture<List<OrderItemEntity>> convertToOrderItemEntities(List<PancakeOrderResponse.DataItem> apiOrders,String userName) {
+        List<OrderItemEntity> orderItemEntities = new ArrayList<>();
+        for (PancakeOrderResponse.DataItem orderData : apiOrders) {
+            orderItemEntities.addAll(convertToOrderItemEntity(orderData,userName));
+        }
+        return  CompletableFuture.completedFuture(orderItemEntities);
+    }
+
+    public List<OrderItemEntity> convertToOrderItemEntity(PancakeOrderResponse.DataItem apiOrder,String userName) {
+        List<OrderItemEntity> orderItemEntities = new ArrayList<>();
+        for (PancakeOrderResponse.Item product : apiOrder.getItems()) {
+            BigDecimal quantity = BigDecimal.valueOf(product.getQuantity());
+            orderItemEntities.add(OrderItemEntity.builder()
+                    .orderItemId(String.valueOf(product.getId()))
+                    .orderId(String.valueOf(apiOrder.getId()))
+                    .quantity(product.getQuantity())
+                    .sku(product.getVariationInfo().getDisplayId())
+                    .variantName(product.getVariationInfo().getName())
+                    .price(product.getVariationInfo().getRetailPrice())
+                    .totalPrice(product.getVariationInfo().getRetailPrice().multiply(quantity))
+                    .productName(product.getVariationInfo().getName())
+                    .createdBy(userName)
+                    .build());
+        }
+        return orderItemEntities;
+    }
+
+
 }

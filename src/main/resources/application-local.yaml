@@ -13,14 +13,15 @@ spring:
       minimum-idle: 2
       connection-timeout: 30000
       idle-timeout: 600000
-      max-lifetime: 840000
+      max-lifetime: 120000
       validation-timeout: 5000
   jpa:
     #    show-sql: true
     properties:
       hibernate:
         jdbc:
-          batch_size: 50
+          batch_size: 100
+          order_batch_size: 200
           order_inserts: true
           order_updates: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
@@ -106,7 +107,7 @@ pancake:
         6: "CANCELLED"      # Đã hủy
         7: "CANCELLED"      # da xoa
   sync:
-    order: 100
+    order: 1000
     order-item: 200
     product: 100
     page-start: 1

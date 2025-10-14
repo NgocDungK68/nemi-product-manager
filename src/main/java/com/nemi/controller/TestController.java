@@ -43,11 +43,11 @@ public class TestController {
         return posReAuthService.buildReAuthLink(posEntity);
     }
 
-    @PostMapping("/public-api/pancake/{posId}")
+    @PostMapping("/client-api/pancake/{posId}")
     public ResponseEntity<String> connectPos(@PathVariable String posId) {
 
-        pancakeService.syncProduct(posId);
-//        pancakeService.syncOrder(posId);
+//        pancakeService.syncProduct(posId);
+        pancakeService.syncOrder(posId);
         return ResponseEntity.ok("xong");
 
     }
