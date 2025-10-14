@@ -1,26 +1,44 @@
 package com.nemi.model.request.pancake;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.nemi.configuration.PancakeConfig;
+import com.nemi.constant.NhanhvnConstants;
+import com.nemi.constant.PancakeConstatns;
+import com.nemi.entity.PosEntity;
+import com.nemi.enums.SyncErrorMessage;
+import com.nemi.utils.PosUtils;
+import jakarta.annotation.PostConstruct;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 
-import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 @Data
-@NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class PancakeRequest {
+
+    private final PancakeConfig pancakeConfig;
+
+    public PancakeRequest(PancakeConfig pancakeConfig) {
+        this.pancakeConfig = pancakeConfig;
+    }
+
+
+
+
     private String shopId;       // ID shop
     private String apiKey;       // API key
 
     private int pageSize;        // mặc định 30
     private int pageNumber;      // số trang, mặc định 1
 
-//    private String search;       // tìm theo tên / keyword
+    //    private String search;       // tìm theo tên / keyword
 //    private String sellingStatus;   // none, bad, normal, star
     private String productStatus;   // locked, not_locked
 
@@ -33,11 +51,26 @@ public class PancakeRequest {
 
 //    private List<String> manipulationWarehouses; // danh sách kho để lọc
 
-//    private Long startDate;
+    //    private Long startDate;
 //    private Long endDate;
 //    private Long startTimeUpdate;
 //    private Long endTimeUpdate;
 //
 //    private String includedComposite; // parent / children
 //    private List<String> variationIds; // chỉ lấy các variation cụ thể
+    public static PancakeRequest buildRequest(String config, String accesToken,int pageStartNumber, int productBatchSize) {
+
+        Map<String, String> configMap = PosUtils.convertToConfigMap(config);
+
+        String shopId = configMap.get(PancakeConstatns.SHOP_ID);
+
+        int pageNumber = pageStartNumber;
+
+        return PancakeRequest.builder()
+                .apiKey(accesToken)
+                .pageNumber(pageNumber)
+                .pageSize(productBatchSize)
+                .shopId(shopId)
+                .build();
+    }
 }

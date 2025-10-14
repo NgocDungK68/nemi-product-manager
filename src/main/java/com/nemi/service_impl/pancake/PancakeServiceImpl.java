@@ -131,29 +131,16 @@ public class PancakeServiceImpl implements PosManagementService {
         try {
             PosEntity posEntity = generalPosService.getPos(posId);
 
-            Map<String, String> configMap = objectMapper.readValue(
-                    posEntity.getConfig(), new TypeReference<>() {
-                    });
-            String shopId = configMap.get(PancakeConstatns.SHOP_ID);
-            String accessToken = encryptionService.decrypt(posEntity.getAccessToken());
+           String decryptedToken = encryptionService.decrypt(posEntity.getAccessToken());
 
-
-            if (StringUtils.isEmpty(shopId) || StringUtils.isEmpty(accessToken)) {
-                syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.MISSING_CONFIG, false));
-                log.error("Missing required config for posId={}", posId);
-                CompletableFuture.completedFuture(false);
-            }
+            PancakeRequest request = PancakeRequest.buildRequest
+                    (posEntity.getConfig(),
+                            decryptedToken,
+                            pageStartNumber,
+                            productBatchSize);
 
             List<ProductEntity> allProducts = new ArrayList<>();
             List<ProductVariantEntity> allVariants = new ArrayList<>();
-            int pageNumber = pageStartNumber;
-
-            PancakeRequest request = PancakeRequest.builder()
-                    .apiKey(posEntity.getAccessToken())
-                    .pageNumber(pageNumber)
-                    .pageSize(productBatchSize)
-                    .shopId(shopId)
-                    .build();
 
             while (true) {
                 Optional<PancakeProductResponse> responseOpt = pancakeClient.getProducts(request);
@@ -173,7 +160,7 @@ public class PancakeServiceImpl implements PosManagementService {
                 }
 
                 if (ObjectUtils.isEmpty(response.getData())) {
-                    log.info("No products found with page number: {}", pageNumber);
+                    log.info("No products found with page number: {}", request.getPageNumber());
                     break;
                 } else {
                     request.setPageNumber(request.getPageNumber() + 1);
@@ -226,32 +213,15 @@ public class PancakeServiceImpl implements PosManagementService {
                 .build();
         try {
             PosEntity posEntity = generalPosService.getPos(posId);
+            String decryptedToken = encryptionService.decrypt(posEntity.getAccessToken());
 
-            Map<String, String> configMap = objectMapper.readValue(
-                    posEntity.getConfig(), new TypeReference<>() {
-                    });
-            String shopId = configMap.get(PancakeConstatns.SHOP_ID);
-            String accessToken = encryptionService.decrypt(posEntity.getAccessToken());
+            PancakeRequest request = PancakeRequest.buildRequest(posEntity.getConfig(),decryptedToken,pageStartNumber, productBatchSize);
 
-            if (StringUtils.isEmpty(shopId) || StringUtils.isEmpty(accessToken)) {
-                syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.MISSING_CONFIG, false));
-                log.error("Missing required config for posId={}", posId);
-
-            }
-
-            int pageNumber = pageStartNumber;
             List<OrderEntity> allOrders = new ArrayList<>();
             List<OrderItemEntity> allOrderItems = new ArrayList<>();
-
-            PancakeRequest request = PancakeRequest.builder()
-                    .apiKey(posEntity.getAccessToken())
-                    .pageNumber(pageNumber)
-                    .pageSize(orderBatchSize)
-                    .shopId(shopId)
-                    .build();
             String userName = claimUtil.getUserName();
             while (true) {
-                Optional<PancakeOrderResponse> responseOpt = pancakeClient.getOrders(request);
+                Optional<PancakeOrderResponse> responseOpt = pancakeClient.getOrders(request,posEntity.getCreatedAt());
                 if (responseOpt.isEmpty()) {
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.ORDER_CONNECTION_FAILED, false));
                     log.error("No response from Pancake API when fetching orders, posId={}", posId);
@@ -276,7 +246,7 @@ public class PancakeServiceImpl implements PosManagementService {
                 }
 
                 if (ObjectUtils.isEmpty(response.getData())) {
-                    log.info("No orders found with page number: {}", pageNumber);
+                    log.info("No orders found with page number: {}", request.getPageNumber());
                     break;
                 } else {
                     request.setPageNumber(request.getPageNumber() + 1);
