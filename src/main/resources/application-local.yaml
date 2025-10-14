@@ -158,6 +158,11 @@ secret:
   jwt-public-key: "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArh1qU7sGe0uiquAuZo9+T4RTLZoG5NdtHtPCxcFp04EaTJFF+EmN/hwC0v3BXjNbvHYOPfUkmZ98QGeGXE6Q8xp3RGJafrmg6IAOzcWVSaVS4X0hlZjUNs5gW197ojhCCPRuWUSdSmAJG1i+CLQPn+pCBK7Wy2sJ6JTVtnuvs6LaUeqL9B7yE4LaMgEJo9ubi/TCrkD6dI4mxrqsVQVDpaHxau+sZbBsbGD/V4rWfFv7XqAbqWbam3gF/Qr2q/321sLkYjoSEG5sLxaDLgrDPk2moZ1PyLtuDpeF1DWygcK7XRsZjD3j4LkV2K4Ubi+P2wQCI+oZfM1XVlslzKKnVQIDAQAB"
   service-username: "nemi"
   service-password: "Nemi@2025@"
+
+crypto:
+  password: ${secret.service-password}
+  mode: GCM         # GCM or CTR
+  strength: 256     # 128, 192, 256
 logging:
   level:
     root: info

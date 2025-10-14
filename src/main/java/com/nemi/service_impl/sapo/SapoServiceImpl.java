@@ -24,6 +24,7 @@ import com.nemi.model.response.sapo.SapoWebhookResponse;
 import com.nemi.repository.*;
 import com.nemi.service.GeneralPosService;
 import com.nemi.service.PosManagementService;
+import com.nemi.service.EncryptionService;
 import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
 import com.nemi.utils.PosUtils;
@@ -60,6 +61,7 @@ public class SapoServiceImpl implements PosManagementService {
     private final OrderItemRepository orderItemRepository;
     private final SapoConfig sapoConfig;
     private final GeneralPosService generalPosService;
+    private final EncryptionService tokenEncryptionService;
 
     private int pageStartNumber;
     private int productLimit;
@@ -423,7 +425,9 @@ public class SapoServiceImpl implements PosManagementService {
             String clientId = configMap.get(SapoConstants.CLIENT_ID);
             String clientSecret = configMap.get(SapoConstants.CLIENT_SECRET);
             String storeName = configMap.get(SapoConstants.STORE_NAME);
-            String accessToken = posEntity.getAccessToken();
+            
+            // Decrypt access token when using for API calls
+            String accessToken = tokenEncryptionService.decrypt(posEntity.getAccessToken());
 
             if (StringUtils.isEmpty(clientId) || StringUtils.isEmpty(clientSecret) || StringUtils.isEmpty(storeName) || StringUtils.isEmpty(accessToken)) {
                 syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.MISSING_CONFIG, false));
@@ -492,11 +496,14 @@ public class SapoServiceImpl implements PosManagementService {
     }
 
     private PosEntity createNewPos(SapoAccessTokenResponse tokenResponse, Map<String, String> configMap) {
+        // Encrypt access token before storing in database
+        String encryptedAccessToken = tokenEncryptionService.encrypt(tokenResponse.getAccessToken());
+        
         PosEntity newPos = PosEntity.builder()
                 .posName(PosName.SAPO.getValue())
                 .userId(claimUtil.getUserId())
                 .status(PosStatus.ACTIVE.name())
-                .accessToken(tokenResponse.getAccessToken())
+                .accessToken(encryptedAccessToken)
                 .config(JsonUtils.toJson(configMap))
                 .expiredTime(null)
                 .companyId(String.valueOf(claimUtil.getCompanyId()))
@@ -518,17 +525,18 @@ public class SapoServiceImpl implements PosManagementService {
             String clientId = configMap.get(SapoConstants.CLIENT_ID);
             String clientSecret = configMap.get(SapoConstants.CLIENT_SECRET);
             String storeName = configMap.get(SapoConstants.STORE_NAME);
-            String accessToken = posEntity.getAccessToken();
-
+            
+            // Decrypt access token when using for API calls
+            String decryptedAccessToken = tokenEncryptionService.decrypt(posEntity.getAccessToken());
 
             return SapoRequest.builder()
                     .clientId(clientId)
                     .clientSecret(clientSecret)
                     .storeName(storeName)
-                    .accessToken(accessToken)
+                    .accessToken(decryptedAccessToken)
                     .build();
         } catch (Exception e) {
-            log.error("Failed request PancakeRequest - {}", e.getMessage(), e);
+            log.error("Failed request SapoRequest - {}", e.getMessage(), e);
             throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.JSON_PARSE_ERROR));
         }
     }
