@@ -13,10 +13,10 @@ import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
 import com.nemi.mapper.NhanhvnMapper;
+import com.nemi.model.request.nhanhvn.NhanhvnOrderWebhookRequest;
 import com.nemi.model.request.nhanhvn.NhanhvnRequest;
 import com.nemi.model.request.nhanhvn.NhanhvnWebhookRequest;
 import com.nemi.model.response.nhanhvn.NhanhvnInventoryResponse;
-import com.nemi.model.response.nhanhvn.NhanhvnOrderResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
 import com.nemi.repository.*;
 import com.nemi.service.WebhookService;
@@ -27,7 +27,6 @@ import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -307,8 +306,8 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
     }
 
     private boolean handleOrderAdd(String posId, Object data) {
-        NhanhvnOrderResponse.OrderData orderData = objectMapper.convertValue(
-                data, NhanhvnOrderResponse.OrderData.class
+        NhanhvnOrderWebhookRequest orderData = objectMapper.convertValue(
+                data, NhanhvnOrderWebhookRequest.class
         );
         log.info("[NhanhvnWebhookServiceImpl.handleOrderAdd] Add OrderData: {}", orderData);
 
@@ -343,8 +342,8 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
     }
 
     private boolean handleOrderUpdate(String posId, Object data) {
-        NhanhvnOrderResponse.OrderData orderData = objectMapper.convertValue(
-                data, NhanhvnOrderResponse.OrderData.class
+        NhanhvnOrderWebhookRequest orderData = objectMapper.convertValue(
+                data, NhanhvnOrderWebhookRequest.class
         );
         log.info("[NhanhvnWebhookServiceImpl.handleOrderUpdate] Update OrderData: {}", orderData);
 
@@ -446,8 +445,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
 
             NhanhvnRequest request = NhanhvnRequest.buildRequest(
                     posEntity.getConfig(),
-                    posEntity.getAccessToken(),
-                    posEntity.getCreatedAt().toInstant(ZoneOffset.UTC).getEpochSecond()
+                    posEntity.getAccessToken()
             );
             request.setFilters(Map.of(NhanhvnConstants.IDS, id));
             Optional<NhanhvnProductResponse> responseOpt = nhanhvnClient.getProducts(request);

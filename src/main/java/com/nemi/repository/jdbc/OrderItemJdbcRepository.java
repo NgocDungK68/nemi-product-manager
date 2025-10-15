@@ -1,6 +1,5 @@
 package com.nemi.repository.jdbc;
 
-import com.nemi.entity.OrderEntity;
 import com.nemi.entity.OrderItemEntity;
 import com.zaxxer.hikari.HikariDataSource;
 import lombok.extern.slf4j.Slf4j;
@@ -14,12 +13,8 @@ import java.math.BigDecimal;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.stream.Collectors;
 
 @Repository
 @Slf4j

@@ -1,8 +1,6 @@
 package com.nemi.configuration;
 
-import jakarta.annotation.PostConstruct;
 import lombok.Data;
-import lombok.Getter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
@@ -27,18 +25,6 @@ public class NhanhvnConfig {
     private OrderConfig order;
     private SyncConfig sync;
     private Integer recentDays;
-
-    @Getter
-    private static NhanhvnConfig instance;
-
-    @PostConstruct
-    public void init() {
-        instance = this;
-    }
-
-    public static Integer getRecentDaysStatic() {
-        return instance.recentDays;
-    }
 
     @Data
     public static class ProductConfig {

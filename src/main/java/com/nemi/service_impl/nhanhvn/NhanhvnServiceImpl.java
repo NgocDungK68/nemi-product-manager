@@ -130,9 +130,15 @@ public class NhanhvnServiceImpl implements PosManagementService {
             String decryptedConfig = encryptionService.decrypt(posEntity.getConfig());
             NhanhvnRequest request = NhanhvnRequest.buildRequest(
                     decryptedConfig,
-                    decryptedToken,
-                    posEntity.getCreatedAt().toInstant(ZoneOffset.UTC).getEpochSecond()
+                    decryptedToken
             );
+            // filter lay data trong 30 ngay
+            long updatedAtTo = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC);
+            long updateAtFrom = LocalDateTime.now().minusDays(nhanhvnConfig.getRecentDays()).toEpochSecond(ZoneOffset.UTC);
+            Map<String, Object> filters = new HashMap<>();
+            filters.put(NhanhvnConstants.UPDATED_AT_FROM, updateAtFrom);
+            filters.put(NhanhvnConstants.UPDATED_AT_TO, updatedAtTo);
+            request.setFilters(filters);
 
             if (isInvalidRequest(request)) {
                 syncHistoryRepository.save(toSyncHistory(history, (SyncErrorMessage.MISSING_CONFIG), false));
@@ -228,8 +234,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
             String decryptedConfig = encryptionService.decrypt(posEntity.getConfig());
             NhanhvnRequest request = NhanhvnRequest.buildRequest(
                     decryptedConfig,
-                    decryptedToken,
-                    posEntity.getCreatedAt().toInstant(ZoneOffset.UTC).getEpochSecond()
+                    decryptedToken
             );
 
             if (isInvalidRequest(request)) {
