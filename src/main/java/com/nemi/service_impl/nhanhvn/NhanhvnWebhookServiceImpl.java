@@ -17,7 +17,6 @@ import com.nemi.model.request.nhanhvn.NhanhvnOrderWebhookRequest;
 import com.nemi.model.request.nhanhvn.NhanhvnRequest;
 import com.nemi.model.request.nhanhvn.NhanhvnWebhookRequest;
 import com.nemi.model.response.nhanhvn.NhanhvnInventoryResponse;
-import com.nemi.model.response.nhanhvn.NhanhvnOrderResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
 import com.nemi.repository.*;
 import com.nemi.service.WebhookService;

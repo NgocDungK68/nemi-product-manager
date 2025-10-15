@@ -1,7 +1,6 @@
 package com.nemi.model.request.nhanhvn;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.nemi.configuration.NhanhvnConfig;
 import com.nemi.constant.NhanhvnConstants;
 import com.nemi.utils.PosUtils;
 import lombok.AllArgsConstructor;
@@ -9,9 +8,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.util.HashMap;
 import java.util.Map;
 
 @Data
