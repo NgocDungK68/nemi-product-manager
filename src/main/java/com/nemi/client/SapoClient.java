@@ -9,12 +9,20 @@ import com.nemi.exception.pojo.AlertMessages;
 import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.request.sapo.SapoRequest;
 import com.nemi.model.request.sapo.SapoWebhookRequest;
-import com.nemi.model.response.sapo.*;
+import com.nemi.model.response.sapo.SapoAccessTokenResponse;
+import com.nemi.model.response.sapo.SapoOrderResponse;
+import com.nemi.model.response.sapo.SapoProductResponse;
+import com.nemi.model.response.sapo.SapoWebhookListResponse;
+import com.nemi.model.response.sapo.SapoWebhookResponse;
 import com.nemi.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ObjectUtils;
-import org.springframework.http.*;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -48,14 +56,14 @@ public class SapoClient {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<String> entity = new HttpEntity<>(headers);
-            
+
             ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
 
             if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
                 log.error("[SapoClient.getAccessToken] Failed, status: {}", resp.getStatusCode());
                 throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
             }
-            
+
             SapoAccessTokenResponse tokenResponse =
                     JsonUtils.fromJson(resp.getBody(), SapoAccessTokenResponse.class);
 
@@ -64,7 +72,7 @@ public class SapoClient {
                 log.error("[SapoClient.getAccessToken] Response does not contain accessToken: {}", resp.getBody());
                 throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
             }
-            
+
             return tokenResponse;
         } catch (Exception e) {
             log.error("[SapoClient.getAccessToken] Failed: {}", e.getMessage(), e);
@@ -80,7 +88,7 @@ public class SapoClient {
             String url = UriComponentsBuilder.fromHttpUrl(baseUrl)
                     .path(sapoConfig.getPathProducts())
                     .toUriString();
-            
+
             log.debug("[SapoClient.getProducts] Calling URL: {}", url);
 
             HttpHeaders headers = new HttpHeaders();
@@ -118,7 +126,7 @@ public class SapoClient {
 
         try {
             String url = "https://" + request.getStoreName() + ".mysapo.net/admin/orders.json";
-            log.debug("[SapoClient.getProducts] Calling URL: {}", url);
+            log.debug("[SapoClient.getOrders] Calling URL: {}", url);
 
 
             String urlWithParams = UriComponentsBuilder.fromHttpUrl(url)
@@ -130,35 +138,36 @@ public class SapoClient {
             headers.set("X-Sapo-Access-Token", request.getAccessToken());
 
             HttpEntity<String> entity = new HttpEntity<>(headers);
-            log.debug("[SapoClient.getProducts] Request headers: {}", headers);
+            log.debug("[SapoClient.getOrders] Request headers: {}", headers);
 
             ResponseEntity<String> resp = restTemplate.exchange(urlWithParams, HttpMethod.GET, entity, String.class);
             String jsonResp = resp.getBody();
-            log.debug("[SapoClient.getProducts] Response: {}", resp);
+            log.debug("[SapoClient.getOrders] Response: {}", resp);
 
             if (ObjectUtils.isEmpty(jsonResp)) {
-                log.warn("[SapoClient.getProducts] Empty response body (status: {})", resp.getStatusCode());
+                log.warn("[SapoClient.getOrders] Empty response body (status: {})", resp.getStatusCode());
                 return Optional.empty();
             }
 
-               SapoOrderResponse productsResponse =
+            SapoOrderResponse productsResponse =
                     JsonUtils.fromJson(jsonResp, SapoOrderResponse.class);
 
-            log.info("[SapoClient.getProducts] Got products response successfully");
+            log.info("[SapoClient.getOrders] Got products response successfully");
 
             return Optional.of(productsResponse);
 
         } catch (Exception e) {
-            log.error("[SapoClient.getProducts] Failed: {}", e.getMessage(), e);
+            log.error("[SapoClient.getOrders] Failed: {}", e.getMessage(), e);
             return Optional.empty();
         }
     }
 
     /**
      * Register webhooks for a POS with automatic webhook URL generation
-     * @param storeName The store name
+     *
+     * @param storeName   The store name
      * @param accessToken The access token
-     * @param posId The POS ID for webhook URL
+     * @param posId       The POS ID for webhook URL
      * @return List of registered webhook responses
      */
     public List<SapoWebhookResponse> registerWebhook(String storeName, String accessToken, String posId) {
@@ -177,6 +186,7 @@ public class SapoClient {
 
     /**
      * Register webhooks for all configured topics
+     *
      * @param webhookRequest The webhook registration request
      * @return List of registered webhook responses
      */
@@ -279,13 +289,13 @@ public class SapoClient {
      */
     public List<SapoWebhookResponse.Webhook> listWebhooks(String storeName, String accessToken) {
 
-            String url = UriComponentsBuilder.fromHttpUrl(buildBaseUrl(storeName))
-                    .path(sapoConfig.getPathWebhooks())
-                    .toUriString();
+        String url = UriComponentsBuilder.fromHttpUrl(buildBaseUrl(storeName))
+                .path(sapoConfig.getPathWebhooks())
+                .toUriString();
 
-            HttpEntity<String> entity = new HttpEntity<>(buildHeaders(accessToken));
+        HttpEntity<String> entity = new HttpEntity<>(buildHeaders(accessToken));
 
-             try {
+        try {
             ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
 
             if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
@@ -338,12 +348,12 @@ public class SapoClient {
             }
 
             current.stream()
-                    .filter(webhook -> ObjectUtils.isNotEmpty(webhook) 
-                            && ObjectUtils.isNotEmpty(webhook.getId()) 
+                    .filter(webhook -> ObjectUtils.isNotEmpty(webhook)
+                            && ObjectUtils.isNotEmpty(webhook.getId())
                             && ObjectUtils.isNotEmpty(webhook.getAddress()))
                     .filter(webhook -> !webhook.getAddress().contains(posId))
                     .forEach(webhook -> {
-                        log.info("[SapoClient.deleteWebhook(posId)] Deleting webhook id={} not matching posId={}", 
+                        log.info("[SapoClient.deleteWebhook(posId)] Deleting webhook id={} not matching posId={}",
                                 webhook.getId(), posId);
                         deleteWebhook(storeName, accessToken, webhook.getId());
                     });

@@ -20,13 +20,10 @@ public enum EncryptionStrength {
     }
 
     public static EncryptionStrength getAESKeyLength(int encryptionStrength) {
-        switch (encryptionStrength) {
-            case 128:
-                return EncryptionStrength.BIT_128;
-            case 192:
-                return EncryptionStrength.BIT_192;
-            default:
-                return EncryptionStrength.BIT_256;
-        }
+        return switch (encryptionStrength) {
+            case 128 -> EncryptionStrength.BIT_128;
+            case 192 -> EncryptionStrength.BIT_192;
+            default -> EncryptionStrength.BIT_256;
+        };
     }
 }

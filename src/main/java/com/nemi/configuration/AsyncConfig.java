@@ -9,7 +9,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.security.task.DelegatingSecurityContextAsyncTaskExecutor;
 
 @Configuration
-@EnableAsync
+//@EnableAsync
 @RequiredArgsConstructor
 public class AsyncConfig {
     private final AsyncProperties asyncProperties;

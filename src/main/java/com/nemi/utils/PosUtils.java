@@ -19,9 +19,8 @@ import java.util.Map;
 import java.util.TreeMap;
 
 @Slf4j
-@RequiredArgsConstructor
-@Component
 public class PosUtils {
+    PosUtils (){}
     private static final ObjectMapper mapper = new ObjectMapper();
 
     public static Map<String, String> extractHeaders(HttpServletRequest request) {

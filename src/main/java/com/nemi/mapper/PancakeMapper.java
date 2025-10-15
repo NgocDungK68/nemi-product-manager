@@ -12,7 +12,6 @@ import com.nemi.model.response.pancake.PancakeProductResponse;
 import com.nemi.util.ClaimUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -20,7 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 @Service
@@ -29,9 +27,10 @@ import java.util.stream.Collectors;
 public class PancakeMapper {
     private final PancakeConfig pancakeConfig;
     private final ClaimUtil claimUtil;
+
     public List<ProductEntity> convertToProductEntities( // return btg
-            String posId,
-            List<PancakeProductResponse.ProductData> apiProducts
+                                                         String posId,
+                                                         List<PancakeProductResponse.ProductData> apiProducts
     ) {
         return apiProducts.stream()  // hoặc parallelStream()
                 .map(apiProduct -> convertToProductEntity(posId, apiProduct))
@@ -55,7 +54,6 @@ public class PancakeMapper {
                 .orElse(null);
 
 
-
         ProductEntity product = ProductEntity.builder()
                 .posId(posId)
                 .productId(String.valueOf(apiProducts.getId()))
@@ -66,7 +64,7 @@ public class PancakeMapper {
                 .images(images)
                 .category(categories)
                 .build();
-        if (apiProducts.getIsLocked()) {
+        if (Boolean.TRUE.equals(apiProducts.getIsLocked())) {
             product.setStatus(Status.INACTIVE.getValue());
         } else {
             product.setStatus(Status.ACTIVE.getValue());
@@ -82,7 +80,6 @@ public class PancakeMapper {
                 .map(apiProduct -> convertToVariantEntity(posId, apiProduct))
                 .collect(Collectors.toList());
     }
-
 
 
     public ProductVariantEntity convertToVariantEntity(String posId, PancakeProductResponse.ProductData apiProduct) {
@@ -108,14 +105,14 @@ public class PancakeMapper {
                 .build();
     }
 
-    public List<OrderEntity> convertToOrderEntities(String posId, List<PancakeOrderResponse.DataItem> apiOrders,String userName) {
-        return   apiOrders.stream()
-                .map(orders -> convertToOrderEntity(posId, orders,userName))
+    public List<OrderEntity> convertToOrderEntities(String posId, List<PancakeOrderResponse.DataItem> apiOrders, String userName) {
+        return apiOrders.stream()
+                .map(orders -> convertToOrderEntity(posId, orders, userName))
                 .filter(Objects::nonNull)
                 .toList();
     }
 
-    public OrderEntity convertToOrderEntity(String posId, PancakeOrderResponse.DataItem apiOrders,String userName) {
+    public OrderEntity convertToOrderEntity(String posId, PancakeOrderResponse.DataItem apiOrders, String userName) {
         String status = pancakeConfig.getStatusMapping(apiOrders.getStatus(), apiOrders.getStatusName());
         log.info("status of orderId {} is {}", apiOrders.getId(), status);
 
@@ -145,15 +142,15 @@ public class PancakeMapper {
                 .build();
     }
 
-    public List<OrderItemEntity> convertToOrderItemEntities(List<PancakeOrderResponse.DataItem> apiOrders,String userName) {
+    public List<OrderItemEntity> convertToOrderItemEntities(List<PancakeOrderResponse.DataItem> apiOrders, String userName) {
         List<OrderItemEntity> orderItemEntities = new ArrayList<>();
         for (PancakeOrderResponse.DataItem orderData : apiOrders) {
-            orderItemEntities.addAll(convertToOrderItemEntity(orderData,userName));
+            orderItemEntities.addAll(convertToOrderItemEntity(orderData, userName));
         }
         return orderItemEntities;
     }
 
-    public List<OrderItemEntity> convertToOrderItemEntity(PancakeOrderResponse.DataItem apiOrder,String userName) {
+    public List<OrderItemEntity> convertToOrderItemEntity(PancakeOrderResponse.DataItem apiOrder, String userName) {
         List<OrderItemEntity> orderItemEntities = new ArrayList<>();
         for (PancakeOrderResponse.Item product : apiOrder.getItems()) {
             BigDecimal quantity = BigDecimal.valueOf(product.getQuantity());

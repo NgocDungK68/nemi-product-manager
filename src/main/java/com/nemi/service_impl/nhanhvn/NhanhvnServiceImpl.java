@@ -4,7 +4,12 @@ import com.nemi.client.NhanhvnClient;
 import com.nemi.configuration.NhanhvnConfig;
 import com.nemi.constant.NhanhvnConstants;
 import com.nemi.constant.PosConstants;
-import com.nemi.entity.*;
+import com.nemi.entity.OrderEntity;
+import com.nemi.entity.OrderItemEntity;
+import com.nemi.entity.PosEntity;
+import com.nemi.entity.ProductEntity;
+import com.nemi.entity.ProductVariantEntity;
+import com.nemi.entity.SyncHistoryEntity;
 import com.nemi.enums.PosName;
 import com.nemi.enums.PosStatus;
 import com.nemi.enums.SyncErrorMessage;
@@ -19,7 +24,12 @@ import com.nemi.model.response.PosConnectionResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnAccessTokenResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnOrderResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
-import com.nemi.repository.*;
+import com.nemi.repository.OrderItemRepository;
+import com.nemi.repository.OrderRepository;
+import com.nemi.repository.PosRepository;
+import com.nemi.repository.ProductRepository;
+import com.nemi.repository.ProductVariantRepository;
+import com.nemi.repository.SyncHistoryRepository;
 import com.nemi.service.EncryptionService;
 import com.nemi.service.GeneralPosService;
 import com.nemi.service.PosManagementService;
@@ -36,7 +46,11 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 @Service
@@ -97,7 +111,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
     @Override
     @Async("syncExecutor")
-    public void syncProduct(String posId) {
+    public void syncProduct(String posId,Boolean isSyncAll) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
                 .startTime(LocalDateTime.now())
@@ -201,7 +215,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
     @Override
     @Async("syncExecutor")
-    public void syncOrder(String posId) {
+    public void syncOrder(String posId,Boolean isSyncAll) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
                 .startTime(LocalDateTime.now())

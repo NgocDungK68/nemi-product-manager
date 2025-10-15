@@ -9,12 +9,16 @@ import com.nemi.util.JsonUtils;
 import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.*;
+import org.apache.commons.lang3.BooleanUtils;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Map;
@@ -26,29 +30,26 @@ import java.util.Optional;
 public class PancakeClient {
     @Resource(name = "pancakeRestTemplate")
     private final RestTemplate restTemplate;
-    private final PancakeConfig pancakeConfig;
 
-
-    public Optional<PancakeProductResponse> getProducts(PancakeRequest request) {
+    public Optional<PancakeProductResponse> getProducts(PancakeRequest request, Boolean isSyncAll, LocalDateTime posConnectionStart) {
 
         try {
-
-//            LocalDate firstDay = LocalDate.now().withDayOfMonth(1);
-//            LocalDateTime startOfDay = firstDay.atStartOfDay();
-//            long startUnix = startOfDay.toEpochSecond(ZoneOffset.UTC);  // hoặc ZoneOffset.of("+07:00")
-//
-//            // Thời điểm hiện tại
-//            LocalDateTime end = LocalDateTime.now();
-//            long endUnix = end.toEpochSecond(ZoneOffset.UTC);
 
             String relativeUri = UriComponentsBuilder.fromPath(request.getShopId() + "/products/variations")
                     .queryParam(PancakeConstatns.API_KEY, request.getApiKey())
                     .queryParam(PancakeConstatns.PAGE_SIZE, request.getPageSize())
                     .queryParam(PancakeConstatns.PAGE_NUMBER, request.getPageNumber()).toUriString();
-//                    .queryParam("startDateTime", startUnix)
-//                    .queryParam("endDateTime", endUnix)
 
+            if (Boolean.FALSE.equals(isSyncAll)) {
+                LocalDateTime minusDays = posConnectionStart.minusDays(30);
+                long startUnix = minusDays.toEpochSecond(ZoneOffset.of("+07:00"));
+                long endUnix = posConnectionStart.toEpochSecond(ZoneOffset.of("+07:00"));
 
+                relativeUri = UriComponentsBuilder.fromUriString(relativeUri)
+                        .queryParam(PancakeConstatns.START_DATE_TIME, startUnix)
+                        .queryParam(PancakeConstatns.END_DATE_TIME, endUnix)
+                        .build().toUriString();
+            }
             log.debug("[Pancake.getProducts] Calling relative URI: {}", relativeUri);
             // build request body
 
@@ -56,7 +57,7 @@ public class PancakeClient {
             headers.setContentType(MediaType.APPLICATION_JSON);
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(headers);
-            log.debug("[NhanhvnClient.getProducts] Calling URL: {}", relativeUri);
+            log.debug("[PancakeClient.getProducts] Calling URL: {}", relativeUri);
             ResponseEntity<String> resp = restTemplate.exchange(relativeUri, HttpMethod.GET, entity, String.class);
             String jsonResp = resp.getBody();
             log.debug("[PancakeClient.getProducts] resp {}", resp);
@@ -80,44 +81,50 @@ public class PancakeClient {
         }
     }
 
-    public Optional<PancakeOrderResponse> getOrders(PancakeRequest request, LocalDateTime posStartDate) {
-        log.debug("[Pancake.getOrders] with pagesize {} and page number", request.getPageSize(),request.getPageNumber());
+    public Optional<PancakeOrderResponse> getOrders(PancakeRequest request, Boolean isSyncAll, LocalDateTime posConnectionStart) {
+        log.debug("[Pancake.getOrders] with pagesize {} and page number {}", request.getPageSize(), request.getPageNumber());
 
         try {
-            LocalDateTime posEndDate = posStartDate.plusDays(30);
-            long startUnix = posStartDate.toEpochSecond(ZoneOffset.of("+07:00"));
-            long endUnix = posEndDate.toEpochSecond(ZoneOffset.of("+07:00"));
-
             String relativeUri = UriComponentsBuilder.fromPath(request.getShopId() + "/orders")
                     .queryParam(PancakeConstatns.API_KEY, request.getApiKey())
                     .queryParam(PancakeConstatns.PAGE_SIZE, request.getPageSize())
                     .queryParam(PancakeConstatns.PAGE_NUMBER, request.getPageNumber())
-                    .queryParam(PancakeConstatns.START_DATE_TIME, startUnix)
-                    .queryParam(PancakeConstatns.END_DATE_TIME, endUnix)
+                    .build()
                     .toUriString();
 
-            log.debug("[Pancake.getProducts] Calling relative URI: {}", relativeUri);
+
+            if (BooleanUtils.isFalse(isSyncAll)) {
+                LocalDateTime minusDays = posConnectionStart.minusDays(30);
+                long endUnix = posConnectionStart.toEpochSecond(ZoneOffset.of("+07:00"));
+                long startUnix = minusDays.toEpochSecond(ZoneOffset.of("+07:00"));
+
+                relativeUri = UriComponentsBuilder.fromUriString(relativeUri)
+                        .queryParam(PancakeConstatns.START_DATE_TIME, startUnix)
+                        .queryParam(PancakeConstatns.END_DATE_TIME, endUnix)
+                        .build()
+                        .toUriString();
+            }
+
+
+            log.debug("[Pancake.getOrders] Calling relative URI: {}", relativeUri);
 
             // build request body
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(headers);
-            log.debug("[PancakeClient.getProducts] Calling URL: {}", relativeUri);
+            log.debug("[PancakeClient.getOrders] Calling URL: {}", relativeUri);
             ResponseEntity<String> resp = restTemplate.exchange(relativeUri, HttpMethod.GET, entity, String.class);
             String jsonResp = resp.getBody();
-            log.debug("[PancakeClient.getProducts] resp {}", resp);
+            log.debug("[PancakeClient.getOrders] resp {}", resp);
 
             if (jsonResp == null || jsonResp.isBlank()) {
-                log.warn("[PancakeClient.getProducts] Empty response body (status: {})", resp.getStatusCode());
+                log.warn("[PancakeClient.getOrders] Empty response body (status: {})", resp.getStatusCode());
                 return Optional.empty();
             }
 
             PancakeOrderResponse productsResponse =
                     JsonUtils.fromJson(jsonResp, PancakeOrderResponse.class);
-
-            log.info("[PancakeClient.getProducts] Got {} products",
-                    productsResponse.getData() != null ? productsResponse.getData().size() : 0);
 
             return Optional.of(productsResponse);
 
