@@ -28,18 +28,6 @@ public class NhanhvnConfig {
     private SyncConfig sync;
     private Integer recentDays;
 
-    @Getter
-    private static NhanhvnConfig instance;
-
-    @PostConstruct
-    public void init() {
-        instance = this;
-    }
-
-    public static Integer getRecentDaysStatic() {
-        return instance.recentDays;
-    }
-
     @Data
     public static class ProductConfig {
         private StatusConfig status;

@@ -13,6 +13,7 @@ import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
 import com.nemi.mapper.NhanhvnMapper;
+import com.nemi.model.request.nhanhvn.NhanhvnOrderWebhookRequest;
 import com.nemi.model.request.nhanhvn.NhanhvnRequest;
 import com.nemi.model.request.nhanhvn.NhanhvnWebhookRequest;
 import com.nemi.model.response.nhanhvn.NhanhvnInventoryResponse;
@@ -306,8 +307,8 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
     }
 
     private boolean handleOrderAdd(String posId, Object data) {
-        NhanhvnOrderResponse.OrderData orderData = objectMapper.convertValue(
-                data, NhanhvnOrderResponse.OrderData.class
+        NhanhvnOrderWebhookRequest orderData = objectMapper.convertValue(
+                data, NhanhvnOrderWebhookRequest.class
         );
         log.info("[NhanhvnWebhookServiceImpl.handleOrderAdd] Add OrderData: {}", orderData);
 
@@ -342,8 +343,8 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
     }
 
     private boolean handleOrderUpdate(String posId, Object data) {
-        NhanhvnOrderResponse.OrderData orderData = objectMapper.convertValue(
-                data, NhanhvnOrderResponse.OrderData.class
+        NhanhvnOrderWebhookRequest orderData = objectMapper.convertValue(
+                data, NhanhvnOrderWebhookRequest.class
         );
         log.info("[NhanhvnWebhookServiceImpl.handleOrderUpdate] Update OrderData: {}", orderData);
 

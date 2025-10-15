@@ -35,6 +35,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
@@ -117,6 +118,13 @@ public class NhanhvnServiceImpl implements PosManagementService {
                     decryptedConfig,
                     decryptedToken
             );
+            // filter lay data trong 30 ngay
+            long updatedAtTo = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC);
+            long updateAtFrom = LocalDateTime.now().minusDays(nhanhvnConfig.getRecentDays()).toEpochSecond(ZoneOffset.UTC);
+            Map<String, Object> filters = new HashMap<>();
+            filters.put(NhanhvnConstants.UPDATED_AT_FROM, updateAtFrom);
+            filters.put(NhanhvnConstants.UPDATED_AT_TO, updatedAtTo);
+            request.setFilters(filters);
 
             if (isInvalidRequest(request)) {
                 syncHistoryRepository.save(toSyncHistory(history, (SyncErrorMessage.MISSING_CONFIG), false));

@@ -35,21 +35,13 @@ public class NhanhvnRequest {
 
     public static NhanhvnRequest buildRequest(String config, String accessToken) {
         Map<String, String> configMap = PosUtils.convertToConfigMap(config);
-
         String appId = configMap.get(NhanhvnConstants.APP_ID);
         String businessId = configMap.get(NhanhvnConstants.BUSINESS_ID);
-
-        long updatedAtTo = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC);
-        long updateAtFrom = LocalDateTime.now().minusDays(NhanhvnConfig.getRecentDaysStatic()).toEpochSecond(ZoneOffset.UTC);
-        Map<String, Object> filters = new HashMap<>();
-        filters.put(NhanhvnConstants.UPDATED_AT_FROM, updateAtFrom);
-        filters.put(NhanhvnConstants.UPDATED_AT_TO, updatedAtTo);
 
         return NhanhvnRequest.builder()
                 .appId(appId)
                 .businessId(businessId)
                 .accessToken(accessToken)
-                .filters(filters)
                 .build();
     }
 }
