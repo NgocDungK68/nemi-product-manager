@@ -112,8 +112,10 @@ public class NhanhvnServiceImpl implements PosManagementService {
             // Decrypt access token before using for API calls
             String decryptedToken = encryptionService.decrypt(posEntity.getAccessToken());
             
+            // Decrypt config before using
+            String decryptedConfig = encryptionService.decrypt(posEntity.getConfig());
             NhanhvnRequest request = NhanhvnRequest.buildRequest(
-                    posEntity.getConfig(),
+                    decryptedConfig,
                     decryptedToken,
                     posEntity.getCreatedAt().toInstant(ZoneOffset.UTC).getEpochSecond()
             );
@@ -208,8 +210,10 @@ public class NhanhvnServiceImpl implements PosManagementService {
             // Decrypt access token before using for API calls
             String decryptedToken = encryptionService.decrypt(posEntity.getAccessToken());
             
+            // Decrypt config before using
+            String decryptedConfig = encryptionService.decrypt(posEntity.getConfig());
             NhanhvnRequest request = NhanhvnRequest.buildRequest(
-                    posEntity.getConfig(),
+                    decryptedConfig,
                     decryptedToken,
                     posEntity.getCreatedAt().toInstant(ZoneOffset.UTC).getEpochSecond()
             );
@@ -306,7 +310,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 .userId(claimUtil.getUserId())
                 .status(PosStatus.ACTIVE.name())
                 .accessToken(encryptedToken)
-                .config(JsonUtils.toJson(configMap))
+                .config(encryptionService.encrypt(JsonUtils.toJson(configMap)))
                 .expiredTime(expiredTime)
                 .companyId(String.valueOf(claimUtil.getCompanyId()))
                 .createdBy(claimUtil.getUserName())
