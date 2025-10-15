@@ -118,7 +118,7 @@ public class SapoServiceImpl implements PosManagementService {
     }
 
     @Override
-    public void syncProduct(String posId) {
+    public void syncProduct(String posId, Boolean isSyncAll) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
                 .startTime(LocalDateTime.now())
@@ -224,7 +224,7 @@ public class SapoServiceImpl implements PosManagementService {
 
 
     @Override
-    public void syncOrder(String posId) {
+    public void syncOrder(String posId, Boolean isSyncAll) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
                 .startTime(LocalDateTime.now())

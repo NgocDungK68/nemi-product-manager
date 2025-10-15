@@ -121,7 +121,7 @@ public class PancakeServiceImpl implements PosManagementService {
 
     @Override
     @Async("syncExecutor")
-    public void syncProduct(String posId) {
+    public void syncProduct(String posId, Boolean isSyncAll) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
                 .startTime(LocalDateTime.now())
@@ -145,7 +145,7 @@ public class PancakeServiceImpl implements PosManagementService {
             List<ProductVariantEntity> allVariants = new ArrayList<>();
 
             while (true) {
-                Optional<PancakeProductResponse> responseOpt = pancakeClient.getProducts(request);
+                Optional<PancakeProductResponse> responseOpt = pancakeClient.getProducts(request,isSyncAll,posEntity.getCreatedAt());
                 if (responseOpt.isEmpty()) { // handle tinh huonh nhu server loi
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.PRODUCT_CONNECTION_FAILED, false));
                     log.error("No response from Pancake API when fetching products, posId={}", posId);
@@ -206,7 +206,7 @@ public class PancakeServiceImpl implements PosManagementService {
 
     @Override
     @Async("syncExecutor")
-    public void syncOrder(String posId) {
+    public void syncOrder(String posId, Boolean isSyncAll) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
                 .startTime(LocalDateTime.now())
@@ -225,7 +225,7 @@ public class PancakeServiceImpl implements PosManagementService {
             List<OrderItemEntity> allOrderItems = new ArrayList<>();
             String userName = claimUtil.getUserName();
             while (true) {
-                Optional<PancakeOrderResponse> responseOpt = pancakeClient.getOrders(request,posEntity.getCreatedAt());
+                Optional<PancakeOrderResponse> responseOpt = pancakeClient.getOrders(request,isSyncAll,posEntity.getCreatedAt());
                 if (responseOpt.isEmpty()) {
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.ORDER_CONNECTION_FAILED, false));
                     log.error("No response from Pancake API when fetching orders, posId={}", posId);

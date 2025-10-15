@@ -9,6 +9,7 @@ import com.nemi.util.JsonUtils;
 import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.BooleanUtils;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -29,7 +30,7 @@ public class PancakeClient {
     private final PancakeConfig pancakeConfig;
 
 
-    public Optional<PancakeProductResponse> getProducts(PancakeRequest request) {
+    public Optional<PancakeProductResponse> getProducts(PancakeRequest request,Boolean isSyncAll,LocalDateTime posConnectionStart) {
 
         try {
 
@@ -45,10 +46,17 @@ public class PancakeClient {
                     .queryParam(PancakeConstatns.API_KEY, request.getApiKey())
                     .queryParam(PancakeConstatns.PAGE_SIZE, request.getPageSize())
                     .queryParam(PancakeConstatns.PAGE_NUMBER, request.getPageNumber()).toUriString();
-//                    .queryParam("startDateTime", startUnix)
-//                    .queryParam("endDateTime", endUnix)
 
+            if (BooleanUtils.isFalse(isSyncAll)) {
+                LocalDateTime minusDays = posConnectionStart.minusDays(30);
+                long startUnix = minusDays.toEpochSecond(ZoneOffset.of("+07:00"));
+                long endUnix = posConnectionStart.toEpochSecond(ZoneOffset.of("+07:00"));
 
+                relativeUri = UriComponentsBuilder.fromUriString(relativeUri)
+                        .queryParam(PancakeConstatns.START_DATE_TIME, startUnix)
+                        .queryParam(PancakeConstatns.END_DATE_TIME, endUnix)
+                        .build().toUriString();
+            }
             log.debug("[Pancake.getProducts] Calling relative URI: {}", relativeUri);
             // build request body
 
@@ -80,21 +88,30 @@ public class PancakeClient {
         }
     }
 
-    public Optional<PancakeOrderResponse> getOrders(PancakeRequest request, LocalDateTime posStartDate) {
-        log.debug("[Pancake.getOrders] with pagesize {} and page number", request.getPageSize(),request.getPageNumber());
+    public Optional<PancakeOrderResponse> getOrders(PancakeRequest request, Boolean isSyncAll ,  LocalDateTime posConnectionStart) {
+        log.debug("[Pancake.getOrders] with pagesize {} and page number {}", request.getPageSize(),request.getPageNumber());
 
         try {
-            LocalDateTime posEndDate = posStartDate.plusDays(30);
-            long startUnix = posStartDate.toEpochSecond(ZoneOffset.of("+07:00"));
-            long endUnix = posEndDate.toEpochSecond(ZoneOffset.of("+07:00"));
-
-            String relativeUri = UriComponentsBuilder.fromPath(request.getShopId() + "/orders")
+     String relativeUri = UriComponentsBuilder.fromPath(request.getShopId() + "/orders")
                     .queryParam(PancakeConstatns.API_KEY, request.getApiKey())
                     .queryParam(PancakeConstatns.PAGE_SIZE, request.getPageSize())
                     .queryParam(PancakeConstatns.PAGE_NUMBER, request.getPageNumber())
-                    .queryParam(PancakeConstatns.START_DATE_TIME, startUnix)
-                    .queryParam(PancakeConstatns.END_DATE_TIME, endUnix)
+                    .build()
                     .toUriString();
+
+
+            if (BooleanUtils.isFalse(isSyncAll)) {
+                LocalDateTime minusDays = posConnectionStart.minusDays(30);
+                long endUnix = posConnectionStart.toEpochSecond(ZoneOffset.of("+07:00"));
+                long  startUnix = minusDays.toEpochSecond(ZoneOffset.of("+07:00"));
+
+                relativeUri = UriComponentsBuilder.fromUriString(relativeUri)
+                        .queryParam(PancakeConstatns.START_DATE_TIME, startUnix)
+                        .queryParam(PancakeConstatns.END_DATE_TIME, endUnix)
+                        .build()
+                        .toUriString();
+            }
+
 
             log.debug("[Pancake.getProducts] Calling relative URI: {}", relativeUri);
 
