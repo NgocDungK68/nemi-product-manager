@@ -3,7 +3,7 @@ package com.nemi.controller;
 import com.nemi.entity.PosEntity;
 import com.nemi.repository.PosRepository;
 import com.nemi.service.GeneralPosService;
-import com.nemi.service.PosReAuthService;
+import com.nemi.service.EncryptionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class TestController {
     private final PosRepository posRepository;
     private final GeneralPosService generalPosService;
+    private final EncryptionService encryptionService;
 
 //    private final PosManagementService pancakeService;
 
@@ -47,5 +48,19 @@ public class TestController {
 //        pancakeService.syncOrder(posId);
         return ResponseEntity.ok("xong");
 
+    }
+
+    @GetMapping("/public-api/test-decrypt-config/{posId}")
+    public ResponseEntity<String> testDecryptConfig(@PathVariable String posId) {
+                // Lấy POS entity từ database
+            PosEntity posEntity = posRepository.findById(posId)
+                    .orElseThrow(() -> new RuntimeException("POS not found with id: " + posId));
+            
+            // Decrypt config
+            String decryptedConfig = encryptionService.decrypt(posEntity.getConfig());
+            
+            // Trả về kết quả
+            return ResponseEntity.ok("Decrypted Config for POS " + posId + ":\n" + decryptedConfig);
+            
     }
 }

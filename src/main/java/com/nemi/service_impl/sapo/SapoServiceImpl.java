@@ -234,8 +234,10 @@ public class SapoServiceImpl implements PosManagementService {
         try {
             PosEntity posEntity = generalPosService.getPos(posId);
 
+            // Decrypt config before using
+            String decryptedConfig = tokenEncryptionService.decrypt(posEntity.getConfig());
             Map<String, String> configMap = objectMapper.readValue(
-                    posEntity.getConfig(), new TypeReference<>() {
+                    decryptedConfig, new TypeReference<>() {
                     });
 
             String clientId = configMap.get(SapoConstants.CLIENT_ID);
@@ -321,7 +323,7 @@ public class SapoServiceImpl implements PosManagementService {
                 .userId(claimUtil.getUserId())
                 .status(PosStatus.ACTIVE.name())
                 .accessToken(encryptedAccessToken)
-                .config(JsonUtils.toJson(configMap))
+                .config(tokenEncryptionService.encrypt(JsonUtils.toJson(configMap)))
                 .expiredTime(null)
                 .companyId(String.valueOf(claimUtil.getCompanyId()))
                 .createdBy(claimUtil.getUserName())
@@ -333,8 +335,10 @@ public class SapoServiceImpl implements PosManagementService {
     public SapoRequest buildRequest(PosEntity posEntity) {
         try {
             //parse config
+            // Decrypt config before using
+            String decryptedConfig = tokenEncryptionService.decrypt(posEntity.getConfig());
             Map<String, String> configMap = objectMapper.readValue(
-                    posEntity.getConfig(),
+                    decryptedConfig,
                     new TypeReference<>() {
                     }
             );

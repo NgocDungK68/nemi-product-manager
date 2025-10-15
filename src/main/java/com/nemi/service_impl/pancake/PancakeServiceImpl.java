@@ -102,7 +102,7 @@ public class PancakeServiceImpl implements PosManagementService {
                     .userId(userId)
                     .status(PosStatus.ACTIVE.name())
                     .accessToken(encryptionService.encrypt(posConnectionRequest.getApiKey()))
-                    .config(JsonUtils.toJson(configMap))
+                    .config(encryptionService.encrypt(JsonUtils.toJson(configMap)))
                     .expiredTime(expiredTime)
                     .companyId(String.valueOf(claimUtil.getCompanyId()))
                     .createdBy(claimUtil.getUserName())
@@ -133,8 +133,10 @@ public class PancakeServiceImpl implements PosManagementService {
 
            String decryptedToken = encryptionService.decrypt(posEntity.getAccessToken());
 
+            // Decrypt config before using
+            String decryptedConfig = encryptionService.decrypt(posEntity.getConfig());
             PancakeRequest request = PancakeRequest.buildRequest
-                    (posEntity.getConfig(),
+                    (decryptedConfig,
                             decryptedToken,
                             pageStartNumber,
                             productBatchSize);
@@ -215,7 +217,9 @@ public class PancakeServiceImpl implements PosManagementService {
             PosEntity posEntity = generalPosService.getPos(posId);
             String decryptedToken = encryptionService.decrypt(posEntity.getAccessToken());
 
-            PancakeRequest request = PancakeRequest.buildRequest(posEntity.getConfig(),decryptedToken,pageStartNumber, productBatchSize);
+            // Decrypt config before using
+            String decryptedConfig = encryptionService.decrypt(posEntity.getConfig());
+            PancakeRequest request = PancakeRequest.buildRequest(decryptedConfig,decryptedToken,pageStartNumber, productBatchSize);
 
             List<OrderEntity> allOrders = new ArrayList<>();
             List<OrderItemEntity> allOrderItems = new ArrayList<>();
