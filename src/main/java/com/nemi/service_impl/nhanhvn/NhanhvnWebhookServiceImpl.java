@@ -27,7 +27,6 @@ import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -446,8 +445,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
 
             NhanhvnRequest request = NhanhvnRequest.buildRequest(
                     posEntity.getConfig(),
-                    posEntity.getAccessToken(),
-                    posEntity.getCreatedAt().toInstant(ZoneOffset.UTC).getEpochSecond()
+                    posEntity.getAccessToken()
             );
             request.setFilters(Map.of(NhanhvnConstants.IDS, id));
             Optional<NhanhvnProductResponse> responseOpt = nhanhvnClient.getProducts(request);

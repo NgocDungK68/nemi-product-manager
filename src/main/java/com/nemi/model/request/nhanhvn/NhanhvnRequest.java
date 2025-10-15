@@ -9,6 +9,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -31,16 +33,17 @@ public class NhanhvnRequest {
         private Object next;
     }
 
-    public static NhanhvnRequest buildRequest(String config, String accessToken, long posCreatedAt) {
+    public static NhanhvnRequest buildRequest(String config, String accessToken) {
         Map<String, String> configMap = PosUtils.convertToConfigMap(config);
 
         String appId = configMap.get(NhanhvnConstants.APP_ID);
         String businessId = configMap.get(NhanhvnConstants.BUSINESS_ID);
 
-        long updateAtFrom = posCreatedAt - NhanhvnConfig.getRecentDaysStatic() * 86400;
+        long updatedAtTo = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC);
+        long updateAtFrom = LocalDateTime.now().minusDays(NhanhvnConfig.getRecentDaysStatic()).toEpochSecond(ZoneOffset.UTC);
         Map<String, Object> filters = new HashMap<>();
         filters.put(NhanhvnConstants.UPDATED_AT_FROM, updateAtFrom);
-        filters.put(NhanhvnConstants.UPDATED_AT_TO, posCreatedAt);
+        filters.put(NhanhvnConstants.UPDATED_AT_TO, updatedAtTo);
 
         return NhanhvnRequest.builder()
                 .appId(appId)

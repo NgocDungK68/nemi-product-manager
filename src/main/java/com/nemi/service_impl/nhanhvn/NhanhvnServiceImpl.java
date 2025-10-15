@@ -35,7 +35,6 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
@@ -116,8 +115,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
             String decryptedConfig = encryptionService.decrypt(posEntity.getConfig());
             NhanhvnRequest request = NhanhvnRequest.buildRequest(
                     decryptedConfig,
-                    decryptedToken,
-                    posEntity.getCreatedAt().toInstant(ZoneOffset.UTC).getEpochSecond()
+                    decryptedToken
             );
 
             if (isInvalidRequest(request)) {
@@ -214,8 +212,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
             String decryptedConfig = encryptionService.decrypt(posEntity.getConfig());
             NhanhvnRequest request = NhanhvnRequest.buildRequest(
                     decryptedConfig,
-                    decryptedToken,
-                    posEntity.getCreatedAt().toInstant(ZoneOffset.UTC).getEpochSecond()
+                    decryptedToken
             );
 
             if (isInvalidRequest(request)) {
