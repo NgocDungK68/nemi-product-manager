@@ -1,6 +1,5 @@
-package com.nemi.utils;
+package com.nemi.utils.security;
 
-import com.nemi.utils.security.EncryptionStrength;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.crypto.KeyGenerator;

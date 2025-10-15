@@ -4,7 +4,6 @@ package com.nemi.utils.security;
 import com.nemi.utils.security.model.CipherText;
 import com.nemi.utils.security.model.Password;
 import com.nemi.utils.security.model.PlainText;
-import com.nemi.utils.AesCipherUtils;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 

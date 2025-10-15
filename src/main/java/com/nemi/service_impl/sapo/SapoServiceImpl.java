@@ -6,7 +6,12 @@ import com.nemi.client.SapoClient;
 import com.nemi.configuration.SapoConfig;
 import com.nemi.constant.PosConstants;
 import com.nemi.constant.SapoConstants;
-import com.nemi.entity.*;
+import com.nemi.entity.OrderEntity;
+import com.nemi.entity.OrderItemEntity;
+import com.nemi.entity.PosEntity;
+import com.nemi.entity.ProductEntity;
+import com.nemi.entity.ProductVariantEntity;
+import com.nemi.entity.SyncHistoryEntity;
 import com.nemi.enums.PosName;
 import com.nemi.enums.PosStatus;
 import com.nemi.enums.SyncErrorMessage;
@@ -14,6 +19,7 @@ import com.nemi.enums.SyncType;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
+import com.nemi.mapper.SapoMapper;
 import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.request.sapo.SapoRequest;
 import com.nemi.model.response.PosConnectionResponse;
@@ -21,11 +27,15 @@ import com.nemi.model.response.sapo.SapoAccessTokenResponse;
 import com.nemi.model.response.sapo.SapoOrderResponse;
 import com.nemi.model.response.sapo.SapoProductResponse;
 import com.nemi.model.response.sapo.SapoWebhookResponse;
-import com.nemi.repository.*;
-import com.nemi.mapper.SapoMapper;
+import com.nemi.repository.OrderItemRepository;
+import com.nemi.repository.OrderRepository;
+import com.nemi.repository.PosRepository;
+import com.nemi.repository.ProductRepository;
+import com.nemi.repository.ProductVariantRepository;
+import com.nemi.repository.SyncHistoryRepository;
+import com.nemi.service.EncryptionService;
 import com.nemi.service.GeneralPosService;
 import com.nemi.service.PosManagementService;
-import com.nemi.service.EncryptionService;
 import com.nemi.util.ClaimUtil;
 import com.nemi.util.JsonUtils;
 import jakarta.annotation.PostConstruct;
@@ -34,8 +44,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
+
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 @Service
@@ -222,7 +237,6 @@ public class SapoServiceImpl implements PosManagementService {
     }
 
 
-
     @Override
     public void syncOrder(String posId, Boolean isSyncAll) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
@@ -243,7 +257,7 @@ public class SapoServiceImpl implements PosManagementService {
             String clientId = configMap.get(SapoConstants.CLIENT_ID);
             String clientSecret = configMap.get(SapoConstants.CLIENT_SECRET);
             String storeName = configMap.get(SapoConstants.STORE_NAME);
-            
+
             // Decrypt access token when using for API calls
             String accessToken = tokenEncryptionService.decrypt(posEntity.getAccessToken());
 
@@ -317,7 +331,7 @@ public class SapoServiceImpl implements PosManagementService {
     private PosEntity createNewPos(SapoAccessTokenResponse tokenResponse, Map<String, String> configMap) {
         // Encrypt access token before storing in database
         String encryptedAccessToken = tokenEncryptionService.encrypt(tokenResponse.getAccessToken());
-        
+
         PosEntity newPos = PosEntity.builder()
                 .posName(PosName.SAPO.getValue())
                 .userId(claimUtil.getUserId())
@@ -346,7 +360,7 @@ public class SapoServiceImpl implements PosManagementService {
             String clientId = configMap.get(SapoConstants.CLIENT_ID);
             String clientSecret = configMap.get(SapoConstants.CLIENT_SECRET);
             String storeName = configMap.get(SapoConstants.STORE_NAME);
-            
+
             // Decrypt access token when using for API calls
             String decryptedAccessToken = tokenEncryptionService.decrypt(posEntity.getAccessToken());
 

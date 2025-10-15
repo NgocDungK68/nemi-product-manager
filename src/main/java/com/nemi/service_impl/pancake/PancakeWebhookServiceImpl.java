@@ -9,7 +9,6 @@ import com.nemi.entity.OrderItemEntity;
 import com.nemi.entity.WebhookHistoryEntity;
 import com.nemi.enums.PancakeEvent;
 import com.nemi.enums.PosName;
-import com.nemi.enums.Status;
 import com.nemi.model.request.pancake.PancakeWebhookRequest;
 import com.nemi.model.response.pancake.PancakeOrderResponse;
 import com.nemi.repository.OrderItemRepository;
@@ -168,7 +167,7 @@ public class PancakeWebhookServiceImpl implements WebhookService {
 
     public OrderEntity convertToOrderEntity(String posId, PancakeOrderResponse.DataItem apiOrders) {
 
-        String status = pancakeConfig.getStatusMapping(apiOrders.getStatus(),apiOrders.getStatusName());
+        String status = pancakeConfig.getStatusMapping(apiOrders.getStatus(), apiOrders.getStatusName());
         log.info("status of orderId {} is {}", apiOrders.getId(), status);
 
         String paymentMethod = Optional.ofNullable(apiOrders.getPaymentPurchaseHistories())

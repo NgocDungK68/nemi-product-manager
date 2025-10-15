@@ -65,10 +65,10 @@ public class SapoMapper {
         if (ObjectUtils.isNotEmpty(apiProduct.getModifiedOn())) {
             product.setUpdatedAt(PosUtils.parseDateTime(apiProduct.getModifiedOn()));
         }
-        
+
         product.setCreatedBy(username);
         product.setUpdatedBy(username);
-        
+
         return product;
     }
 
@@ -121,7 +121,7 @@ public class SapoMapper {
 
         // Warehouse quantities - for now empty, can be extended later
         variant.setWarehouseQuantities("{}");
-        
+
         variant.setCreatedBy(username);
         variant.setUpdatedBy(username);
 

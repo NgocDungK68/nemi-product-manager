@@ -1,6 +1,5 @@
 package com.nemi.service_impl.pancake;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.client.PancakeClient;
 import com.nemi.configuration.PancakeConfig;
@@ -39,7 +38,6 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ObjectUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -131,7 +129,7 @@ public class PancakeServiceImpl implements PosManagementService {
         try {
             PosEntity posEntity = generalPosService.getPos(posId);
 
-           String decryptedToken = encryptionService.decrypt(posEntity.getAccessToken());
+            String decryptedToken = encryptionService.decrypt(posEntity.getAccessToken());
 
             // Decrypt config before using
             String decryptedConfig = encryptionService.decrypt(posEntity.getConfig());
@@ -145,7 +143,7 @@ public class PancakeServiceImpl implements PosManagementService {
             List<ProductVariantEntity> allVariants = new ArrayList<>();
 
             while (true) {
-                Optional<PancakeProductResponse> responseOpt = pancakeClient.getProducts(request,isSyncAll,posEntity.getCreatedAt());
+                Optional<PancakeProductResponse> responseOpt = pancakeClient.getProducts(request, isSyncAll, posEntity.getCreatedAt());
                 if (responseOpt.isEmpty()) { // handle tinh huonh nhu server loi
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.PRODUCT_CONNECTION_FAILED, false));
                     log.error("No response from Pancake API when fetching products, posId={}", posId);
@@ -193,7 +191,7 @@ public class PancakeServiceImpl implements PosManagementService {
     }
 
     private SyncHistoryEntity toSyncHistory(SyncHistoryEntity syncHistoryEntity, SyncErrorMessage syncErrorMessage, Boolean isSyncSuccess) {
-        if (!isSyncSuccess) {
+        if (Boolean.FALSE.equals(isSyncSuccess)) {
             syncHistoryEntity.setEndTime(LocalDateTime.now());
             syncHistoryEntity.setErrorMessage(PosName.PANCAKE.getValue() + ": " + syncErrorMessage.getMessage());
             return syncHistoryEntity;
@@ -219,13 +217,13 @@ public class PancakeServiceImpl implements PosManagementService {
 
             // Decrypt config before using
             String decryptedConfig = encryptionService.decrypt(posEntity.getConfig());
-            PancakeRequest request = PancakeRequest.buildRequest(decryptedConfig,decryptedToken,pageStartNumber, productBatchSize);
+            PancakeRequest request = PancakeRequest.buildRequest(decryptedConfig, decryptedToken, pageStartNumber, productBatchSize);
 
             List<OrderEntity> allOrders = new ArrayList<>();
             List<OrderItemEntity> allOrderItems = new ArrayList<>();
             String userName = claimUtil.getUserName();
             while (true) {
-                Optional<PancakeOrderResponse> responseOpt = pancakeClient.getOrders(request,isSyncAll,posEntity.getCreatedAt());
+                Optional<PancakeOrderResponse> responseOpt = pancakeClient.getOrders(request, isSyncAll, posEntity.getCreatedAt());
                 if (responseOpt.isEmpty()) {
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.ORDER_CONNECTION_FAILED, false));
                     log.error("No response from Pancake API when fetching orders, posId={}", posId);

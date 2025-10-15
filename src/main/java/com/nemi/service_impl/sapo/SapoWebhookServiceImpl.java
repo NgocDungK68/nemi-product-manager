@@ -3,22 +3,31 @@ package com.nemi.service_impl.sapo;
 import com.nemi.configuration.SapoConfig;
 import com.nemi.constant.SapoConstants;
 import com.nemi.constant.WebhookConstants;
-import com.nemi.entity.*;
+import com.nemi.entity.OrderEntity;
+import com.nemi.entity.OrderItemEntity;
+import com.nemi.entity.ProductEntity;
+import com.nemi.entity.ProductId;
+import com.nemi.entity.ProductVariantEntity;
+import com.nemi.entity.WebhookHistoryEntity;
 import com.nemi.enums.PosName;
 import com.nemi.enums.SapoEvent;
+import com.nemi.mapper.SapoMapper;
 import com.nemi.model.response.sapo.SapoOrderResponse;
 import com.nemi.model.response.sapo.SapoProductResponse;
-import com.nemi.repository.*;
-import com.nemi.mapper.SapoMapper;
+import com.nemi.repository.OrderItemRepository;
+import com.nemi.repository.OrderRepository;
+import com.nemi.repository.ProductRepository;
+import com.nemi.repository.ProductVariantRepository;
+import com.nemi.repository.WebhookHistoryRepository;
 import com.nemi.service.WebhookService;
 import com.nemi.util.JsonUtils;
 import com.nemi.utils.PosUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.apache.commons.lang3.ObjectUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -94,7 +103,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 case PRODUCT_DELETE -> processProductDeleteWebhook(posId, payloadProduct);
                 case ORDER_ADD -> processOrderCreateWebhook(posId, payloadOrder);
                 case ORDER_UPDATED -> processOrderUpdateWebhook(posId, payloadOrder);
-                case ORDER_FULFILLED, ORDER_UPDATE ->  false;
+                case ORDER_FULFILLED, ORDER_UPDATE -> false;
                 case ORDER_DELETE -> processOrderDeleteWebhook(posId, payloadOrder);
             };
 
@@ -189,8 +198,6 @@ public class SapoWebhookServiceImpl implements WebhookService {
             return false;
         }
     }
-
-
 
 
     /**
@@ -403,7 +410,6 @@ public class SapoWebhookServiceImpl implements WebhookService {
             return false;
         }
     }
-
 
 
     /**
