@@ -89,6 +89,9 @@ pancake:
   secret: elqsF9ERiFWGacWQO9Gg5XC4kXojot
   base-url: https://pos.pages.fm/api/v1
   api-key: 10b76cf31be245848c8361287cee2adf
+  is-sync-all-product: false
+  is-sync-all-order: false
+  recent-days: 30
   shop-id: 1720119150
   timeout: 30000
   x-api-key: elqsF9ERiFWGacWQO9Gg5XC4kXojot
@@ -185,6 +188,7 @@ logging:
 
 
 
-
+timezone:
+  Vietnam: +07:00
 
 

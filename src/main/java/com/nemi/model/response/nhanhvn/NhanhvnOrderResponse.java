@@ -24,13 +24,6 @@ public class NhanhvnOrderResponse {
     @AllArgsConstructor
     public static class Paginator {
         private Object next;
-
-        @Data
-        @NoArgsConstructor
-        @AllArgsConstructor
-        public static class Next {
-            private long id;
-        }
     }
 
     @Data

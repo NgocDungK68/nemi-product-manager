@@ -1,36 +1,21 @@
 package com.nemi.model.request.pancake;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.nemi.configuration.PancakeConfig;
-import com.nemi.constant.NhanhvnConstants;
 import com.nemi.constant.PancakeConstatns;
-import com.nemi.entity.PosEntity;
-import com.nemi.enums.SyncErrorMessage;
 import com.nemi.utils.PosUtils;
-import jakarta.annotation.PostConstruct;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.RequiredArgsConstructor;
-import org.apache.commons.lang3.StringUtils;
+import lombok.extern.slf4j.Slf4j;
 
+import java.time.LocalDateTime;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 
 @Data
 @AllArgsConstructor
 @Builder
+@Slf4j
 public class PancakeRequest {
-
-    private final PancakeConfig pancakeConfig;
-
-    public PancakeRequest(PancakeConfig pancakeConfig) {
-        this.pancakeConfig = pancakeConfig;
-    }
-
-
-
 
     private String shopId;       // ID shop
     private String apiKey;       // API key
@@ -41,6 +26,8 @@ public class PancakeRequest {
     //    private String search;       // tìm theo tên / keyword
 //    private String sellingStatus;   // none, bad, normal, star
     private String productStatus;   // locked, not_locked
+    private Long startUnix;
+    private Long endUnix;
 
 //    private List<String> categoryIds;    // lọc theo category
 //    private Boolean isFilterCategoriesByOr; // true = OR, false = AND
@@ -58,7 +45,7 @@ public class PancakeRequest {
 //
 //    private String includedComposite; // parent / children
 //    private List<String> variationIds; // chỉ lấy các variation cụ thể
-    public static PancakeRequest buildRequest(String config, String accesToken,int pageStartNumber, int productBatchSize) {
+    public static PancakeRequest buildRequest(String config, String accesToken, int pageStartNumber, int productBatchSize, LocalDateTime fromdate) {
 
         Map<String, String> configMap = PosUtils.convertToConfigMap(config);
 
@@ -66,11 +53,18 @@ public class PancakeRequest {
 
         int pageNumber = pageStartNumber;
 
+        long startUnix = PosUtils.toEpochSecond(fromdate.minusDays(PancakeConfig.getRecentDaysStatic()));
+        long endUnix = PosUtils.toEpochSecond(fromdate);
+
+        log.info("start time unix: {}, end time unix: {}", startUnix, endUnix);
+
         return PancakeRequest.builder()
                 .apiKey(accesToken)
                 .pageNumber(pageNumber)
                 .pageSize(productBatchSize)
                 .shopId(shopId)
+                .endUnix(endUnix)
+                .startUnix(startUnix)
                 .build();
     }
 }
