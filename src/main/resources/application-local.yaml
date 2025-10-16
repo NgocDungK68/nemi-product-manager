@@ -129,6 +129,8 @@ sapo:
   access-token: 6774cbee20e240a5a527c0497ce283e0
   url: https://nemi-test02.mysapo.net/
   recent-days: 30 # số ngày gần nhất để lấy sản phẩm
+  is-sync-all-product: false
+  is-sync-all-order: false
   url-register-webhook: https://nemi-dev-02.ecombase.net/nemi-product-manager/webhook/v1/sapo/
   # API Paths
   path-oauth-access-token: /admin/oauth/access_token
@@ -166,7 +168,7 @@ secret:
   service-password: "Nemi@2025@"
 
 crypto:
-  password: ${secret.service-password}
+  password: "Nemi@2025@!"
   mode: GCM         # GCM or CTR
   strength: 256     # 128, 192, 256
 logging:

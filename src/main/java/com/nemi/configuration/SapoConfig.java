@@ -19,6 +19,8 @@ public class SapoConfig {
     private String url;
     private BatchConfig sync;
     private Integer recentDays;
+    private Boolean isSyncAllProduct;    // added
+    private Boolean isSyncAllOrder;      // added
     //---status-----
 
     private OrderConfig order;

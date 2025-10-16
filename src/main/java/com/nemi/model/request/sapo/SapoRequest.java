@@ -47,11 +47,18 @@ public class SapoRequest {
 
             // Calculate the time range for recent days
             long updateAtFrom = posCreatedAt - (long) recentDays * 86400L;
+            
+            // Convert to ISO 8601 format with timezone
+            java.time.Instant fromInstant = java.time.Instant.ofEpochSecond(updateAtFrom);
+            java.time.Instant toInstant = java.time.Instant.ofEpochSecond(posCreatedAt);
+            
+            String fromDate = fromInstant.atOffset(java.time.ZoneOffset.UTC).format(java.time.format.DateTimeFormatter.ISO_INSTANT);
+            String toDate = toInstant.atOffset(java.time.ZoneOffset.UTC).format(java.time.format.DateTimeFormatter.ISO_INSTANT);
 
             // Decrypt access token when using for API calls
             Map<String, Object> filters = new HashMap<>();
-            filters.put(SapoConstants.CREATE_ON_MIN, updateAtFrom); // lấy order tạo sau thời điểm này (epoch seconds)
-            filters.put(SapoConstants.CREATE_ON_MAX, posCreatedAt); // lấy order tạo trước thời điểm này (epoch seconds)
+            filters.put(SapoConstants.CREATE_ON_MIN, fromDate); // lấy order tạo sau thời điểm này (ISO format)
+            filters.put(SapoConstants.CREATE_ON_MAX, toDate); // lấy order tạo trước thời điểm này (ISO format)
 
             return SapoRequest.builder()
                     .clientId(clientId)
