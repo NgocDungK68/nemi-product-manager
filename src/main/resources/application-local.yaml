@@ -95,7 +95,6 @@ pancake:
   shop-id: 1720119150
   timeout: 30000
   x-api-key: elqsF9ERiFWGacWQO9Gg5XC4kXojot
-  recent-days: 30 # số ngày gần nhất để lấy sản phẩm
   retry:
     max-attempts: 3
     backoff-delay: 2000

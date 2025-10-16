@@ -151,7 +151,8 @@ public class SapoServiceImpl implements PosManagementService {
             SapoRequest request = SapoRequest.buildRequest(
                     decryptedConfig,
                     decryptedToken,
-                    posEntity.getCreatedAt().toEpochSecond(java.time.ZoneOffset.UTC)
+                    posEntity.getCreatedAt().toEpochSecond(java.time.ZoneOffset.UTC),
+                    sapoConfig.getRecentDays()
             );
 
             if (isInvalidRequest(request)) {
@@ -265,7 +266,8 @@ public class SapoServiceImpl implements PosManagementService {
             SapoRequest request = SapoRequest.buildRequest(
                     decryptedConfig,
                     decryptedToken,
-                    posEntity.getCreatedAt().toEpochSecond(java.time.ZoneOffset.UTC)
+                    posEntity.getCreatedAt().toEpochSecond(java.time.ZoneOffset.UTC),
+                    sapoConfig.getRecentDays()
             );
 
             if (isInvalidRequest(request)) {

@@ -36,7 +36,7 @@ public class SapoRequest {
         private int page;
     }
 
-    public static SapoRequest buildRequest(String config, String accessToken, long posCreatedAt) {
+    public static SapoRequest buildRequest(String config, String accessToken, long posCreatedAt, int recentDays) {
         try {
 
             Map<String, String> configMap = PosUtils.convertToConfigMap(config);
@@ -45,7 +45,7 @@ public class SapoRequest {
             String clientSecret = configMap.get(SapoConstants.CLIENT_SECRET);
             String storeName = configMap.get(SapoConstants.STORE_NAME);
 
-            int recentDays = SapoConfig.getRecentDaysStatic();
+            // Calculate the time range for recent days
             long updateAtFrom = posCreatedAt - (long) recentDays * 86400L;
 
             // Decrypt access token when using for API calls
