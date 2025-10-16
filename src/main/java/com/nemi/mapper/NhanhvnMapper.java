@@ -7,6 +7,7 @@ import com.nemi.entity.OrderItemEntity;
 import com.nemi.entity.ProductEntity;
 import com.nemi.entity.ProductVariantEntity;
 import com.nemi.enums.WeightUnit;
+import com.nemi.model.request.nhanhvn.NhanhvnOrderWebhookRequest;
 import com.nemi.model.response.nhanhvn.NhanhvnOrderResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
 import lombok.RequiredArgsConstructor;
@@ -140,6 +141,47 @@ public class NhanhvnMapper {
         return orderItemEntities;
     }
 
+    //---------------webhook order request---------------------
+    public OrderEntity convertToOrderEntity(String posId, NhanhvnOrderWebhookRequest apiOrder, String username) {
+        String status = nhanhvnConfig.getOrderStatusMapping(apiOrder.getInfo().getStatus());
+
+        return OrderEntity.builder()
+                .posId(posId)
+                .orderId(String.valueOf(apiOrder.getInfo().getId()))
+                .orderCode(apiOrder.getCarrier().getCarrierCode())
+                .customerName(apiOrder.getCustomer().getName())
+                .customerEmail(apiOrder.getCustomer().getEmail())
+                .customerPhone(apiOrder.getCustomer().getMobile())// khi user co du thi them custemer phone va email
+                .shippingAddress(apiOrder.getCustomer().getAddress())
+                .shippingMethod(apiOrder.getCarrier().getName())
+                .paymentMethod(apiOrder.getInfo().getPaymentMethod().toString())
+                .totalPrice(totalProductPrice(apiOrder))
+                .shippingFee(apiOrder.getCarrier().getShipFee())
+                .status(status)
+                .updatedBy(username)
+                .build();
+    }
+
+    public List<OrderItemEntity> convertToOrderItemEntity(NhanhvnOrderWebhookRequest apiOrder, String username) {
+        List<OrderItemEntity> orderItemEntities = new ArrayList<>();
+        for (NhanhvnOrderWebhookRequest.Product product : apiOrder.getProducts()) {
+            BigDecimal quantity = BigDecimal.valueOf(product.getQuantity());
+            orderItemEntities.add(OrderItemEntity.builder()
+                    .orderItemId(String.valueOf(product.getId()))
+                    .orderId(String.valueOf(apiOrder.getInfo().getId()))
+                    .quantity(product.getQuantity())
+                    .sku(product.getCode())
+                    .price(product.getPrice())
+                    .totalPrice(product.getPrice().multiply(quantity))
+                    .productName(product.getName())
+                    .updatedBy(username)
+                    .build());
+        }
+
+        return orderItemEntities;
+    }
+
+
     private BigDecimal totalProductPrice(NhanhvnOrderResponse.OrderData apiOrders) {
         BigDecimal totalPrice = BigDecimal.valueOf(0);
         for (NhanhvnOrderResponse.Product product : apiOrders.getProducts()) {
@@ -147,7 +189,6 @@ public class NhanhvnMapper {
             BigDecimal vat = product.getVat().divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
             BigDecimal quantity = BigDecimal.valueOf(product.getQuantity());
             BigDecimal discount = product.getDiscount();
-
 
             BigDecimal lineTotal = price
                     .multiply(BigDecimal.ONE.add(vat))
@@ -157,5 +198,59 @@ public class NhanhvnMapper {
             totalPrice = totalPrice.add(lineTotal);
         }
         return totalPrice.add(apiOrders.getCarrier().getShipFee());
+    }
+
+    private BigDecimal totalProductPrice(NhanhvnOrderWebhookRequest order) {
+        BigDecimal totalPrice = BigDecimal.ZERO;
+
+        if (ObjectUtils.isEmpty(order.getProducts())) {
+            return totalPrice;
+        }
+
+        for (NhanhvnOrderWebhookRequest.Product product : order.getProducts()) {
+            // Lấy giá, số lượng
+            BigDecimal price = safeValue(product.getPrice());
+            BigDecimal quantity = BigDecimal.valueOf(product.getQuantity());
+
+            // Lấy thuế VAT (%)
+            BigDecimal vatPercent = ObjectUtils.isNotEmpty(product.getVat()) ?
+                    safeValue(product.getVat().getPercent()) : BigDecimal.ZERO;
+            BigDecimal vatRate = vatPercent.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
+
+            // Lấy discount amount (ưu tiên amount hơn percent)
+            BigDecimal discountAmount = BigDecimal.ZERO;
+            if (ObjectUtils.isNotEmpty(product.getDiscount())) {
+                if (ObjectUtils.isNotEmpty(product.getDiscount().getAmount())) {
+                    discountAmount = safeValue(product.getDiscount().getAmount());
+                } else if (ObjectUtils.isNotEmpty(product.getDiscount().getPercent())) {
+                    BigDecimal percent = safeValue(product.getDiscount().getPercent());
+                    discountAmount = price.multiply(percent).divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
+                }
+            }
+
+            // Tổng cho từng dòng
+            BigDecimal lineTotal = price
+                    .multiply(BigDecimal.ONE.add(vatRate)) // áp VAT
+                    .multiply(quantity)                     // nhân số lượng
+                    .subtract(discountAmount)               // trừ giảm giá
+                    .setScale(4, RoundingMode.HALF_UP);     // giữ 4 chữ số sau dấu phẩy
+
+            totalPrice = totalPrice.add(lineTotal);
+        }
+
+        // Thêm phí vận chuyển (nếu có)
+        if (ObjectUtils.isNotEmpty(order.getCarrier()) && ObjectUtils.isNotEmpty(order.getCarrier().getShipFee())) {
+            totalPrice = totalPrice.add(safeValue(order.getCarrier().getShipFee()));
+        }
+
+        return totalPrice.setScale(4, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Tránh NullPointerException khi xử lý BigDecimal.
+     */
+    private BigDecimal safeValue(BigDecimal value) {
+        return ObjectUtils.isNotEmpty(value) ?
+                value.setScale(4, RoundingMode.HALF_UP) : BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
     }
 }
