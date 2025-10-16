@@ -19,7 +19,8 @@ public enum TechnicalAlertCode implements IAlertCode {
     DATA_PERSISTENCE_ERROR("500009", "Lỗi lưu trữ dữ liệu", AlertType.ERROR),
     SYNC_HISTORY_NOT_FOUND("500010", "Không tìm thấy quá trình sync", AlertType.ERROR),
     JSON_PARSE_ERROR("500011", "Lỗi xử lý dữ liệu JSON", AlertType.ERROR),
-    POS_ALREADY_CONNECTED("500012", "Pos đã được kết nối", AlertType.ERROR)
+    POS_ALREADY_CONNECTED("500012", "Pos đã được kết nối", AlertType.ERROR),
+    DATE_CONVERSION_ERROR("500013", "Lỗi chuyển đổi ngày tháng", AlertType.ERROR)
     ;
 
     private final AlertCode alertCode;

@@ -24,12 +24,11 @@ public class PosManagementController {
     // POS-specific endpoints (require posName)
     @PostMapping("/{posName}/pos")
     public ResponseEntity<PosConnectionResponse> connectPos(@PathVariable String posName,
-                                                            @RequestBody PosConnectionRequest posConnectionRequest,
-                                                            @RequestParam( defaultValue = "false") boolean isSyncAll) {
+                                                            @RequestBody PosConnectionRequest posConnectionRequest) {
         PosManagementService posManagementService = posManagementFactory.getPosName(posName);
         PosConnectionResponse posConnectionResponse = posManagementService.connectPos(posConnectionRequest);
-        posManagementService.syncProduct(posConnectionResponse.getId(),isSyncAll);
-        posManagementService.syncOrder(posConnectionResponse.getId(),isSyncAll);
+        posManagementService.syncProduct(posConnectionResponse.getId());
+        posManagementService.syncOrder(posConnectionResponse.getId());
 
         return ResponseEntity.ok(posConnectionResponse);
     }
@@ -58,8 +57,8 @@ public class PosManagementController {
     public ResponseEntity<PosConnectionResponse> manualSync(@PathVariable String posId,@RequestParam( defaultValue = "false") boolean isSyncAll) {
         PosEntity posEntity = generalPosService.getPos(posId);
         PosManagementService posManagementService = posManagementFactory.getPosName(posEntity.getPosName());
-        posManagementService.syncProduct(posId,isSyncAll);
-        posManagementService.syncOrder(posId,isSyncAll);
+        posManagementService.syncProduct(posId);
+        posManagementService.syncOrder(posId);
         return ResponseEntity.ok(PosConnectionResponse.toPosConnectionResponse(posEntity));
     }
 }
