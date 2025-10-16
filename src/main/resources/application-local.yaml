@@ -92,6 +92,7 @@ pancake:
   shop-id: 1720119150
   timeout: 30000
   x-api-key: elqsF9ERiFWGacWQO9Gg5XC4kXojot
+  recent-days: 30 # số ngày gần nhất để lấy sản phẩm
   retry:
     max-attempts: 3
     backoff-delay: 2000
@@ -125,6 +126,7 @@ sapo:
   client-secret: 50ce6b4d47a04ca18aa6f972b698779a
   access-token: 6774cbee20e240a5a527c0497ce283e0
   url: https://nemi-test02.mysapo.net/
+  recent-days: 30 # số ngày gần nhất để lấy sản phẩm
   url-register-webhook: https://nemi-dev-02.ecombase.net/nemi-product-manager/webhook/v1/sapo/
   # API Paths
   path-oauth-access-token: /admin/oauth/access_token

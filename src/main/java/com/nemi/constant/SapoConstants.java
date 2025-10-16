@@ -17,6 +17,8 @@ public class SapoConstants {
     public static final String FORMAT = "format";
     public static final String WEBHOOK = "webhook";
     public static final String WEBHOOKS = "webhooks";
+    public static final String CREATE_ON_MIN = "created_on_min";
+    public static final String CREATE_ON_MAX = "created_on_max";
 
     // URL paths
 
