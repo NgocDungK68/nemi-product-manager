@@ -2,6 +2,7 @@ package com.nemi.configuration;
 
 import com.nemi.enums.Status;
 import lombok.Data;
+import lombok.Getter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
@@ -17,6 +18,9 @@ public class SapoConfig {
     private String accessToken;
     private String url;
     private BatchConfig sync;
+    private Integer recentDays;
+    private Boolean isSyncAllProduct;    // added
+    private Boolean isSyncAllOrder;      // added
     //---status-----
 
     private OrderConfig order;
@@ -30,6 +34,10 @@ public class SapoConfig {
             private Map<String, String> mapping;
         }
     }
+
+    @Getter
+    private static SapoConfig instance;
+
     @Data
     public static class BatchConfig {
         private int pageStart;

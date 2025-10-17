@@ -1,7 +1,9 @@
 package com.nemi.configuration;
 
 import com.nemi.enums.Status;
+import jakarta.annotation.PostConstruct;
 import lombok.Data;
+import lombok.Getter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
@@ -11,13 +13,26 @@ import java.util.Optional;
 @Data
 @Configuration
 @ConfigurationProperties("pancake")
-public  class PancakeConfig {
+@Getter
+public class PancakeConfig {
     private String baseUrl;
     private String apiKey;
     private String shopId;
     private int timeout;
     private Sync sync;
     private String xApiKey;
+    private Boolean isSyncAllProduct;    // added
+    private Boolean isSyncAllOrder;      // added
+    private Integer recentDays;          // added
+
+
+    @Getter
+    private static PancakeConfig instance;
+
+    @PostConstruct
+    public void init() {
+        instance = this;
+    }
 
     @Data
     public static class Retry {
@@ -47,12 +62,17 @@ public  class PancakeConfig {
         private int pageStart;
     }
 
-    public String getStatusMapping(Integer key,String statusName) {
+    public String getStatusMapping(Integer key, String statusName) {
 
         return Optional.ofNullable(key)
                 .map(code -> this.getOrder().getStatus().getMapping()
-                        .getOrDefault(code,statusName))
+                        .getOrDefault(code, statusName))
                 .orElse(Status.UNKNOWN.getValue());
     }
+
+    public static Integer getRecentDaysStatic() {
+        return instance.recentDays;
+    }
+
 
 }

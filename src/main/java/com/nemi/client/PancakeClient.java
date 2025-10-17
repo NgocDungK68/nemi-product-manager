@@ -10,6 +10,7 @@ import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.BooleanUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -30,8 +31,9 @@ import java.util.Optional;
 public class PancakeClient {
     @Resource(name = "pancakeRestTemplate")
     private final RestTemplate restTemplate;
+    private final PancakeConfig pancakeConfig;
 
-    public Optional<PancakeProductResponse> getProducts(PancakeRequest request, Boolean isSyncAll, LocalDateTime posConnectionStart) {
+    public Optional<PancakeProductResponse> getProducts(PancakeRequest request) {
 
         try {
 
@@ -40,14 +42,11 @@ public class PancakeClient {
                     .queryParam(PancakeConstatns.PAGE_SIZE, request.getPageSize())
                     .queryParam(PancakeConstatns.PAGE_NUMBER, request.getPageNumber()).toUriString();
 
-            if (Boolean.FALSE.equals(isSyncAll)) {
-                LocalDateTime minusDays = posConnectionStart.minusDays(30);
-                long startUnix = minusDays.toEpochSecond(ZoneOffset.of("+07:00"));
-                long endUnix = posConnectionStart.toEpochSecond(ZoneOffset.of("+07:00"));
+            if (Boolean.FALSE.equals(pancakeConfig.getIsSyncAllProduct())) {
 
                 relativeUri = UriComponentsBuilder.fromUriString(relativeUri)
-                        .queryParam(PancakeConstatns.START_DATE_TIME, startUnix)
-                        .queryParam(PancakeConstatns.END_DATE_TIME, endUnix)
+                        .queryParam(PancakeConstatns.START_DATE_TIME, request.getStartUnix())
+                        .queryParam(PancakeConstatns.END_DATE_TIME, request.getEndUnix())
                         .build().toUriString();
             }
             log.debug("[Pancake.getProducts] Calling relative URI: {}", relativeUri);
@@ -62,7 +61,7 @@ public class PancakeClient {
             String jsonResp = resp.getBody();
             log.debug("[PancakeClient.getProducts] resp {}", resp);
 
-            if (jsonResp == null || jsonResp.isBlank()) {
+            if (StringUtils.isEmpty(jsonResp)) {
                 log.warn("[PancakeClient.getProducts] Empty response body (status: {})", resp.getStatusCode());
                 return Optional.empty();
             }
@@ -81,7 +80,7 @@ public class PancakeClient {
         }
     }
 
-    public Optional<PancakeOrderResponse> getOrders(PancakeRequest request, Boolean isSyncAll, LocalDateTime posConnectionStart) {
+    public Optional<PancakeOrderResponse> getOrders(PancakeRequest request) {
         log.debug("[Pancake.getOrders] with pagesize {} and page number {}", request.getPageSize(), request.getPageNumber());
 
         try {
@@ -93,14 +92,11 @@ public class PancakeClient {
                     .toUriString();
 
 
-            if (BooleanUtils.isFalse(isSyncAll)) {
-                LocalDateTime minusDays = posConnectionStart.minusDays(30);
-                long endUnix = posConnectionStart.toEpochSecond(ZoneOffset.of("+07:00"));
-                long startUnix = minusDays.toEpochSecond(ZoneOffset.of("+07:00"));
+            if (BooleanUtils.isFalse(pancakeConfig.getIsSyncAllOrder())) {
 
                 relativeUri = UriComponentsBuilder.fromUriString(relativeUri)
-                        .queryParam(PancakeConstatns.START_DATE_TIME, startUnix)
-                        .queryParam(PancakeConstatns.END_DATE_TIME, endUnix)
+                        .queryParam(PancakeConstatns.START_DATE_TIME, request.getStartUnix())
+                        .queryParam(PancakeConstatns.END_DATE_TIME, request.getEndUnix())
                         .build()
                         .toUriString();
             }
@@ -118,7 +114,7 @@ public class PancakeClient {
             String jsonResp = resp.getBody();
             log.debug("[PancakeClient.getOrders] resp {}", resp);
 
-            if (jsonResp == null || jsonResp.isBlank()) {
+            if (StringUtils.isEmpty(jsonResp)) {
                 log.warn("[PancakeClient.getOrders] Empty response body (status: {})", resp.getStatusCode());
                 return Optional.empty();
             }

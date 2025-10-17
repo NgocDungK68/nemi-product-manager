@@ -2,6 +2,7 @@ package com.nemi.utils;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nemi.constant.PosConstants;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
@@ -64,4 +65,18 @@ public class PosUtils {
             throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.JSON_PARSE_ERROR));
         }
     }
+
+    public static long toEpochSecond(LocalDateTime dateTime) {
+        if (dateTime == null) {
+            return 0L;
+        }
+        try {
+            return dateTime.toEpochSecond(ZoneOffset.of(PosConstants.VIETNAM_ZONE));
+        } catch (Exception e) {
+            log.error("Failed to convert LocalDateTime to epoch seconds: {}", e.getMessage(), e);
+            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.DATE_CONVERSION_ERROR));
+        }
+    }
+
+
 }

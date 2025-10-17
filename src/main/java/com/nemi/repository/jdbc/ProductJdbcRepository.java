@@ -78,7 +78,7 @@ public class ProductJdbcRepository extends BaseBatchRepository<ProductEntity> {
         ps.setString(10, productEntity.getCreatedBy());
     }
 
-    public void insertProductsVariantParallel(List<ProductEntity> products) {
+    public void insertProductsParallel(List<ProductEntity> products) {
         List<List<ProductEntity>> partitions = createSubList(products, batchSize);
 
         List<Future<Object>> futures = partitions.stream()

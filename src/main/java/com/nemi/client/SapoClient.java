@@ -2,6 +2,7 @@ package com.nemi.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.configuration.SapoConfig;
+import com.nemi.constant.PancakeConstatns;
 import com.nemi.constant.SapoConstants;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
@@ -89,6 +90,13 @@ public class SapoClient {
                     .path(sapoConfig.getPathProducts())
                     .toUriString();
 
+            if (Boolean.FALSE.equals(sapoConfig.getIsSyncAllProduct())) {
+                url = UriComponentsBuilder.fromUriString(url)
+                        .queryParam(SapoConstants.CREATE_ON_MIN, request.getFilters().get(SapoConstants.CREATE_ON_MIN))
+                        .queryParam(SapoConstants.CREATE_ON_MAX, request.getFilters().get(SapoConstants.CREATE_ON_MAX))
+                        .build().toUriString();
+            }
+
             log.debug("[SapoClient.getProducts] Calling URL: {}", url);
 
             HttpHeaders headers = new HttpHeaders();
@@ -125,12 +133,21 @@ public class SapoClient {
 
 
         try {
-            String url = "https://" + request.getStoreName() + ".mysapo.net/admin/orders.json";
+            String baseUrl = "https://" + request.getStoreName() + ".mysapo.net";
+            String url = UriComponentsBuilder.fromHttpUrl(baseUrl)
+                    .path("/admin/orders.json")
+                    .toUriString();
+
+            if (Boolean.FALSE.equals(sapoConfig.getIsSyncAllOrder())) {
+                url = UriComponentsBuilder.fromUriString(url)
+                        .queryParam(SapoConstants.CREATE_ON_MIN, request.getFilters().get(SapoConstants.CREATE_ON_MIN))
+                        .queryParam(SapoConstants.CREATE_ON_MAX, request.getFilters().get(SapoConstants.CREATE_ON_MAX))
+                        .build().toUriString();
+            }
+
             log.debug("[SapoClient.getOrders] Calling URL: {}", url);
 
-
-            String urlWithParams = UriComponentsBuilder.fromHttpUrl(url)
-                    .toUriString();
+            String urlWithParams = url;
 
             log.debug("[SapoClient.getProducts] URL with params: {}", urlWithParams);
             HttpHeaders headers = new HttpHeaders();

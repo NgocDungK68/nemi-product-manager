@@ -1,7 +1,5 @@
 package com.nemi.service_impl.sapo;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.client.SapoClient;
 import com.nemi.configuration.SapoConfig;
 import com.nemi.constant.PosConstants;
@@ -42,7 +40,6 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ObjectUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -65,7 +62,6 @@ public class SapoServiceImpl implements PosManagementService {
     private final PosRepository posRepository;
     private final ProductVariantRepository variantRepository;
     private final SyncHistoryRepository syncHistoryRepository;
-    private final ObjectMapper objectMapper;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final SapoConfig sapoConfig;
@@ -133,7 +129,7 @@ public class SapoServiceImpl implements PosManagementService {
     }
 
     @Override
-    public void syncProduct(String posId, Boolean isSyncAll) {
+    public void syncProduct(String posId ) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
                 .startTime(LocalDateTime.now())
@@ -144,8 +140,20 @@ public class SapoServiceImpl implements PosManagementService {
             String username = claimUtil.getUserName();
             //B1 : Lay posentity va validate posName
             PosEntity posEntity = generalPosService.getPos(posId);
+            
+            // Decrypt access token before using for API calls
+            String decryptedToken = tokenEncryptionService.decrypt(posEntity.getAccessToken());
+            
+            // Decrypt config before using
+            String decryptedConfig = tokenEncryptionService.decrypt(posEntity.getConfig());
+            
             // B2: parse config
-            SapoRequest request = buildRequest(posEntity);
+            SapoRequest request = SapoRequest.buildRequest(
+                    decryptedConfig,
+                    decryptedToken,
+                    posEntity.getCreatedAt().toEpochSecond(java.time.ZoneOffset.UTC),
+                    sapoConfig.getRecentDays()
+            );
 
             if (isInvalidRequest(request)) {
                 syncHistoryRepository.save(toSyncHistory(history, (SyncErrorMessage.MISSING_CONFIG), false));
@@ -162,6 +170,7 @@ public class SapoServiceImpl implements PosManagementService {
 
             paginator.setLimit(productLimit);
             paginator.setPage(pageStartNumber);
+            request.setPaginator(paginator);
 
             //B3 : goi SapoClient de lay du lieu
             while (true) {
@@ -238,7 +247,7 @@ public class SapoServiceImpl implements PosManagementService {
 
 
     @Override
-    public void syncOrder(String posId, Boolean isSyncAll) {
+    public void syncOrder(String posId) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
                 .startTime(LocalDateTime.now())
@@ -247,21 +256,21 @@ public class SapoServiceImpl implements PosManagementService {
                 .build();
         try {
             PosEntity posEntity = generalPosService.getPos(posId);
-
+            
+            // Decrypt access token before using for API calls
+            String decryptedToken = tokenEncryptionService.decrypt(posEntity.getAccessToken());
+            
             // Decrypt config before using
             String decryptedConfig = tokenEncryptionService.decrypt(posEntity.getConfig());
-            Map<String, String> configMap = objectMapper.readValue(
-                    decryptedConfig, new TypeReference<>() {
-                    });
+            
+            SapoRequest request = SapoRequest.buildRequest(
+                    decryptedConfig,
+                    decryptedToken,
+                    posEntity.getCreatedAt().toEpochSecond(java.time.ZoneOffset.UTC),
+                    sapoConfig.getRecentDays()
+            );
 
-            String clientId = configMap.get(SapoConstants.CLIENT_ID);
-            String clientSecret = configMap.get(SapoConstants.CLIENT_SECRET);
-            String storeName = configMap.get(SapoConstants.STORE_NAME);
-
-            // Decrypt access token when using for API calls
-            String accessToken = tokenEncryptionService.decrypt(posEntity.getAccessToken());
-
-            if (StringUtils.isEmpty(clientId) || StringUtils.isEmpty(clientSecret) || StringUtils.isEmpty(storeName) || StringUtils.isEmpty(accessToken)) {
+            if (isInvalidRequest(request)) {
                 syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.MISSING_CONFIG, false));
                 log.error("Missing required config for posId={}", posId);
                 return;
@@ -275,12 +284,7 @@ public class SapoServiceImpl implements PosManagementService {
             SapoRequest.Paginator paginator = new SapoRequest.Paginator();
             paginator.setLimit(productLimit); // reuse productLimit as API max page size
             paginator.setPage(pageNumber);
-
-            SapoRequest request = SapoRequest.builder()
-                    .storeName(storeName)
-                    .accessToken(accessToken)
-                    .paginator(paginator)
-                    .build();
+            request.setPaginator(paginator);
 
             while (true) {
                 Optional<SapoOrderResponse> responseOpt = sapoClient.getOrders(request);
@@ -346,35 +350,6 @@ public class SapoServiceImpl implements PosManagementService {
         return posRepository.save(newPos);
     }
 
-    public SapoRequest buildRequest(PosEntity posEntity) {
-        try {
-            //parse config
-            // Decrypt config before using
-            String decryptedConfig = tokenEncryptionService.decrypt(posEntity.getConfig());
-            Map<String, String> configMap = objectMapper.readValue(
-                    decryptedConfig,
-                    new TypeReference<>() {
-                    }
-            );
-
-            String clientId = configMap.get(SapoConstants.CLIENT_ID);
-            String clientSecret = configMap.get(SapoConstants.CLIENT_SECRET);
-            String storeName = configMap.get(SapoConstants.STORE_NAME);
-
-            // Decrypt access token when using for API calls
-            String decryptedAccessToken = tokenEncryptionService.decrypt(posEntity.getAccessToken());
-
-            return SapoRequest.builder()
-                    .clientId(clientId)
-                    .clientSecret(clientSecret)
-                    .storeName(storeName)
-                    .accessToken(decryptedAccessToken)
-                    .build();
-        } catch (Exception e) {
-            log.error("Failed request SapoRequest - {}", e.getMessage(), e);
-            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.JSON_PARSE_ERROR));
-        }
-    }
 
     private boolean isInvalidRequest(SapoRequest request) {
         return ObjectUtils.isEmpty(request.getClientId())

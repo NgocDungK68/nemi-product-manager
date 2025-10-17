@@ -119,7 +119,7 @@ public class PancakeServiceImpl implements PosManagementService {
 
     @Override
     @Async("syncExecutor")
-    public void syncProduct(String posId, Boolean isSyncAll) {
+    public void syncProduct(String posId) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
                 .startTime(LocalDateTime.now())
@@ -137,17 +137,21 @@ public class PancakeServiceImpl implements PosManagementService {
                     (decryptedConfig,
                             decryptedToken,
                             pageStartNumber,
-                            productBatchSize);
+                            productBatchSize,
+                            posEntity.getCreatedAt()
+                            );
 
             List<ProductEntity> allProducts = new ArrayList<>();
             List<ProductVariantEntity> allVariants = new ArrayList<>();
 
             while (true) {
-                Optional<PancakeProductResponse> responseOpt = pancakeClient.getProducts(request, isSyncAll, posEntity.getCreatedAt());
+
+                Optional<PancakeProductResponse> responseOpt = pancakeClient.getProducts(request);
                 if (responseOpt.isEmpty()) { // handle tinh huonh nhu server loi
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.PRODUCT_CONNECTION_FAILED, false));
                     log.error("No response from Pancake API when fetching products, posId={}", posId);
-                    productJdbcRepository.insertProductsVariantParallel(allProducts);
+                    productJdbcRepository.insertProductsParallel(allProducts);
+                    productVariantJdbcRepository.insertProductsVariantParallel(allVariants);
 
                 }
 
@@ -155,7 +159,8 @@ public class PancakeServiceImpl implements PosManagementService {
                 if (!response.isSuccess()) { //hanle cac tinh huon call dc api nhung sai credentail
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.PRODUCT_INVALID_CREDENTIAL, false));
                     log.error("Invalid API key or shopId when fetching products, posId={}", posId);
-                    productJdbcRepository.insertProductsVariantParallel(allProducts);
+                    productJdbcRepository.insertProductsParallel(allProducts);
+                    productVariantJdbcRepository.insertProductsVariantParallel(allVariants);
                     CompletableFuture.completedFuture(false);
                 }
 
@@ -177,7 +182,7 @@ public class PancakeServiceImpl implements PosManagementService {
             Long startDate = System.currentTimeMillis();
             log.info("Start date {}", startDate);
             syncHistoryRepository.save(toSyncHistory(history, null, true));
-            productJdbcRepository.insertProductsVariantParallel(allProducts);
+            productJdbcRepository.insertProductsParallel(allProducts);
             productVariantJdbcRepository.insertProductsVariantParallel(allVariants);
             Long endDate = System.currentTimeMillis();
             log.info("End date {}", endDate);
@@ -204,7 +209,7 @@ public class PancakeServiceImpl implements PosManagementService {
 
     @Override
     @Async("syncExecutor")
-    public void syncOrder(String posId, Boolean isSyncAll) {
+    public void syncOrder(String posId ) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
                 .startTime(LocalDateTime.now())
@@ -217,13 +222,13 @@ public class PancakeServiceImpl implements PosManagementService {
 
             // Decrypt config before using
             String decryptedConfig = encryptionService.decrypt(posEntity.getConfig());
-            PancakeRequest request = PancakeRequest.buildRequest(decryptedConfig, decryptedToken, pageStartNumber, productBatchSize);
+            PancakeRequest request = PancakeRequest.buildRequest(decryptedConfig, decryptedToken, pageStartNumber, productBatchSize,posEntity.getCreatedAt());
 
             List<OrderEntity> allOrders = new ArrayList<>();
             List<OrderItemEntity> allOrderItems = new ArrayList<>();
             String userName = claimUtil.getUserName();
             while (true) {
-                Optional<PancakeOrderResponse> responseOpt = pancakeClient.getOrders(request, isSyncAll, posEntity.getCreatedAt());
+                Optional<PancakeOrderResponse> responseOpt = pancakeClient.getOrders(request);
                 if (responseOpt.isEmpty()) {
                     syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.ORDER_CONNECTION_FAILED, false));
                     log.error("No response from Pancake API when fetching orders, posId={}", posId);
