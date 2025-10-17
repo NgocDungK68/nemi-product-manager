@@ -84,7 +84,7 @@ public class OrderJdbcRepository extends BaseBatchRepository<OrderEntity> {
 
         // Chỉ check null cho discountAmount
         if (o.getDiscountAmount() != null) {
-            ps.setBigDecimal(12, BigDecimal.valueOf(o.getDiscountAmount()));
+            ps.setBigDecimal(12, o.getDiscountAmount());
         } else {
             ps.setBigDecimal(12, BigDecimal.ZERO); // hoặc ps.setNull(12, java.sql.Types.DECIMAL);
         }

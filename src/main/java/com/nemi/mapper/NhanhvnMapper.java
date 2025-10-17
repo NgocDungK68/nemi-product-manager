@@ -142,33 +142,34 @@ public class NhanhvnMapper {
     }
 
     //---------------webhook order request---------------------
-    public OrderEntity convertToOrderEntity(String posId, NhanhvnOrderWebhookRequest apiOrder, String username) {
-        String status = nhanhvnConfig.getOrderStatusMapping(apiOrder.getInfo().getStatus());
+    public OrderEntity convertToOrderEntity(String posId, NhanhvnOrderWebhookRequest orderWebhookRequest, String username) {
+        String status = nhanhvnConfig.getOrderStatusMapping(orderWebhookRequest.getInfo().getStatus());
 
         return OrderEntity.builder()
                 .posId(posId)
-                .orderId(String.valueOf(apiOrder.getInfo().getId()))
-                .orderCode(apiOrder.getCarrier().getCarrierCode())
-                .customerName(apiOrder.getCustomer().getName())
-                .customerEmail(apiOrder.getCustomer().getEmail())
-                .customerPhone(apiOrder.getCustomer().getMobile())// khi user co du thi them custemer phone va email
-                .shippingAddress(apiOrder.getCustomer().getAddress())
-                .shippingMethod(apiOrder.getCarrier().getName())
-                .paymentMethod(apiOrder.getInfo().getPaymentMethod().toString())
-                .totalPrice(totalProductPrice(apiOrder))
-                .shippingFee(apiOrder.getCarrier().getShipFee())
+                .orderId(String.valueOf(orderWebhookRequest.getInfo().getId()))
+                .orderCode(orderWebhookRequest.getCarrier().getCarrierCode())
+                .customerName(orderWebhookRequest.getCustomer().getName())
+                .customerEmail(orderWebhookRequest.getCustomer().getEmail())
+                .customerPhone(orderWebhookRequest.getCustomer().getMobile())// khi user co du thi them custemer phone va email
+                .shippingAddress(orderWebhookRequest.getCustomer().getAddress())
+                .shippingMethod(orderWebhookRequest.getCarrier().getName())
+                .paymentMethod(orderWebhookRequest.getInfo().getPaymentMethod().toString())
+                .totalPrice(totalProductPrice(orderWebhookRequest))
+                .shippingFee(orderWebhookRequest.getCarrier().getShipFee())
+                .discountAmount(orderWebhookRequest.getInfo().getDiscount())
                 .status(status)
                 .updatedBy(username)
                 .build();
     }
 
-    public List<OrderItemEntity> convertToOrderItemEntity(NhanhvnOrderWebhookRequest apiOrder, String username) {
+    public List<OrderItemEntity> convertToOrderItemEntity(NhanhvnOrderWebhookRequest orderWebhookRequest, String username) {
         List<OrderItemEntity> orderItemEntities = new ArrayList<>();
-        for (NhanhvnOrderWebhookRequest.Product product : apiOrder.getProducts()) {
+        for (NhanhvnOrderWebhookRequest.Product product : orderWebhookRequest.getProducts()) {
             BigDecimal quantity = BigDecimal.valueOf(product.getQuantity());
             orderItemEntities.add(OrderItemEntity.builder()
                     .orderItemId(String.valueOf(product.getId()))
-                    .orderId(String.valueOf(apiOrder.getInfo().getId()))
+                    .orderId(String.valueOf(orderWebhookRequest.getInfo().getId()))
                     .quantity(product.getQuantity())
                     .sku(product.getCode())
                     .price(product.getPrice())
