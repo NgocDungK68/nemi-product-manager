@@ -1,4 +1,6 @@
+# =========================
 # Java / Maven build
+# =========================
 /target/
 **/target/
 *.class
@@ -6,16 +8,40 @@
 *.war
 *.ear
 
-# Spring Boot
+# =========================
+# Spring Boot logs & temp
+# =========================
 *.log
 /logs/
 /tmp/
 
-# Maven local settings (avoid committing secrets)
-settings.xml
+# =========================
+# Maven settings (avoid committing secrets)
+/settings.xml
 .mvn/wrapper/maven-wrapper.jar
 
-# IDEs
+# =========================
+# Sensitive configuration files
+# =========================
+# Common Spring Boot secrets
+src/main/resources/application.yaml
+src/main/resources/application.yml
+src/main/resources/application.properties
+src/main/resources/*.env
+.env
+*.env
+*.local.env
+
+# AWS / Cloud / Key configs
+**/aws-credentials*
+**/rds-credentials*
+**/secrets.json
+**/private-key.pem
+**/public-key.pem
+
+# =========================
+# IDEs and editor configs
+# =========================
 .idea/
 *.iml
 *.ipr
@@ -28,20 +54,30 @@ settings.xml
 /out/
 /build/
 
-# OS-specific
+# =========================
+# OS-specific junk
+# =========================
 .DS_Store
 Thumbs.db
 
-# Node/NPM leftovers (if any UI bits appear later)
+# =========================
+# Node/NPM leftovers (for future frontend bits)
+# =========================
 node_modules/
 
+# =========================
 # Docker artifacts
+# =========================
 /docker-compose-deploy.yml
 
+# =========================
 # Generated files
+# =========================
 **/*.generated.*
 
+# =========================
 # Others
+# =========================
 *.swp
 *.swo
 .idea/
