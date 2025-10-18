@@ -60,7 +60,7 @@ public class OrderEntity extends BaseEntity {
     private BigDecimal shippingFee;
 
     @JsonProperty("discount_amount")
-    private Double discountAmount;
+    private BigDecimal discountAmount;
 
 }
 

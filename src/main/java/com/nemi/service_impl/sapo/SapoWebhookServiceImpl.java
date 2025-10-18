@@ -437,7 +437,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 .shippingMethod(extractShippingMethod(sapoOrder))
                 .totalPrice(sapoOrder.getTotalPrice())
                 .shippingFee(extractShippingFee(sapoOrder))
-                .discountAmount(extractDiscountAmount(sapoOrder))
+                .discountAmount(sapoOrder.getTotalDiscounts())
                 .createdAt(PosUtils.parseDateTime(sapoOrder.getCreatedOn()))
                 .updatedAt(PosUtils.parseDateTime(sapoOrder.getCancelledOn()))
                 .build();
@@ -513,13 +513,6 @@ public class SapoWebhookServiceImpl implements WebhookService {
                 .orElse(null);
     }
 
-    // Extract discount amount
-    private Double extractDiscountAmount(SapoOrderResponse.Order sapoOrder) {
-        return Optional.ofNullable(sapoOrder.getTotalDiscounts())
-                .map(BigDecimal::doubleValue)
-                .orElse(0.0);
-    }
-
     /**
      * Update existing OrderEntity from payload without creating new instance
      */
@@ -539,7 +532,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
         order.setShippingMethod(extractShippingMethod(payload));
         order.setTotalPrice(payload.getTotalPrice());
         order.setShippingFee(extractShippingFee(payload));
-        order.setDiscountAmount(extractDiscountAmount(payload));
+        order.setDiscountAmount(payload.getTotalDiscounts());
         order.setCreatedAt(PosUtils.parseDateTime(payload.getCreatedOn()));
         order.setUpdatedAt(PosUtils.parseDateTime(payload.getCancelledOn()));
     }

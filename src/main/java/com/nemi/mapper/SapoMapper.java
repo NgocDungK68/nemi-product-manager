@@ -171,7 +171,7 @@ public class SapoMapper {
                 .shippingMethod(Optional.ofNullable(fulfillment).map(SapoOrderResponse.Fulfillment::getDeliveryMethod).orElse(null))
                 .totalPrice(order.getTotalPrice())
                 .shippingFee(BigDecimal.ZERO)
-                .discountAmount(Optional.ofNullable(order.getTotalDiscounts()).map(BigDecimal::doubleValue).orElse(0.0))
+                .discountAmount(order.getTotalDiscounts())
                 .createdBy(username)
                 .updatedBy(username)
                 .build();
