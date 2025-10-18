@@ -192,4 +192,13 @@ logging:
 timezone:
   Vietnam: +07:00
 
+webhook:
+  allowed-ips:
+    nhanhvn:
+      - 34.80.130.93
+    pancake:
+      - 203.171.22.6
+    sapo:
+      - 42.113.206.190
+
 
