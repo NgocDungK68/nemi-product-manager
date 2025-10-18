@@ -73,7 +73,7 @@ public class TestController {
             
     }
 
-    @PostMapping("/pancake/test")
+    @PostMapping("/public-api/pancake/test")
     public ResponseEntity<String> handleWebhook(HttpServletRequest request) throws IOException {
         // 🧾 Log headers
         Map<String, String> headers = new HashMap<>();
