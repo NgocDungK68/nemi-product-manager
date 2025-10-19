@@ -26,6 +26,35 @@ public class SapoAuthChecker {
 
     public boolean checkSignature(Map<String, String> headers, Object body, String podId) {
         log.debug("SapoAuthChecker.checkSignature called with posId={}", podId);
+        
+        // Method 1: Try simple webhook token approach (like Nhanhvn)
+        String webhookToken = headers.get("Authorization");
+        if (webhookToken != null) {
+            log.debug("Found Authorization header, trying webhook token approach");
+            return checkWebhookToken(headers, podId);
+        }
+        
+        // Method 2: Try HMAC verification with multiple secrets and methods
+        log.debug("No Authorization header found, trying HMAC verification");
+        return checkHmacSignature(headers, body, podId);
+    }
+    
+    public boolean checkWebhookToken(Map<String, String> headers, String posId) {
+        String webhookToken = headers.get("Authorization");
+        if (webhookToken == null) {
+            log.warn("Missing webhook token (posId={})", posId);
+            return false;
+        }
+        
+        log.info("Checking webhook token for posId={}", posId);
+        return posRepository.findById(posId)
+                .map(PosEntity::getWebhookToken)
+                .map(encryptionService::decrypt)
+                .map(webhookToken::equals)
+                .orElse(false);
+    }
+    
+    public boolean checkHmacSignature(Map<String, String> headers, Object body, String podId) {
         log.debug("Headers received: {}", headers);
         log.debug("Body received: {}", body);
         
