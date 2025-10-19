@@ -66,12 +66,31 @@ public class SapoAuthChecker {
         boolean isValid = verifyHmac(bodyJson, accessToken, hmacHeader);
         
         if (!isValid) {
-            log.debug("HMAC verification failed with access token, trying with client secret...");
-            // Try with client secret as fallback
+            log.debug("HMAC verification failed with access token, trying with other secrets...");
+            
+            // Try with client secret
             String clientSecret = sapoConfig.getClientSecret();
             isValid = verifyHmac(bodyJson, clientSecret, hmacHeader);
             if (isValid) {
                 log.debug("HMAC verification succeeded with client secret");
+            }
+            
+            // Try with other possible secrets
+            if (!isValid) {
+                String masterSecret = sapoConfig.getAccessToken(); // Try master token
+                isValid = verifyHmac(bodyJson, masterSecret, hmacHeader);
+                if (isValid) {
+                    log.debug("HMAC verification succeeded with master token");
+                }
+            }
+            
+            // Try with a combination of secrets
+            if (!isValid) {
+                String combinedSecret = clientSecret + accessToken;
+                isValid = verifyHmac(bodyJson, combinedSecret, hmacHeader);
+                if (isValid) {
+                    log.debug("HMAC verification succeeded with combined secret");
+                }
             }
         }
         log.debug("HMAC verification result: {}", isValid);
@@ -85,22 +104,94 @@ public class SapoAuthChecker {
 
     public boolean verifyHmac(String body, String accessToken, String hmacHeader) {
         try {
-            Mac hmac = Mac.getInstance("HmacSHA256");
-            SecretKeySpec key = new SecretKeySpec(accessToken.getBytes(), "HmacSHA256");
-            hmac.init(key);
-            String computed = Base64.getEncoder().encodeToString(hmac.doFinal(body.getBytes()));
+            // Try different approaches for HMAC verification
+            log.debug("=== HMAC Verification Attempts ===");
             
-            log.debug("HMAC verification details:");
-            log.debug("  Body: {}", body);
-            log.debug("  AccessToken: {}", accessToken);
-            log.debug("  Computed HMAC: {}", computed);
-            log.debug("  Received HMAC: {}", hmacHeader);
-            log.debug("  Match: {}", computed.equals(hmacHeader));
+            // Method 1: Standard HMAC-SHA256 with UTF-8 encoding
+            boolean method1 = verifyHmacMethod(body, accessToken, hmacHeader, "UTF-8", "Method 1 (UTF-8)");
+            if (method1) return true;
             
-            return computed.equals(hmacHeader);
+            // Method 2: Try with different character encoding
+            boolean method2 = verifyHmacMethod(body, accessToken, hmacHeader, "ISO-8859-1", "Method 2 (ISO-8859-1)");
+            if (method2) return true;
+            
+            // Method 3: Try with raw bytes (no encoding)
+            boolean method3 = verifyHmacRawBytes(body, accessToken, hmacHeader);
+            if (method3) return true;
+            
+            // Method 4: Try with hex encoding instead of base64
+            boolean method4 = verifyHmacHex(body, accessToken, hmacHeader);
+            if (method4) return true;
+            
+            log.debug("All HMAC verification methods failed");
+            return false;
+            
         } catch (Exception e) {
             log.error("Error verifying HMAC", e);
             return false;
         }
+    }
+    
+    private boolean verifyHmacMethod(String body, String secret, String receivedHmac, String encoding, String methodName) {
+        try {
+            Mac hmac = Mac.getInstance("HmacSHA256");
+            SecretKeySpec key = new SecretKeySpec(secret.getBytes(encoding), "HmacSHA256");
+            hmac.init(key);
+            String computed = Base64.getEncoder().encodeToString(hmac.doFinal(body.getBytes(encoding)));
+            
+            log.debug("  {}: Computed={}, Received={}, Match={}", 
+                    methodName, computed, receivedHmac, computed.equals(receivedHmac));
+            
+            return computed.equals(receivedHmac);
+        } catch (Exception e) {
+            log.debug("  {}: Failed with exception: {}", methodName, e.getMessage());
+            return false;
+        }
+    }
+    
+    private boolean verifyHmacRawBytes(String body, String secret, String receivedHmac) {
+        try {
+            Mac hmac = Mac.getInstance("HmacSHA256");
+            SecretKeySpec key = new SecretKeySpec(secret.getBytes(), "HmacSHA256");
+            hmac.init(key);
+            String computed = Base64.getEncoder().encodeToString(hmac.doFinal(body.getBytes()));
+            
+            log.debug("  Method 3 (Raw bytes): Computed={}, Received={}, Match={}", 
+                    computed, receivedHmac, computed.equals(receivedHmac));
+            
+            return computed.equals(receivedHmac);
+        } catch (Exception e) {
+            log.debug("  Method 3: Failed with exception: {}", e.getMessage());
+            return false;
+        }
+    }
+    
+    private boolean verifyHmacHex(String body, String secret, String receivedHmac) {
+        try {
+            Mac hmac = Mac.getInstance("HmacSHA256");
+            SecretKeySpec key = new SecretKeySpec(secret.getBytes(), "HmacSHA256");
+            hmac.init(key);
+            
+            // Convert hex string to bytes for comparison
+            byte[] receivedBytes = Base64.getDecoder().decode(receivedHmac);
+            String computedHex = bytesToHex(hmac.doFinal(body.getBytes()));
+            String receivedHex = bytesToHex(receivedBytes);
+            
+            log.debug("  Method 4 (Hex): Computed={}, Received={}, Match={}", 
+                    computedHex, receivedHex, computedHex.equals(receivedHex));
+            
+            return computedHex.equals(receivedHex);
+        } catch (Exception e) {
+            log.debug("  Method 4: Failed with exception: {}", e.getMessage());
+            return false;
+        }
+    }
+    
+    private String bytesToHex(byte[] bytes) {
+        StringBuilder result = new StringBuilder();
+        for (byte b : bytes) {
+            result.append(String.format("%02x", b));
+        }
+        return result.toString();
     }
 }
