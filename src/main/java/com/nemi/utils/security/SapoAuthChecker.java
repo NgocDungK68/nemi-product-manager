@@ -47,30 +47,26 @@ public class SapoAuthChecker {
 
 
     public boolean verifyHmacWithDifferentFormats(Object body, String secret, String hmacHeader) {
-        // Try different body formats
-        String[] bodyFormats = {
-            JsonUtils.toJson(body),                    // Standard JSON serialization
-            body.toString(),                          // Object toString()
-            JsonUtils.toJson(body).replace(":null", ":null").replace(":\"\"", ":\"\"")  // Preserve exact format
-        };
-        
-        for (int i = 0; i < bodyFormats.length; i++) {
-            String bodyFormat = bodyFormats[i];
-            log.debug("Trying body format {}: {}", i + 1, bodyFormat);
-            
-            if (verifyHmac(bodyFormat, secret, hmacHeader)) {
-                log.debug("HMAC verification succeeded with body format {}", i + 1);
-                return true;
-            }
+        // Standard JSON serialization (works for CREATE)
+        String standardJson = JsonUtils.toJson(body);
+        log.debug("Trying standard JSON format");
+        if (verifyHmac(standardJson, secret, hmacHeader)) {
+            log.debug("HMAC verification succeeded with standard JSON format");
+            return true;
         }
         
-        // Try with normalized JSON (handle null vs empty string differences)
-        String normalizedJson = JsonUtils.toJson(body)
-                .replace(":null", ":null")
-                .replace(":\"\"", ":null")
-                .replace(":0.0", ":0");
+        // Handle UPDATE vs CREATE differences:
+        // 1. Empty string "" -> null (content field)
+        // 2. Float 0.0 -> Integer 0 (price field)
+        // 3. Handle edge cases in variants array
+        String normalizedJson = standardJson
+                .replace("\"content\":\"\"", "\"content\":null")           // Empty content -> null
+                .replace("\"price\":0.0", "\"price\":0")                   // Float price -> integer
+                .replace("\"weight\":0.0", "\"weight\":0")                 // Float weight -> integer
+                .replace("\"grams\":0.0", "\"grams\":0")                   // Float grams -> integer
+                .replace("\"compare_at_price\":0.0", "\"compare_at_price\":null"); // Float compare_at_price -> null
         
-        log.debug("Trying normalized JSON format: {}", normalizedJson);
+        log.debug("Trying normalized JSON format (UPDATE -> CREATE style)");
         if (verifyHmac(normalizedJson, secret, hmacHeader)) {
             log.debug("HMAC verification succeeded with normalized JSON format");
             return true;
