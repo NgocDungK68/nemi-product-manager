@@ -47,8 +47,23 @@ public class SapoAuthChecker {
 
 
     public boolean verifyHmacWithDifferentFormats(Object body, String secret, String hmacHeader) {
-        // Standard JSON serialization (works for CREATE)
+        // Try empty body first
+        log.debug("Trying empty body");
+        if (verifyHmac("", secret, hmacHeader)) {
+            log.debug("HMAC verification succeeded with empty body");
+            return true;
+        }
+        
+        // Try just the product ID
         String standardJson = JsonUtils.toJson(body);
+        String productIdOnly = "{\"id\":" + extractProductId(standardJson) + "}";
+        log.debug("Trying product ID only: {}", productIdOnly);
+        if (verifyHmac(productIdOnly, secret, hmacHeader)) {
+            log.debug("HMAC verification succeeded with product ID only");
+            return true;
+        }
+        
+        // Standard JSON serialization (works for CREATE)
         log.debug("Trying standard JSON format");
         if (verifyHmac(standardJson, secret, hmacHeader)) {
             log.debug("HMAC verification succeeded with standard JSON format");
@@ -74,6 +89,20 @@ public class SapoAuthChecker {
         
         log.debug("All body formats failed for HMAC verification");
         return false;
+    }
+    
+    private String extractProductId(String json) {
+        try {
+            // Simple extraction of product ID from JSON
+            int idStart = json.indexOf("\"id\":") + 5;
+            int idEnd = json.indexOf(",", idStart);
+            if (idEnd == -1) {
+                idEnd = json.indexOf("}", idStart);
+            }
+            return json.substring(idStart, idEnd).trim();
+        } catch (Exception e) {
+            return "0";
+        }
     }
 
     public boolean verifyHmac(String body, String secret, String hmacHeader) {
