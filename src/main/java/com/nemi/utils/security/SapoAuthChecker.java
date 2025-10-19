@@ -32,7 +32,7 @@ public class SapoAuthChecker {
         }
         
         // Sapo uses master token from config for HMAC verification
-        String masterToken = sapoConfig.getAccessToken();
+        String masterToken = sapoConfig.getClientSecret();
         if (ObjectUtils.isEmpty(masterToken)) {
             log.warn("Master token not found in SapoConfig for posId={}", podId);
             return false;

@@ -15,7 +15,6 @@ import java.util.Optional;
 public class SapoConfig {
     private String clientId;
     private String clientSecret;
-    private String accessToken;
     private String url;
     private BatchConfig sync;
     private Integer recentDays;
