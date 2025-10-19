@@ -47,47 +47,38 @@ public class SapoAuthChecker {
 
 
     public boolean verifyHmacWithDifferentFormats(Object body, String secret, String hmacHeader) {
-        // Try empty body first
-        log.debug("Trying empty body");
-        if (verifyHmac("", secret, hmacHeader)) {
-            log.debug("HMAC verification succeeded with empty body");
-            return true;
-        }
-        
-        // Try just the product ID
         String standardJson = JsonUtils.toJson(body);
-        String productIdOnly = "{\"id\":" + extractProductId(standardJson) + "}";
-        log.debug("Trying product ID only: {}", productIdOnly);
-        if (verifyHmac(productIdOnly, secret, hmacHeader)) {
-            log.debug("HMAC verification succeeded with product ID only");
-            return true;
+        
+        // Try different combinations of body content
+        String[] bodyFormats = {
+            "", // Empty body
+            "{}", // Empty JSON object
+            "{\"id\":" + extractProductId(standardJson) + "}", // Product ID only
+            standardJson, // Standard JSON
+            standardJson.replace("\"content\":\"\"", "\"content\":null") // Normalized JSON
+        };
+        
+        for (String bodyFormat : bodyFormats) {
+            log.debug("Trying body format: {}", bodyFormat.length() > 50 ? bodyFormat.substring(0, 50) + "..." : bodyFormat);
+            if (verifyHmac(bodyFormat, secret, hmacHeader)) {
+                log.debug("HMAC verification succeeded with body format: {}", bodyFormat.length() > 50 ? bodyFormat.substring(0, 50) + "..." : bodyFormat);
+                return true;
+            }
         }
         
-        // Standard JSON serialization (works for CREATE)
-        log.debug("Trying standard JSON format");
-        if (verifyHmac(standardJson, secret, hmacHeader)) {
-            log.debug("HMAC verification succeeded with standard JSON format");
-            return true;
+        // Try with different secret combinations
+        String[] secrets = {secret, secret.toUpperCase(), secret.toLowerCase()};
+        for (String testSecret : secrets) {
+            if (!testSecret.equals(secret)) {
+                log.debug("Trying with modified secret: {}", testSecret);
+                if (verifyHmac(standardJson, testSecret, hmacHeader)) {
+                    log.debug("HMAC verification succeeded with modified secret");
+                    return true;
+                }
+            }
         }
         
-        // Handle UPDATE vs CREATE differences:
-        // 1. Empty string "" -> null (content field)
-        // 2. Float 0.0 -> Integer 0 (price field)
-        // 3. Handle edge cases in variants array
-        String normalizedJson = standardJson
-                .replace("\"content\":\"\"", "\"content\":null")           // Empty content -> null
-                .replace("\"price\":0.0", "\"price\":0")                   // Float price -> integer
-                .replace("\"weight\":0.0", "\"weight\":0")                 // Float weight -> integer
-                .replace("\"grams\":0.0", "\"grams\":0")                   // Float grams -> integer
-                .replace("\"compare_at_price\":0.0", "\"compare_at_price\":null"); // Float compare_at_price -> null
-        
-        log.debug("Trying normalized JSON format (UPDATE -> CREATE style)");
-        if (verifyHmac(normalizedJson, secret, hmacHeader)) {
-            log.debug("HMAC verification succeeded with normalized JSON format");
-            return true;
-        }
-        
-        log.debug("All body formats failed for HMAC verification");
+        log.debug("All body formats and secret variations failed for HMAC verification");
         return false;
     }
     
