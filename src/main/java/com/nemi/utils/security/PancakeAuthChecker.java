@@ -4,6 +4,7 @@ import com.nemi.configuration.PancakeConfig;
 import com.nemi.constant.PancakeConstatns;
 import com.nemi.entity.PosEntity;
 import com.nemi.repository.PosRepository;
+import com.nemi.service.EncryptionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -16,7 +17,9 @@ import java.util.Map;
 public class PancakeAuthChecker {
 
     private final PosRepository posRepository;
+    private final EncryptionService encryptionService;
     public boolean checkXApiKey(Map<String, String> headers, String posId) {
+
 
 
         String apiKey = headers.get(PancakeConstatns.X_API_KEY);
@@ -27,6 +30,7 @@ public class PancakeAuthChecker {
         log.info("Checking X-API-KEY for posId={}", posId);
         return posRepository.findById(posId)
                 .map(PosEntity::getAccessToken)
+                .map(encryptionService::decrypt)
                 .map(apiKey::equals)
                 .orElse(false);
 

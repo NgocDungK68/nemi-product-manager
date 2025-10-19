@@ -63,12 +63,6 @@ public class PancakeWebhookServiceImpl implements WebhookService {
                 .posName(posName)
                 .build();
         try {
-            // 1. Xác thực header x-api-key
-            String apiKey = headers.get(PancakeConstatns.X_API_KEY);
-            if (Objects.isEmpty(apiKey) || !apiKey.equals(pancakeConfig.getXApiKey())) { //sau nay de thg user nhap rong connect post- regiset webhook gi do...
-                log.error("[PancakeWebhookServiceImpl.processWebhook] Invalid x-api-key: {}", apiKey);
-                return false;
-            }
 
             // 2. Parse JSON về model
             PancakeWebhookRequest webhookRequest = JsonUtils.map(body, PancakeWebhookRequest.class);

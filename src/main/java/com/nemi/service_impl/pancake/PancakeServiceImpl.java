@@ -1,6 +1,5 @@
 package com.nemi.service_impl.pancake;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.client.PancakeClient;
 import com.nemi.configuration.PancakeConfig;
 import com.nemi.constant.PancakeConstatns;
@@ -55,7 +54,6 @@ import java.util.concurrent.CompletableFuture;
 public class PancakeServiceImpl implements PosManagementService {
     private final ClaimUtil claimUtil;
     private final PancakeClient pancakeClient;
-    private final ObjectMapper objectMapper;
     private final PosRepository posRepository;
     private final SyncHistoryRepository syncHistoryRepository;
     private final PancakeConfig pancakeConfig;
@@ -67,15 +65,11 @@ public class PancakeServiceImpl implements PosManagementService {
     private final OrderItemJdbcRepository orderItemJdbcRepositoryl;
     private final EncryptionService encryptionService;
 
-    private int orderBatchSize;
-    private int orderItemBatchSize;
     private int productBatchSize;
     private int pageStartNumber;
 
     @PostConstruct
     public void init() {
-        orderBatchSize = pancakeConfig.getSync().getOrder();
-        orderItemBatchSize = pancakeConfig.getSync().getOrderItem();
         productBatchSize = pancakeConfig.getSync().getProduct();
         pageStartNumber = pancakeConfig.getSync().getPageStart();
     }
@@ -139,7 +133,7 @@ public class PancakeServiceImpl implements PosManagementService {
                             pageStartNumber,
                             productBatchSize,
                             posEntity.getCreatedAt()
-                            );
+                    );
 
             List<ProductEntity> allProducts = new ArrayList<>();
             List<ProductVariantEntity> allVariants = new ArrayList<>();
@@ -209,7 +203,7 @@ public class PancakeServiceImpl implements PosManagementService {
 
     @Override
     @Async("syncExecutor")
-    public void syncOrder(String posId ) {
+    public void syncOrder(String posId) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
                 .startTime(LocalDateTime.now())
@@ -222,7 +216,7 @@ public class PancakeServiceImpl implements PosManagementService {
 
             // Decrypt config before using
             String decryptedConfig = encryptionService.decrypt(posEntity.getConfig());
-            PancakeRequest request = PancakeRequest.buildRequest(decryptedConfig, decryptedToken, pageStartNumber, productBatchSize,posEntity.getCreatedAt());
+            PancakeRequest request = PancakeRequest.buildRequest(decryptedConfig, decryptedToken, pageStartNumber, productBatchSize, posEntity.getCreatedAt());
 
             List<OrderEntity> allOrders = new ArrayList<>();
             List<OrderItemEntity> allOrderItems = new ArrayList<>();
