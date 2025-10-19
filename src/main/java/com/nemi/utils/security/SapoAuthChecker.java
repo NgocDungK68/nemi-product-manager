@@ -33,9 +33,12 @@ public class SapoAuthChecker {
         
         String hmacHeader = headers.get(SapoConstants.X_SAPO_SIGNATURE);
         if (hmacHeader == null) {
-            log.warn("Missing X-SAPO-SIGNATURE (posId={}). Available headers: {}", podId, headers.keySet());
+            log.warn("Missing signature header '{}' (posId={}). Available headers: {}", 
+                    SapoConstants.X_SAPO_SIGNATURE, podId, headers.keySet());
             return false;
         }
+        
+        log.debug("Found signature header '{}' with value: {}", SapoConstants.X_SAPO_SIGNATURE, hmacHeader);
 
         String accessToken = posRepository.findById(podId)
                 .map(PosEntity::getAccessToken)
