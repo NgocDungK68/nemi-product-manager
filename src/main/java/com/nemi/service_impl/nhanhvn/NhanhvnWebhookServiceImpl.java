@@ -6,7 +6,14 @@ import com.nemi.client.NhanhvnClient;
 import com.nemi.configuration.NhanhvnConfig;
 import com.nemi.constant.NhanhvnConstants;
 import com.nemi.constant.WebhookConstants;
-import com.nemi.entity.*;
+import com.nemi.entity.OrderEntity;
+import com.nemi.entity.OrderItemEntity;
+import com.nemi.entity.PosEntity;
+import com.nemi.entity.ProductEntity;
+import com.nemi.entity.ProductId;
+import com.nemi.entity.ProductVariantEntity;
+import com.nemi.entity.VariantId;
+import com.nemi.entity.WebhookHistoryEntity;
 import com.nemi.enums.NhanhvnEvent;
 import com.nemi.enums.PosName;
 import com.nemi.exception.TechnicalAlertCode;
@@ -18,13 +25,19 @@ import com.nemi.model.request.nhanhvn.NhanhvnRequest;
 import com.nemi.model.request.nhanhvn.NhanhvnWebhookRequest;
 import com.nemi.model.response.nhanhvn.NhanhvnInventoryResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
-import com.nemi.repository.*;
+import com.nemi.repository.OrderItemRepository;
+import com.nemi.repository.OrderRepository;
+import com.nemi.repository.PosRepository;
+import com.nemi.repository.ProductRepository;
+import com.nemi.repository.ProductVariantRepository;
+import com.nemi.repository.WebhookHistoryRepository;
 import com.nemi.service.WebhookService;
 import com.nemi.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.http.HttpHeaders;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,6 +68,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
 
     @Override
     @Transactional
+    @PreAuthorize("@nhanhvnAuth.checkWebhookToken(#headers, #posId)")
     public boolean processWebhook(String posId, String posName, Map<String, String> headers, Object body) {
         WebhookHistoryEntity webhookHistory = WebhookHistoryEntity.builder()
                 .header(JsonUtils.toJson(headers))
@@ -260,7 +274,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
             return false;
         }
 
-        for (String id: ids) {
+        for (String id : ids) {
             VariantId variantId = new VariantId(id, posId);
             Optional<ProductVariantEntity> variantEntity = variantRepository.findById(variantId);
             if (variantEntity.isEmpty()) {

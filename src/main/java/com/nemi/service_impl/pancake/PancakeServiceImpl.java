@@ -98,6 +98,7 @@ public class PancakeServiceImpl implements PosManagementService {
                     .expiredTime(expiredTime)
                     .companyId(String.valueOf(claimUtil.getCompanyId()))
                     .createdBy(claimUtil.getUserName())
+                    .webhookToken(encryptionService.encrypt(posConnectionRequest.getWebhookToken()))
                     .build();
 
             posRepository.save(posEntityBuilder);

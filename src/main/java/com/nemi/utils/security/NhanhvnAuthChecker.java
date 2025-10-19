@@ -1,5 +1,6 @@
 package com.nemi.utils.security;
 
+import com.nemi.constant.NhanhvnConstants;
 import com.nemi.constant.PancakeConstatns;
 import com.nemi.entity.PosEntity;
 import com.nemi.repository.PosRepository;
@@ -9,19 +10,17 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
-
-@Component("pancakeAuth")
 @RequiredArgsConstructor
 @Slf4j
-public class PancakeAuthChecker {
-
+@Component("nhanhvnAuth")
+public class NhanhvnAuthChecker {
     private final PosRepository posRepository;
     private final EncryptionService encryptionService;
     public boolean checkWebhookToken(Map<String, String> headers, String posId) {
 
 
 
-        String webhookToken = headers.get(PancakeConstatns.WEBHOOK_TOKEN);
+        String webhookToken = headers.get(NhanhvnConstants.AUTHORIZATION);
         if (webhookToken == null){
             log.warn("Missing webhook token (posId={})", posId);
             return false;

@@ -16,7 +16,7 @@ public class NhanhvnConstants {
 
     public static final String UPDATED_AT_FROM = "updatedAtFrom";
     public static final String UPDATED_AT_TO = "updatedAtTo";
-
+    public static final String AUTHORIZATION = "authorization";
     private NhanhvnConstants() {
     }
 }

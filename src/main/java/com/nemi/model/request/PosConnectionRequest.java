@@ -21,6 +21,10 @@ public class PosConnectionRequest {
 
     private String shopId;
     private String apiKey;    //PANCAKE
+
+    // aop preAuthorize
+    private String webhookToken;
+
 }
 
 // mapping: nhanhvn: appId = appId
