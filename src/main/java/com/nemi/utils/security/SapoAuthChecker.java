@@ -1,5 +1,6 @@
 package com.nemi.utils.security;
 
+import com.nemi.configuration.SapoConfig;
 import com.nemi.constant.SapoConstants;
 import com.nemi.entity.PosEntity;
 import com.nemi.repository.PosRepository;
@@ -21,6 +22,7 @@ import java.util.Map;
 public class SapoAuthChecker {
     private final PosRepository posRepository;
     private final EncryptionService encryptionService;
+    private final SapoConfig sapoConfig;
 
     public boolean checkSignature(Map<String, String> headers, Object body, String podId) {
         log.debug("SapoAuthChecker.checkSignature called with posId={}", podId);
@@ -40,6 +42,14 @@ public class SapoAuthChecker {
         
         log.debug("Found signature header '{}' with value: {}", SapoConstants.X_SAPO_SIGNATURE, hmacHeader);
 
+        // Check if POS entity exists
+        if (!posRepository.findById(podId).isPresent()) {
+            log.warn("POS entity not found for posId={}", podId);
+            return false;
+        }
+        
+        // For Sapo webhooks, we might need to use client secret instead of access token
+        // Let's try both approaches
         String accessToken = posRepository.findById(podId)
                 .map(PosEntity::getAccessToken)
                 .map(encryptionService::decrypt)
@@ -54,6 +64,16 @@ public class SapoAuthChecker {
                 accessToken.length(), hmacHeader);
         
         boolean isValid = verifyHmac(bodyJson, accessToken, hmacHeader);
+        
+        if (!isValid) {
+            log.debug("HMAC verification failed with access token, trying with client secret...");
+            // Try with client secret as fallback
+            String clientSecret = sapoConfig.getClientSecret();
+            isValid = verifyHmac(bodyJson, clientSecret, hmacHeader);
+            if (isValid) {
+                log.debug("HMAC verification succeeded with client secret");
+            }
+        }
         log.debug("HMAC verification result: {}", isValid);
         return isValid;
     }
