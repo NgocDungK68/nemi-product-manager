@@ -22,9 +22,6 @@ public class SapoAuthChecker {
     public boolean checkSignature(Map<String, String> headers, Object body, String podId) {
         log.debug("SapoAuthChecker.checkSignature called with posId={}", podId);
         
-        // Convert Object body to proper JSON string for HMAC verification
-        String bodyJson = JsonUtils.toJson(body);
-        
         String hmacHeader = headers.get(SapoConstants.X_SAPO_SIGNATURE);
         if (hmacHeader == null) {
             log.warn("Missing signature header '{}' (posId={})", SapoConstants.X_SAPO_SIGNATURE, podId);
@@ -39,13 +36,37 @@ public class SapoAuthChecker {
         }
         
         log.debug("Using client secret for HMAC verification: {}", clientSecret);
-        return verifyHmac(bodyJson, clientSecret, hmacHeader);
+        
+        // Try different body formats for HMAC verification
+        return verifyHmacWithDifferentFormats(body, clientSecret, hmacHeader);
     }
 
     public boolean checkSignature(Map<String, String> headers, String body, String podId) {
         return checkSignature(headers, (Object) body, podId);
     }
 
+
+    public boolean verifyHmacWithDifferentFormats(Object body, String secret, String hmacHeader) {
+        // Try different body formats
+        String[] bodyFormats = {
+            JsonUtils.toJson(body),                    // Standard JSON serialization
+            body.toString(),                          // Object toString()
+            JsonUtils.toJson(body).replace(":null", ":null").replace(":\"\"", ":\"\"")  // Preserve exact format
+        };
+        
+        for (int i = 0; i < bodyFormats.length; i++) {
+            String bodyFormat = bodyFormats[i];
+            log.debug("Trying body format {}: {}", i + 1, bodyFormat);
+            
+            if (verifyHmac(bodyFormat, secret, hmacHeader)) {
+                log.debug("HMAC verification succeeded with body format {}", i + 1);
+                return true;
+            }
+        }
+        
+        log.debug("All body formats failed for HMAC verification");
+        return false;
+    }
 
     public boolean verifyHmac(String body, String secret, String hmacHeader) {
         try {
