@@ -63,7 +63,7 @@ public class SecurityConfig {
     @Order(Ordered.HIGHEST_PRECEDENCE)
     public SecurityFilterChain webhookApiChain(HttpSecurity http) throws Exception {
         http.securityMatcher("/webhook/**")
-                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
                 .addFilterBefore(
                         webhookRateLimitFilter,
                         UsernamePasswordAuthenticationFilter.class
