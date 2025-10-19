@@ -60,7 +60,7 @@ public class SecurityConfig {
 
 
     @Bean
-    @Order(Ordered.HIGHEST_PRECEDENCE)
+    @Order(1)
     public SecurityFilterChain webhookApiChain(HttpSecurity http) throws Exception {
         http.securityMatcher("/webhook/**")
                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
@@ -75,4 +75,5 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()));
         return http.build();
     }
+
 }

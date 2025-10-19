@@ -189,9 +189,6 @@ logging:
 
 
 
-timezone:
-  Vietnam: +07:00
-
 webhook:
   allowed-ips:
     nhanhvn:
@@ -200,5 +197,14 @@ webhook:
       - 203.171.22.6
     sapo:
       - 42.113.206.190
-
-
+  rate-limit:
+    enable: true
+    nhanhvn:
+      requests: 60
+      period: 1m
+    pancake:
+      requests: 60
+      period: 1m
+    sapo:
+      requests: 60
+      period: 1m

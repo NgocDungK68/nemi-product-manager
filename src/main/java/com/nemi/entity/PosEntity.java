@@ -43,4 +43,7 @@ public class PosEntity extends BaseEntity {
 
     @Column(name = "expired_time")
     private LocalDateTime expiredTime;
+
+    @Column(name = "webhook_token")
+    private String webhookToken;
 }

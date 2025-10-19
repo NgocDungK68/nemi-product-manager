@@ -98,7 +98,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
                     .atZone(ZoneId.systemDefault())
                     .toLocalDateTime();
 
-            PosEntity newPos = createNewPos(tokenResponse, configMap, expiredTime);
+            PosEntity newPos = createNewPos(tokenResponse, configMap, expiredTime, posConnectionRequest.getWebhookToken());
             PosConnectionResponse posConnectionResponse = PosConnectionResponse.toPosConnectionResponse(newPos);
 
             log.info("[NhanhvnServiceImpl.connectPos] Connected successfully: {}", newPos.getId());
@@ -122,10 +122,10 @@ public class NhanhvnServiceImpl implements PosManagementService {
             String username = claimUtil.getUserName();
             // lấy PosEntity và validate posName
             PosEntity posEntity = generalPosService.getPos(posId);
-            
+
             // Decrypt access token before using for API calls
             String decryptedToken = encryptionService.decrypt(posEntity.getAccessToken());
-            
+
             // Decrypt config before using
             String decryptedConfig = encryptionService.decrypt(posEntity.getConfig());
             NhanhvnRequest request = NhanhvnRequest.buildRequest(
@@ -215,7 +215,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
     @Override
     @Async("syncExecutor")
-    public void syncOrder(String posId ) {
+    public void syncOrder(String posId) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
                 .startTime(LocalDateTime.now())
@@ -226,10 +226,10 @@ public class NhanhvnServiceImpl implements PosManagementService {
             String username = claimUtil.getUserName();
             // lấy PosEntity và validate posName
             PosEntity posEntity = generalPosService.getPos(posId);
-            
+
             // Decrypt access token before using for API calls
             String decryptedToken = encryptionService.decrypt(posEntity.getAccessToken());
-            
+
             // Decrypt config before using
             String decryptedConfig = encryptionService.decrypt(posEntity.getConfig());
             NhanhvnRequest request = NhanhvnRequest.buildRequest(
@@ -320,17 +320,19 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
     private PosEntity createNewPos(NhanhvnAccessTokenResponse tokenResponse,
                                    Map<String, String> configMap,
-                                   LocalDateTime expiredTime) {
-            // Encrypt access token before storing
-            String encryptedToken = encryptionService.encrypt(tokenResponse.getData().getAccessToken());
-            
-            PosEntity newPos = PosEntity.builder()
+                                   LocalDateTime expiredTime,
+                                   String webhookToken) {
+        // Encrypt access token before storing
+        String encryptedToken = encryptionService.encrypt(tokenResponse.getData().getAccessToken());
+
+        PosEntity newPos = PosEntity.builder()
                 .posName(PosName.NHANHVN.getValue())
                 .userId(claimUtil.getUserId())
                 .status(PosStatus.ACTIVE.name())
                 .accessToken(encryptedToken)
                 .config(encryptionService.encrypt(JsonUtils.toJson(configMap)))
                 .expiredTime(expiredTime)
+                .webhookToken(webhookToken)
                 .companyId(String.valueOf(claimUtil.getCompanyId()))
                 .createdBy(claimUtil.getUserName())
                 .build();

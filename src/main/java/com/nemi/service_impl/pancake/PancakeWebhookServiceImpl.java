@@ -2,7 +2,6 @@ package com.nemi.service_impl.pancake;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.configuration.PancakeConfig;
-import com.nemi.constant.PancakeConstatns;
 import com.nemi.constant.WebhookConstants;
 import com.nemi.entity.OrderEntity;
 import com.nemi.entity.OrderItemEntity;
@@ -54,7 +53,7 @@ public class PancakeWebhookServiceImpl implements WebhookService {
 
     @Override
     @Transactional
-    @PreAuthorize("@pancakeAuth.checkXApiKey(#headers, #posId)")
+    @PreAuthorize("@pancakeAuth.checkWebhookToken(#headers, #posId)")
     public boolean processWebhook(String posId, String posName, Map<String, String> headers, Object body) {
         WebhookHistoryEntity webhookHistory = WebhookHistoryEntity.builder()
                 .header(JsonUtils.toJson(headers))
