@@ -49,6 +49,10 @@ public class SapoAuthChecker {
 
     public boolean verifyHmac(String body, String secret, String hmacHeader) {
         try {
+            log.debug("HMAC Debug - Body length: {}, Secret length: {}", body.length(), secret.length());
+            log.debug("HMAC Debug - Body: {}", body);
+            log.debug("HMAC Debug - Secret: {}", secret);
+            
             Mac hmac = Mac.getInstance("HmacSHA256");
             SecretKeySpec key = new SecretKeySpec(secret.getBytes("UTF-8"), "HmacSHA256");
             hmac.init(key);
