@@ -31,14 +31,15 @@ public class SapoAuthChecker {
             return false;
         }
         
-        // Sapo uses master token from config for HMAC verification
-        String masterToken = sapoConfig.getClientSecret();
-        if (ObjectUtils.isEmpty(masterToken)) {
-            log.warn("Master token not found in SapoConfig for posId={}", podId);
+        // Sapo uses client_secret from config for HMAC verification
+        String clientSecret = sapoConfig.getClientSecret();
+        if (ObjectUtils.isEmpty(clientSecret)) {
+            log.warn("Client secret not found in SapoConfig for posId={}", podId);
             return false;
         }
         
-        return verifyHmac(bodyJson, masterToken, hmacHeader);
+        log.debug("Using client secret for HMAC verification: {}", clientSecret);
+        return verifyHmac(bodyJson, clientSecret, hmacHeader);
     }
 
     public boolean checkSignature(Map<String, String> headers, String body, String podId) {
