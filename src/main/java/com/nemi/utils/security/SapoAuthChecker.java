@@ -78,9 +78,11 @@ public class SapoAuthChecker {
 
     public boolean verifyHmac(String body, String secret, String hmacHeader) {
         try {
-            log.debug("HMAC Debug - Body length: {}, Secret length: {}", body.length(), secret.length());
-            log.debug("HMAC Debug - Body: {}", body);
-            log.debug("HMAC Debug - Secret: {}", secret);
+            log.info("=== HMAC VERIFICATION DEBUG ===");
+            log.info("Body length: {}, Secret length: {}", body.length(), secret.length());
+            log.info("Body content: {}", body);
+            log.info("Secret: {}", secret);
+            log.info("Received HMAC: {}", hmacHeader);
             
             Mac hmac = Mac.getInstance("HmacSHA256");
             SecretKeySpec key = new SecretKeySpec(secret.getBytes("UTF-8"), "HmacSHA256");
@@ -88,8 +90,9 @@ public class SapoAuthChecker {
             String computed = Base64.getEncoder().encodeToString(hmac.doFinal(body.getBytes("UTF-8")));
             
             boolean isValid = computed.equals(hmacHeader);
-            log.debug("HMAC verification: Computed={}, Received={}, Match={}", 
-                    computed, hmacHeader, isValid);
+            log.info("Computed HMAC: {}", computed);
+            log.info("HMAC Match: {}", isValid);
+            log.info("=== END HMAC VERIFICATION ===");
             
             return isValid;
         } catch (Exception e) {
