@@ -1,9 +1,7 @@
 package com.nemi.utils.security;
 
+import com.nemi.configuration.SapoConfig;
 import com.nemi.constant.SapoConstants;
-import com.nemi.entity.PosEntity;
-import com.nemi.repository.PosRepository;
-import com.nemi.service.EncryptionService;
 import com.nemi.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,43 +17,28 @@ import java.util.Map;
 @RequiredArgsConstructor
 @Slf4j
 public class SapoAuthChecker {
-    private final PosRepository posRepository;
-    private final EncryptionService encryptionService;
+    private final SapoConfig sapoConfig;
 
     public boolean checkSignature(Map<String, String> headers, Object body, String podId) {
         log.debug("SapoAuthChecker.checkSignature called with posId={}", podId);
-        log.debug("Headers received: {}", headers);
-        log.debug("Body received: {}", body);
         
         // Convert Object body to proper JSON string for HMAC verification
         String bodyJson = JsonUtils.toJson(body);
-        log.debug("Body as JSON: {}", bodyJson);
         
         String hmacHeader = headers.get(SapoConstants.X_SAPO_SIGNATURE);
         if (hmacHeader == null) {
-            log.warn("Missing signature header '{}' (posId={}). Available headers: {}", 
-                    SapoConstants.X_SAPO_SIGNATURE, podId, headers.keySet());
+            log.warn("Missing signature header '{}' (posId={})", SapoConstants.X_SAPO_SIGNATURE, podId);
             return false;
         }
         
-        log.debug("Found signature header '{}' with value: {}", SapoConstants.X_SAPO_SIGNATURE, hmacHeader);
-
-        String accessToken = posRepository.findById(podId)
-                .map(PosEntity::getAccessToken)
-                .map(encryptionService::decrypt)
-                .orElse(null);
-
-        if (ObjectUtils.isEmpty(accessToken)) {
-            log.warn("Access token not found for posId={}", podId);
+        // Sapo uses master token from config for HMAC verification
+        String masterToken = sapoConfig.getClientSecret();
+        if (ObjectUtils.isEmpty(masterToken)) {
+            log.warn("Master token not found in SapoConfig for posId={}", podId);
             return false;
         }
         
-        log.debug("Verifying HMAC with accessToken length={}, hmacHeader={}", 
-                accessToken.length(), hmacHeader);
-        
-        boolean isValid = verifyHmac(bodyJson, accessToken, hmacHeader);
-        log.debug("HMAC verification result: {}", isValid);
-        return isValid;
+        return verifyHmac(bodyJson, masterToken, hmacHeader);
     }
 
     public boolean checkSignature(Map<String, String> headers, String body, String podId) {
@@ -63,21 +46,18 @@ public class SapoAuthChecker {
     }
 
 
-    public boolean verifyHmac(String body, String accessToken, String hmacHeader) {
+    public boolean verifyHmac(String body, String secret, String hmacHeader) {
         try {
             Mac hmac = Mac.getInstance("HmacSHA256");
-            SecretKeySpec key = new SecretKeySpec(accessToken.getBytes(), "HmacSHA256");
+            SecretKeySpec key = new SecretKeySpec(secret.getBytes("UTF-8"), "HmacSHA256");
             hmac.init(key);
-            String computed = Base64.getEncoder().encodeToString(hmac.doFinal(body.getBytes()));
+            String computed = Base64.getEncoder().encodeToString(hmac.doFinal(body.getBytes("UTF-8")));
             
-            log.debug("HMAC verification details:");
-            log.debug("  Body: {}", body);
-            log.debug("  AccessToken: {}", accessToken);
-            log.debug("  Computed HMAC: {}", computed);
-            log.debug("  Received HMAC: {}", hmacHeader);
-            log.debug("  Match: {}", computed.equals(hmacHeader));
+            boolean isValid = computed.equals(hmacHeader);
+            log.debug("HMAC verification: Computed={}, Received={}, Match={}", 
+                    computed, hmacHeader, isValid);
             
-            return computed.equals(hmacHeader);
+            return isValid;
         } catch (Exception e) {
             log.error("Error verifying HMAC", e);
             return false;

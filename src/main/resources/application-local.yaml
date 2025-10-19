@@ -125,8 +125,7 @@ pancake:
 
 sapo:
   client-id: 4f7707502a2b4dabb25b2b08e4bf36ba
-  client-secret: 50ce6b4d47a04ca18aa6f972b698779a
-  access-token: 6774cbee20e240a5a527c0497ce283e0
+  client-secret: 6774cbee20e240a5a527c0497ce283e0
   url: https://nemi-test02.mysapo.net/
   recent-days: 30 # số ngày gần nhất để lấy sản phẩm
   is-sync-all-product: false
