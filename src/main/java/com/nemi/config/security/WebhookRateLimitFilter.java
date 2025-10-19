@@ -2,11 +2,13 @@ package com.nemi.config.security;
 
 
 import com.nemi.config.SlidingWindowCounterRateLimiter;
-import com.nemi.config.WebhookWhitelistConfig;
+import com.nemi.configuration.WebhookWhitelistConfig;
+import com.nemi.constant.PosConstants;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.HttpStatus;
@@ -19,14 +21,11 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class WebhookRateLimitFilter extends OncePerRequestFilter {
 
     private final WebhookWhitelistConfig whitelistConfig;
     private final Map<String, SlidingWindowCounterRateLimiter> rateLimiters = new ConcurrentHashMap<>();
-
-    public WebhookRateLimitFilter(WebhookWhitelistConfig whitelistConfig) {
-        this.whitelistConfig = whitelistConfig;
-    }
 
     @Override
     public void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
@@ -61,6 +60,8 @@ public class WebhookRateLimitFilter extends OncePerRequestFilter {
                 return;
             }
 
+            WebhookWhitelistConfig.PartnerLimit configPartner  = whitelistConfig.getPartnerLimitOrThrow(partner);
+
 
             if (!whitelistConfig.isAllowedIp(partner, ip)) {
                 log.warn(" Forbidden IP {} for partner {}", ip, partner);
@@ -70,7 +71,7 @@ public class WebhookRateLimitFilter extends OncePerRequestFilter {
 // rate limite torng milisec
             SlidingWindowCounterRateLimiter limiter = rateLimiters.computeIfAbsent(
                     partner,
-                    p -> new SlidingWindowCounterRateLimiter(60, 60_000, 1_000)
+                    p -> new SlidingWindowCounterRateLimiter(configPartner.getLimit(), configPartner.getWindowSize(), configPartner.getSegmentSize())
                     // 60 req / 1m, 1 segmend = 1s = 1*10^3 ms
             );
 
@@ -89,10 +90,10 @@ public class WebhookRateLimitFilter extends OncePerRequestFilter {
     }
 
     private String extractClientIp(HttpServletRequest request) throws IOException {
-        String ip = request.getHeader("x-real-ip");
+        String ip = request.getHeader(PosConstants.X_REAL_IP);
 
         if (StringUtils.isEmpty(ip)) {
-            ip = request.getHeader("x-forwarded-for");
+            ip = request.getHeader(PosConstants.X_FORWARDED_FOR);
             if (ip != null && ip.contains(",")) {
                 ip = ip.split(",")[0].trim();
             }

@@ -135,7 +135,7 @@ public class PancakeWebhookServiceImpl implements WebhookService {
         // Save (insert/update)
         orderRepository.save(orderEntity);
 
-        // if delete
+        // 6 va 7 la ma stattus huy cua pancake
         if (webhookResponse.getStatus() == 6 || webhookResponse.getStatus() == 7) {
             return true;
         }

@@ -7,6 +7,8 @@ public class PosConstants {
     public static String ORDER_ITEM = "order item";
 
     public static String VIETNAM_ZONE = "+07:00";
+    public static String X_REAL_IP = "x-real-ip";
+    public static String X_FORWARDED_FOR = "x-forwarded-for";
 
     private PosConstants() {
     }

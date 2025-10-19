@@ -102,7 +102,7 @@ public class SapoServiceImpl implements PosManagementService {
                 log.error("Sapo response does not contain accessToken: {}", tokenResponse);
             }
 
-            PosEntity newPos = createNewPos(tokenResponse, configMap);
+            PosEntity newPos = createNewPos(tokenResponse, configMap,posConnectionRequest.getStoreName());
             PosConnectionResponse posConnectionResponse = PosConnectionResponse.toPosConnectionResponse(newPos);
 
             // Delete old webhooks (posId khác) trước khi đăng ký mới
@@ -332,7 +332,7 @@ public class SapoServiceImpl implements PosManagementService {
         }
     }
 
-    private PosEntity createNewPos(SapoAccessTokenResponse tokenResponse, Map<String, String> configMap) {
+    private PosEntity createNewPos(SapoAccessTokenResponse tokenResponse, Map<String, String> configMap,String webhookToken) {
         // Encrypt access token before storing in database
         String encryptedAccessToken = tokenEncryptionService.encrypt(tokenResponse.getAccessToken());
 
@@ -344,6 +344,7 @@ public class SapoServiceImpl implements PosManagementService {
                 .config(tokenEncryptionService.encrypt(JsonUtils.toJson(configMap)))
                 .expiredTime(null)
                 .companyId(String.valueOf(claimUtil.getCompanyId()))
+                .webhookToken(webhookToken)
                 .createdBy(claimUtil.getUserName())
                 .build();
 
