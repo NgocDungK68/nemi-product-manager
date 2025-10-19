@@ -64,6 +64,18 @@ public class SapoAuthChecker {
             }
         }
         
+        // Try with normalized JSON (handle null vs empty string differences)
+        String normalizedJson = JsonUtils.toJson(body)
+                .replace(":null", ":null")
+                .replace(":\"\"", ":null")
+                .replace(":0.0", ":0");
+        
+        log.debug("Trying normalized JSON format: {}", normalizedJson);
+        if (verifyHmac(normalizedJson, secret, hmacHeader)) {
+            log.debug("HMAC verification succeeded with normalized JSON format");
+            return true;
+        }
+        
         log.debug("All body formats failed for HMAC verification");
         return false;
     }
