@@ -198,12 +198,16 @@ webhook:
       - 42.113.206.190
   rate-limit:
     enable: true
-    nhanhvn:
-      requests: 60
-      period: 1m
-    pancake:
-      requests: 60
-      period: 1m
-    sapo:
-      requests: 60
-      period: 1m
+    partners:
+      nhanhvn:
+        limit: 60
+        window-size: 60000
+        segment-size: 1000
+      pancake:
+        limit: 60
+        window-size: 60000
+        segment-size: 1000
+      sapo:
+        limit: 60
+        window-size: 60000
+        segment-size: 1000
