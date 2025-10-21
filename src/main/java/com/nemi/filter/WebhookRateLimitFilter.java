@@ -1,6 +1,6 @@
 package com.nemi.filter;
 
-import com.nemi.configuration.WebhookWhitelistConfig;
+import com.nemi.configuration.WebhookConfig;
 import com.nemi.constant.PosConstants;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -22,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @RequiredArgsConstructor
 public class WebhookRateLimitFilter extends OncePerRequestFilter {
 
-    private final WebhookWhitelistConfig whitelistConfig;
+    private final WebhookConfig webhookConfig;
     private final Map<String, SlidingWindowCounterRateLimiter> rateLimiters = new ConcurrentHashMap<>();
 
     @Override
@@ -35,6 +35,13 @@ public class WebhookRateLimitFilter extends OncePerRequestFilter {
                 || request.getRequestURI().startsWith("/client-api/")
                 || request.getRequestURI().startsWith("/actuator/")) {
             log.trace("Bypass public path {}", request.getRequestURI());
+            chain.doFilter(request, response);
+            return;
+        }
+
+        // If rate limiting is disabled in configuration, bypass the filter entirely
+        if (!webhookConfig.getRateLimit().isEnable()) {
+            log.trace("Rate limiting is disabled - bypassing WebhookRateLimitFilter");
             chain.doFilter(request, response);
             return;
         }
@@ -58,10 +65,10 @@ public class WebhookRateLimitFilter extends OncePerRequestFilter {
                 return;
             }
 
-            WebhookWhitelistConfig.PartnerLimit configPartner = whitelistConfig.getPartnerLimitOrThrow(partner);
+            WebhookConfig.PartnerLimit configPartner = webhookConfig.getPartnerLimitOrThrow(partner);
 
 
-            if (!whitelistConfig.isAllowedIp(partner, ip)) {
+            if (!webhookConfig.isAllowedIp(partner, ip)) {
                 log.warn(" Forbidden IP {} for partner {}", ip, partner);
                 httpRes.sendError(HttpServletResponse.SC_FORBIDDEN, "IP not allowed");
                 return;
