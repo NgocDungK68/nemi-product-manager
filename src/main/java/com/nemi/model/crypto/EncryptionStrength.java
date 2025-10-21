@@ -1,9 +1,12 @@
-package com.nemi.utils.security;
+package com.nemi.model.crypto;
+
+import lombok.Getter;
 
 /**
  *
  * Three possible options for an AES key length.
  */
+@Getter
 public enum EncryptionStrength {
     BIT_128(128),
     BIT_192(192),
@@ -13,10 +16,6 @@ public enum EncryptionStrength {
 
     EncryptionStrength(int length) {
         this.length = length;
-    }
-
-    public int getLength() {
-        return length;
     }
 
     public static EncryptionStrength getAESKeyLength(int encryptionStrength) {
