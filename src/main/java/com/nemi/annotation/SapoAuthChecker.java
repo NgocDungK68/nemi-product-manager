@@ -51,15 +51,16 @@ public class SapoAuthChecker {
         if (json == null) return "";
 
         String normalized = json;
-
-        // Chuyển content rỗng "" -> null
+        // Chuẩn hóa nội dung JSON trước khi tính HMAC
+        //  Chuyển content rỗng "" -> null
         normalized = normalized.replace("\"content\":\"\"", "\"content\":null");
 
-        // Chuyển price 0.0 -> 0
+        //  Chuyển price 0.0 -> 0
         normalized = normalized.replace("\"price\":0.0", "\"price\":0");
 
-        // trim khoảng trắng thừa (phòng trường hợp có JSON không chuẩn)
+        // Loại bỏ khoảng trắng thừa (phòng trường hợp JSON không chuẩn)
         normalized = normalized.trim();
+
 
         log.debug("Normalized JSON for HMAC: {}", normalized.length() > 200 ? normalized.substring(0, 200) + "..." : normalized);
         return normalized;
