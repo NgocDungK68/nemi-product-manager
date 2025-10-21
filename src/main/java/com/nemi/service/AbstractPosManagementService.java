@@ -24,6 +24,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -198,7 +199,7 @@ public abstract class AbstractPosManagementService {
     }
     public String generateWebhookToken(String shopId){
         String rawData =  shopId + ":" + System.currentTimeMillis();
-        return encryptionService.encrypt(rawData);
+        return Base64.getEncoder().encodeToString(rawData.getBytes());
     }
 
 }
