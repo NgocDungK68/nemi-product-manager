@@ -1,5 +1,6 @@
-package com.nemi.utils.crypto;
+package com.nemi.model.crypto;
 
+import lombok.Getter;
 import org.apache.commons.lang3.NotImplementedException;
 
 import javax.crypto.spec.GCMParameterSpec;
@@ -7,6 +8,7 @@ import javax.crypto.spec.IvParameterSpec;
 import java.security.spec.AlgorithmParameterSpec;
 
 
+@Getter
 public enum EncryptionMode {
     GCM ("AES/GCM/NoPadding", 12), // iv length 12 is recommended by NIST for GCM
     CTR ("AES/CTR/NoPadding", 16);
@@ -20,14 +22,6 @@ public enum EncryptionMode {
     EncryptionMode(String algorithm, int ivLength) {
         this.algorithm = algorithm;
         this.ivLength = ivLength;
-    }
-
-    public String getAlgorithm() {
-        return algorithm;
-    }
-
-    public int getIvLength() {
-        return ivLength;
     }
 
     // GCM needs GCMParameterSpec, CTR needs IvParameterSpec

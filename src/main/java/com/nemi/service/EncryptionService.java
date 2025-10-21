@@ -1,9 +1,9 @@
 package com.nemi.service;
 
-import com.nemi.utils.crypto.AesCipher;
-import com.nemi.utils.crypto.model.CipherText;
-import com.nemi.utils.crypto.model.Password;
-import com.nemi.utils.crypto.model.PlainText;
+import com.nemi.utils.AesCipher;
+import com.nemi.model.crypto.CipherText;
+import com.nemi.model.crypto.Password;
+import com.nemi.model.crypto.PlainText;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.nemi.configuration.CryptoConfig;

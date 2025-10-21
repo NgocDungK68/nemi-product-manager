@@ -1,9 +1,11 @@
-package com.nemi.utils.crypto;
+package com.nemi.utils;
 
 
-import com.nemi.utils.crypto.model.CipherText;
-import com.nemi.utils.crypto.model.Password;
-import com.nemi.utils.crypto.model.PlainText;
+import com.nemi.model.crypto.CipherText;
+import com.nemi.model.crypto.EncryptionMode;
+import com.nemi.model.crypto.EncryptionStrength;
+import com.nemi.model.crypto.Password;
+import com.nemi.model.crypto.PlainText;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
