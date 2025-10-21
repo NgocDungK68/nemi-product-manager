@@ -1,4 +1,4 @@
-package com.nemi.utils.crypto.model;
+package com.nemi.model.crypto;
 
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
