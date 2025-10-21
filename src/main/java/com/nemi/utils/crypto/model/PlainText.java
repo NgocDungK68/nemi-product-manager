@@ -1,4 +1,4 @@
-package com.nemi.utils.security.model;
+package com.nemi.utils.crypto.model;
 
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
@@ -7,6 +7,6 @@ import lombok.Value;
 @AllArgsConstructor
 @NoArgsConstructor(force = true)
 @Value
-public class CipherText {
+public class PlainText {
     String value;
 }

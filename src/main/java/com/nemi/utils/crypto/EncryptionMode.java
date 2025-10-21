@@ -1,4 +1,4 @@
-package com.nemi.utils.security;
+package com.nemi.utils.crypto;
 
 import org.apache.commons.lang3.NotImplementedException;
 
