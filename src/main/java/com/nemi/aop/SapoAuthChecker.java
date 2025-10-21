@@ -1,4 +1,4 @@
-package com.nemi.utils.security;
+package com.nemi.aop;
 
 import com.nemi.configuration.SapoConfig;
 import com.nemi.constant.SapoConstants;
@@ -21,22 +21,22 @@ public class SapoAuthChecker {
 
     public boolean checkSignature(Map<String, String> headers, Object body, String podId) {
         log.debug("SapoAuthChecker.checkSignature called with posId={}", podId);
-        
+
         String hmacHeader = headers.get(SapoConstants.X_SAPO_SIGNATURE);
         if (hmacHeader == null) {
             log.warn("Missing signature header '{}' (posId={})", SapoConstants.X_SAPO_SIGNATURE, podId);
             return false;
         }
-        
+
         // Sapo uses client_secret from config for HMAC verification
         String clientSecret = sapoConfig.getClientSecret();
         if (ObjectUtils.isEmpty(clientSecret)) {
             log.warn("Client secret not found in SapoConfig for posId={}", podId);
             return false;
         }
-        
+
         log.debug("Using client secret for HMAC verification: {}", clientSecret);
-        
+
         // Try different body formats for HMAC verification
         return verifyHmacWithDifferentFormats(body, clientSecret, hmacHeader);
     }
@@ -48,16 +48,16 @@ public class SapoAuthChecker {
 
     public boolean verifyHmacWithDifferentFormats(Object body, String secret, String hmacHeader) {
         String standardJson = JsonUtils.toJson(body);
-        
+
         // Try different combinations of body content
         String[] bodyFormats = {
-            "", // Empty body
-            "{}", // Empty JSON object
-            "{\"id\":" + extractProductId(standardJson) + "}", // Product ID only
-            standardJson, // Standard JSON
-            standardJson.replace("\"content\":\"\"", "\"content\":null") // Normalized JSON
+                "", // Empty body
+                "{}", // Empty JSON object
+                "{\"id\":" + extractProductId(standardJson) + "}", // Product ID only
+                standardJson, // Standard JSON
+                standardJson.replace("\"content\":\"\"", "\"content\":null") // Normalized JSON
         };
-        
+
         for (String bodyFormat : bodyFormats) {
             log.debug("Trying body format: {}", bodyFormat.length() > 50 ? bodyFormat.substring(0, 50) + "..." : bodyFormat);
             if (verifyHmac(bodyFormat, secret, hmacHeader)) {
@@ -65,7 +65,7 @@ public class SapoAuthChecker {
                 return true;
             }
         }
-        
+
         // Try with different secret combinations
         String[] secrets = {secret, secret.toUpperCase(), secret.toLowerCase()};
         for (String testSecret : secrets) {
@@ -77,11 +77,11 @@ public class SapoAuthChecker {
                 }
             }
         }
-        
+
         log.debug("All body formats and secret variations failed for HMAC verification");
         return false;
     }
-    
+
     private String extractProductId(String json) {
         try {
             // Simple extraction of product ID from JSON
@@ -103,17 +103,17 @@ public class SapoAuthChecker {
             log.info("Body content: {}", body);
             log.info("Secret: {}", secret);
             log.info("Received HMAC: {}", hmacHeader);
-            
+
             Mac hmac = Mac.getInstance("HmacSHA256");
             SecretKeySpec key = new SecretKeySpec(secret.getBytes("UTF-8"), "HmacSHA256");
             hmac.init(key);
             String computed = Base64.getEncoder().encodeToString(hmac.doFinal(body.getBytes("UTF-8")));
-            
+
             boolean isValid = computed.equals(hmacHeader);
             log.info("Computed HMAC: {}", computed);
             log.info("HMAC Match: {}", isValid);
             log.info("=== END HMAC VERIFICATION ===");
-            
+
             return isValid;
         } catch (Exception e) {
             log.error("Error verifying HMAC", e);

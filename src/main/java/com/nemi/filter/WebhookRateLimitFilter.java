@@ -1,7 +1,5 @@
-package com.nemi.config.security;
+package com.nemi.filter;
 
-
-import com.nemi.config.SlidingWindowCounterRateLimiter;
 import com.nemi.configuration.WebhookWhitelistConfig;
 import com.nemi.constant.PosConstants;
 import jakarta.servlet.FilterChain;
@@ -60,7 +58,7 @@ public class WebhookRateLimitFilter extends OncePerRequestFilter {
                 return;
             }
 
-            WebhookWhitelistConfig.PartnerLimit configPartner  = whitelistConfig.getPartnerLimitOrThrow(partner);
+            WebhookWhitelistConfig.PartnerLimit configPartner = whitelistConfig.getPartnerLimitOrThrow(partner);
 
 
             if (!whitelistConfig.isAllowedIp(partner, ip)) {
@@ -68,7 +66,7 @@ public class WebhookRateLimitFilter extends OncePerRequestFilter {
                 httpRes.sendError(HttpServletResponse.SC_FORBIDDEN, "IP not allowed");
                 return;
             }
-// rate limite torng milisec
+            // rate limit trong milisec
             SlidingWindowCounterRateLimiter limiter = rateLimiters.computeIfAbsent(
                     partner,
                     p -> new SlidingWindowCounterRateLimiter(configPartner.getLimit(), configPartner.getWindowSize(), configPartner.getSegmentSize())
@@ -80,7 +78,7 @@ public class WebhookRateLimitFilter extends OncePerRequestFilter {
                 httpRes.sendError(HttpStatus.TOO_MANY_REQUESTS.value(), "Rate limit exceeded");
                 return;
             }
-            log.info("✅ WebhookRateLimitFilter passed for partner={} from IP={}", partner, ip);
+            log.info("WebhookRateLimitFilter passed for partner={} from IP={}", partner, ip);
 
             //  3. Cho phép request đi tiếp
             chain.doFilter(request, response);
