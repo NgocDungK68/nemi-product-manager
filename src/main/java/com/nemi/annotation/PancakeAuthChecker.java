@@ -26,6 +26,14 @@ public class PancakeAuthChecker {
             log.warn("Missing webhook token (posId={})", posId);
             return false;
         }
+        PosEntity pos = posRepository.findById(posId).orElse(null);
+        String webhookTokenDecrypted = encryptionService.decrypt(pos.getWebhookToken());
+        log.info("Decrypted webhook token for posId={}: {}", posId, webhookTokenDecrypted);
+        log.info("Received webhook token for posId={}: {}", posId, webhookToken);
+        log.info("pos: {}",pos);
+
+
+
         log.info("Checking webhook token for posId={}", posId);
         return posRepository.findById(posId)
                 .map(PosEntity::getWebhookToken)
