@@ -1,5 +1,6 @@
 package com.nemi.controller;
 
+import com.nemi.annotation.CheckXRealIp;
 import com.nemi.constant.WebhookConstants;
 import com.nemi.service.WebhookService;
 import com.nemi.service.factory.WebhookFactory;
@@ -31,6 +32,7 @@ public class WebhookController {
      * - POST /webhook/pancake -> webhookType = "pancake"
      * - POST /webhook/sapo -> webhookType = "sapo"
      */
+    @CheckXRealIp
     @PostMapping("/{posName}/{posId}")
     public void receiveWebhook(
             @PathVariable String posName,
