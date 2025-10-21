@@ -20,6 +20,7 @@ public class PosConnectionResponse {
     private String posName;
     private String status;
     private String reAuthLink;
+    private String webhookToken;
     private LocalDateTime expiredTime;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

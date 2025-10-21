@@ -6,9 +6,11 @@ import com.nemi.constant.PosConstants;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
+import com.nemi.service.EncryptionService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ObjectUtils;
 
@@ -20,9 +22,12 @@ import java.util.Map;
 import java.util.TreeMap;
 
 @Slf4j
+
 public class PosUtils {
     PosUtils (){}
     private static final ObjectMapper mapper = new ObjectMapper();
+
+
 
     public static Map<String, String> extractHeaders(HttpServletRequest request) {
         Map<String, String> headers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);

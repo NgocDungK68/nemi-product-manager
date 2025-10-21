@@ -25,6 +25,11 @@ public class NhanhvnAuthChecker {
             log.warn("Missing webhook token (posId={})", posId);
             return false;
         }
+        PosEntity posEntity = posRepository.findById(posId).orElse(null);
+        String decryptdb = encryptionService.decrypt(posEntity.getWebhookToken());
+        log.info("Decrypted DB token: {}", decryptdb);
+        log.info("Received webhook token: {}", webhookToken);
+
         log.info("Checking webhook token for posId={}", posId);
         return posRepository.findById(posId)
                 .map(PosEntity::getWebhookToken)

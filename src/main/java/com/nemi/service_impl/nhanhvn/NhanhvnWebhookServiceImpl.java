@@ -77,11 +77,6 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
                 .posName(posName)
                 .build();
         try {
-            String verifyToken = headers.get(HttpHeaders.AUTHORIZATION);
-            if (ObjectUtils.isEmpty(verifyToken) || !verifyToken.equals(nhanhvnConfig.getVerifyToken())) {
-                log.error("[NhanhvnWebhookServiceImpl.processWebhook] Invalid verify token: {}", verifyToken);
-                return false;
-            }
 
             NhanhvnWebhookRequest webhookRequest = JsonUtils.map(body, NhanhvnWebhookRequest.class);
             webhookHistory.setBody(JsonUtils.toJson(webhookRequest));

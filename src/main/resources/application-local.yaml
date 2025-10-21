@@ -192,6 +192,8 @@ webhook:
   allowed-ips:
     nhanhvn:
       - 34.80.130.93
+      - 104.199.211.99
+      - 35.185.145.223
     pancake:
       - 203.171.22.6
     sapo:

@@ -93,13 +93,18 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
             }
 
+            String userId = claimUtil.getUserId();
             Map<String, String> configMap = buildConfigMap(posConnectionRequest);
             LocalDateTime expiredTime = Instant.ofEpochSecond(tokenResponse.getData().getExpiredAt())
                     .atZone(ZoneId.systemDefault())
                     .toLocalDateTime();
 
-            PosEntity newPos = createNewPos(tokenResponse, configMap, expiredTime, posConnectionRequest.getWebhookToken());
+            String webhookToken = generalPosService.generateWebhookToken(posConnectionRequest.getBusinessId());
+
+
+            PosEntity newPos = createNewPos(tokenResponse, configMap, expiredTime, webhookToken);
             PosConnectionResponse posConnectionResponse = PosConnectionResponse.toPosConnectionResponse(newPos);
+            posConnectionResponse.setWebhookToken(webhookToken);
 
             log.info("[NhanhvnServiceImpl.connectPos] Connected successfully: {}", newPos.getId());
             return posConnectionResponse;
@@ -332,7 +337,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 .accessToken(encryptedToken)
                 .config(encryptionService.encrypt(JsonUtils.toJson(configMap)))
                 .expiredTime(expiredTime)
-                .webhookToken(webhookToken)
+                .webhookToken(encryptionService.encrypt(webhookToken))
                 .companyId(String.valueOf(claimUtil.getCompanyId()))
                 .createdBy(claimUtil.getUserName())
                 .build();

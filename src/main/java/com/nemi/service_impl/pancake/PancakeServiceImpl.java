@@ -89,6 +89,9 @@ public class PancakeServiceImpl implements PosManagementService {
 
             LocalDateTime expiredTime = LocalDateTime.now().plusYears(1);
 
+            String webhookToken = generalPosService.generateWebhookToken(posConnectionRequest.getShopId());
+
+
             PosEntity posEntityBuilder = PosEntity.builder()
                     .posName(PosName.PANCAKE.name())
                     .userId(userId)
@@ -98,12 +101,13 @@ public class PancakeServiceImpl implements PosManagementService {
                     .expiredTime(expiredTime)
                     .companyId(String.valueOf(claimUtil.getCompanyId()))
                     .createdBy(claimUtil.getUserName())
-                    .webhookToken(encryptionService.encrypt(posConnectionRequest.getWebhookToken()))
+                    .webhookToken(encryptionService.encrypt(webhookToken))
                     .build();
 
             posRepository.save(posEntityBuilder);
 
             PosConnectionResponse posConnectionResponse = PosConnectionResponse.toPosConnectionResponse(posEntityBuilder);
+            posConnectionResponse.setWebhookToken(webhookToken);
             log.info("Pancake response is {}", posConnectionResponse);
             return posConnectionResponse;
         } catch (Exception e) {

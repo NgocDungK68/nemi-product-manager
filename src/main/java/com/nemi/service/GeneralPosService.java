@@ -11,8 +11,8 @@ import org.springframework.stereotype.Service;
 public class GeneralPosService extends AbstractPosManagementService {
 
     public GeneralPosService(PosRepository posRepository, ClaimUtil claimUtil,
-                             SyncHistoryRepository syncHistoryRepository, ObjectMapper objectMapper, NhanhvnConfig nhanhvnConfig) {
-        super(posRepository, claimUtil, syncHistoryRepository, objectMapper, nhanhvnConfig);
+                             SyncHistoryRepository syncHistoryRepository, ObjectMapper objectMapper, NhanhvnConfig nhanhvnConfig,EncryptionService encryptionService) {
+        super(posRepository, claimUtil, syncHistoryRepository, objectMapper, nhanhvnConfig,encryptionService);
     }
 
     // Inherit all common methods from AbstractPosManagementService:

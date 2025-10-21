@@ -23,7 +23,6 @@ public class PosConnectionRequest {
     private String apiKey;    //PANCAKE
 
     // aop preAuthorize
-    private String webhookToken;
 
 }
 

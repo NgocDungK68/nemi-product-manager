@@ -38,6 +38,7 @@ public abstract class AbstractPosManagementService {
     protected final SyncHistoryRepository syncHistoryRepository;
     protected final ObjectMapper objectMapper;
     protected final NhanhvnConfig  nhanhvnConfig;
+    private final EncryptionService encryptionService;
 
     /**
      * Get POS status by ID
@@ -195,4 +196,9 @@ public abstract class AbstractPosManagementService {
             throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.JSON_PARSE_ERROR));
         }
     }
+    public String generateWebhookToken(String shopId){
+        String rawData =  shopId + ":" + System.currentTimeMillis();
+        return encryptionService.encrypt(rawData);
+    }
+
 }
