@@ -1,4 +1,4 @@
-package com.nemi.aop;
+package com.nemi.annotation;
 
 import com.nemi.constant.NhanhvnConstants;
 import com.nemi.entity.PosEntity;
