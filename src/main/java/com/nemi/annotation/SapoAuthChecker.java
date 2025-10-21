@@ -19,89 +19,61 @@ import java.util.Map;
 public class SapoAuthChecker {
     private final SapoConfig sapoConfig;
 
-    public boolean checkSignature(Map<String, String> headers, Object body, String podId) {
-        log.debug("SapoAuthChecker.checkSignature called with posId={}", podId);
+    public boolean checkSignature(Map<String, String> headers, Object body, String posId) {
+        log.debug("SapoAuthChecker.checkSignature called with posId={}", posId);
 
         String hmacHeader = headers.get(SapoConstants.X_SAPO_SIGNATURE);
         if (hmacHeader == null) {
-            log.warn("Missing signature header '{}' (posId={})", SapoConstants.X_SAPO_SIGNATURE, podId);
+            log.warn("Missing signature header '{}' (posId={})", SapoConstants.X_SAPO_SIGNATURE, posId);
             return false;
         }
 
-        // Sapo uses client_secret from config for HMAC verification
         String clientSecret = sapoConfig.getClientSecret();
         if (ObjectUtils.isEmpty(clientSecret)) {
-            log.warn("Client secret not found in SapoConfig for posId={}", podId);
+            log.warn("Client secret not found in SapoConfig for posId={}", posId);
             return false;
         }
 
-        log.debug("Using client secret for HMAC verification: {}", clientSecret);
+        log.debug("Using client secret for HMAC verification");
 
-        // Try different body formats for HMAC verification
-        return verifyHmacWithDifferentFormats(body, clientSecret, hmacHeader);
+        String normalizedBody = normalizeJson(JsonUtils.toJson(body));
+        return verifyHmac(normalizedBody, clientSecret, hmacHeader);
     }
 
-    public boolean checkSignature(Map<String, String> headers, String body, String podId) {
-        return checkSignature(headers, (Object) body, podId);
+    public boolean checkSignature(Map<String, String> headers, String body, String posId) {
+        return checkSignature(headers, (Object) body, posId);
     }
 
+    /**
+     * Chuẩn hóa JSON để loại bỏ khác biệt về format giữa "" và null, 0.0 và 0
+     */
+    private String normalizeJson(String json) {
+        if (json == null) return "";
 
-    public boolean verifyHmacWithDifferentFormats(Object body, String secret, String hmacHeader) {
-        String standardJson = JsonUtils.toJson(body);
+        String normalized = json;
+        
+        // 1. Chuyển content rỗng "" -> null
+        normalized = normalized.replace("\"content\":\"\"", "\"content\":null");
+        
+        // 2. Chuyển TẤT CẢ số dạng X.0 -> X (dùng regex)
+        // Ví dụ: "price":0.0 → "price":0, "weight":0.0 → "weight":0
+        normalized = normalized.replaceAll(":(\\d+)\\.0(?=[,}])", ":$1");
+        
+        // 3. Loại bỏ spaces sau colon (nếu Jackson thêm vào)
+        normalized = normalized.replaceAll(": ", ":");
+        
+        // 4. Loại bỏ khoảng trắng thừa đầu/cuối
+        normalized = normalized.trim();
 
-        // Try different combinations of body content
-        String[] bodyFormats = {
-                "", // Empty body
-                "{}", // Empty JSON object
-                "{\"id\":" + extractProductId(standardJson) + "}", // Product ID only
-                standardJson, // Standard JSON
-                standardJson.replace("\"content\":\"\"", "\"content\":null") // Normalized JSON
-        };
-
-        for (String bodyFormat : bodyFormats) {
-            log.debug("Trying body format: {}", bodyFormat.length() > 50 ? bodyFormat.substring(0, 50) + "..." : bodyFormat);
-            if (verifyHmac(bodyFormat, secret, hmacHeader)) {
-                log.debug("HMAC verification succeeded with body format: {}", bodyFormat.length() > 50 ? bodyFormat.substring(0, 50) + "..." : bodyFormat);
-                return true;
-            }
-        }
-
-        // Try with different secret combinations
-        String[] secrets = {secret, secret.toUpperCase(), secret.toLowerCase()};
-        for (String testSecret : secrets) {
-            if (!testSecret.equals(secret)) {
-                log.debug("Trying with modified secret: {}", testSecret);
-                if (verifyHmac(standardJson, testSecret, hmacHeader)) {
-                    log.debug("HMAC verification succeeded with modified secret");
-                    return true;
-                }
-            }
-        }
-
-        log.debug("All body formats and secret variations failed for HMAC verification");
-        return false;
+        log.debug("Normalized JSON for HMAC: {}", normalized.length() > 200 ? normalized.substring(0, 200) + "..." : normalized);
+        return normalized;
     }
 
-    private String extractProductId(String json) {
-        try {
-            // Simple extraction of product ID from JSON
-            int idStart = json.indexOf("\"id\":") + 5;
-            int idEnd = json.indexOf(",", idStart);
-            if (idEnd == -1) {
-                idEnd = json.indexOf("}", idStart);
-            }
-            return json.substring(idStart, idEnd).trim();
-        } catch (Exception e) {
-            return "0";
-        }
-    }
-
-    public boolean verifyHmac(String body, String secret, String hmacHeader) {
+    private boolean verifyHmac(String body, String secret, String hmacHeader) {
         try {
             log.info("=== HMAC VERIFICATION DEBUG ===");
-            log.info("Body length: {}, Secret length: {}", body.length(), secret.length());
-            log.info("Body content: {}", body);
-            log.info("Secret: {}", secret);
+            log.info("Body: {}", body);
+            log.info("Secret length: {}", secret.length());
             log.info("Received HMAC: {}", hmacHeader);
 
             Mac hmac = Mac.getInstance("HmacSHA256");
