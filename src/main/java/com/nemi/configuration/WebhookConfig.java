@@ -13,7 +13,7 @@ import java.util.Map;
 @Data
 @Configuration
 @ConfigurationProperties(prefix = "webhook")
-public class WebhookWhitelistConfig {
+public class WebhookConfig {
 
 
     private Map<String, List<String>> allowedIps;
