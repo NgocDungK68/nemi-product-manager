@@ -1,4 +1,4 @@
-package com.nemi.config.security;
+package com.nemi.filter;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
