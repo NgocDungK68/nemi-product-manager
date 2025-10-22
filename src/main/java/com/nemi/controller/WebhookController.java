@@ -54,7 +54,7 @@ public class WebhookController {
         if (rawBodyAttr != null) {
             log.info("Raw body cached by filter: {}", rawBodyAttr.toString().substring(0, Math.min(100, rawBodyAttr.toString().length())) + "...");
         } else {
-            log.debug("Raw body not cached (not Sapo webhook or filter not working)");
+            log.debug("Raw body not cached (not sapo webhook or filter not working)");
         }
         
         log.debug("Parsed body: {}", body);
