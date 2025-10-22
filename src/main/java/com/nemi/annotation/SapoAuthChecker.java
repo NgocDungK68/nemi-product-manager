@@ -1,12 +1,16 @@
 package com.nemi.annotation;
 
+import com.nemi.config.security.SapoWebhookFilter;
 import com.nemi.configuration.SapoConfig;
 import com.nemi.constant.SapoConstants;
 import com.nemi.util.JsonUtils;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.stereotype.Component;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -36,8 +40,39 @@ public class SapoAuthChecker {
 
         log.debug("Using client secret for HMAC verification");
 
+        // ✅ Lấy raw body từ filter cache (đã được SapoWebhookFilter lưu sẵn)
+        String rawBody = getRawBodyFromRequest();
+        if (rawBody != null) {
+            log.info("Using raw body from filter for HMAC verification");
+            return verifyHmac(rawBody, clientSecret, hmacHeader);
+        }
+
+        // Fallback: dùng parsed body (có thể sai format)
+        log.warn("Raw body not found, falling back to parsed body (may fail!)");
         String normalizedBody = normalizeJson(JsonUtils.toJson(body));
         return verifyHmac(normalizedBody, clientSecret, hmacHeader);
+    }
+
+    /**
+     * Lấy raw body đã được cache bởi SapoWebhookFilter.
+     * Filter đã đọc raw body TRỨ KHI Spring parse @RequestBody.
+     * 
+     * @return raw JSON string từ Sapo, hoặc null nếu không có cache
+     */
+    private String getRawBodyFromRequest() {
+        try {
+            ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            if (attributes != null) {
+                HttpServletRequest request = attributes.getRequest();
+                Object rawBody = request.getAttribute(SapoWebhookFilter.CACHED_RAW_BODY_ATTRIBUTE);
+                if (rawBody instanceof String) {
+                    return (String) rawBody;
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Could not retrieve raw body from request attributes: {}", e.getMessage());
+        }
+        return null;
     }
 
     public boolean checkSignature(Map<String, String> headers, String body, String posId) {
@@ -51,19 +86,16 @@ public class SapoAuthChecker {
         if (json == null) return "";
 
         String normalized = json;
-        
-        // 1. Chuyển content rỗng "" -> null
+        // Chuẩn hóa nội dung JSON trước khi tính HMAC
+        //  Chuyển content rỗng "" -> null
         normalized = normalized.replace("\"content\":\"\"", "\"content\":null");
-        
-        // 2. Chuyển TẤT CẢ số dạng X.0 -> X (dùng regex)
-        // Ví dụ: "price":0.0 → "price":0, "weight":0.0 → "weight":0
-        normalized = normalized.replaceAll(":(\\d+)\\.0(?=[,}])", ":$1");
-        
-        // 3. Loại bỏ spaces sau colon (nếu Jackson thêm vào)
-        normalized = normalized.replaceAll(": ", ":");
-        
-        // 4. Loại bỏ khoảng trắng thừa đầu/cuối
+
+        //  Chuyển price 0.0 -> 0
+        normalized = normalized.replace("\"price\":0.0", "\"price\":0");
+
+        // Loại bỏ khoảng trắng thừa (phòng trường hợp JSON không chuẩn)
         normalized = normalized.trim();
+
 
         log.debug("Normalized JSON for HMAC: {}", normalized.length() > 200 ? normalized.substring(0, 200) + "..." : normalized);
         return normalized;
