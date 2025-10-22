@@ -1,9 +1,8 @@
 package com.nemi.annotation;
 
+import com.nemi.constant.SapoConstants;
 import com.nemi.entity.PosEntity;
 import com.nemi.filter.SapoWebhookFilter;
-import com.nemi.configuration.SapoConfig;
-import com.nemi.constant.SapoConstants;
 import com.nemi.service.EncryptionService;
 import com.nemi.service.GeneralPosService;
 import com.nemi.util.JsonUtils;
