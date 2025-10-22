@@ -344,7 +344,6 @@ public class SapoServiceImpl implements PosManagementService {
                 .config(tokenEncryptionService.encrypt(JsonUtils.toJson(configMap)))
                 .expiredTime(null)
                 .companyId(String.valueOf(claimUtil.getCompanyId()))
-                .webhookToken(webhookToken)
                 .createdBy(claimUtil.getUserName())
                 .build();
 

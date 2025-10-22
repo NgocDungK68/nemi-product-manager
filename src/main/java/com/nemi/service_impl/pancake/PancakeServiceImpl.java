@@ -93,7 +93,7 @@ public class PancakeServiceImpl implements PosManagementService {
 
 
             PosEntity posEntityBuilder = PosEntity.builder()
-                    .posName(PosName.PANCAKE.name())
+                    .posName(PosName.PANCAKE.getValue())
                     .userId(userId)
                     .status(PosStatus.ACTIVE.name())
                     .accessToken(encryptionService.encrypt(posConnectionRequest.getApiKey()))
