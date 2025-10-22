@@ -1,9 +1,12 @@
 package com.nemi.annotation;
 
-import com.nemi.config.security.SapoWebhookFilter;
-import com.nemi.configuration.SapoConfig;
 import com.nemi.constant.SapoConstants;
+import com.nemi.entity.PosEntity;
+import com.nemi.filter.SapoWebhookFilter;
+import com.nemi.service.EncryptionService;
+import com.nemi.service.GeneralPosService;
 import com.nemi.util.JsonUtils;
+import com.nemi.utils.PosUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +24,8 @@ import java.util.Map;
 @RequiredArgsConstructor
 @Slf4j
 public class SapoAuthChecker {
-    private final SapoConfig sapoConfig;
+    private final GeneralPosService generalPosService;
+    private final EncryptionService encryptionService;
 
     public boolean checkSignature(Map<String, String> headers, Object body, String posId) {
         log.debug("SapoAuthChecker.checkSignature called with posId={}", posId);
@@ -32,7 +36,11 @@ public class SapoAuthChecker {
             return false;
         }
 
-        String clientSecret = sapoConfig.getClientSecret();
+        PosEntity posEntity = generalPosService.getPos(posId);
+        String decryptedConfig = encryptionService.decrypt(posEntity.getConfig());
+        Map<String, String> configMap = PosUtils.convertToConfigMap(decryptedConfig);
+        String clientSecret = configMap.get(SapoConstants.CLIENT_SECRET);
+
         if (ObjectUtils.isEmpty(clientSecret)) {
             log.warn("Client secret not found in SapoConfig for posId={}", posId);
             return false;
@@ -40,7 +48,7 @@ public class SapoAuthChecker {
 
         log.debug("Using client secret for HMAC verification");
 
-        // ✅ Lấy raw body từ filter cache (đã được SapoWebhookFilter lưu sẵn)
+        // Lấy raw body từ filter cache (đã được SapoWebhookFilter lưu sẵn)
         String rawBody = getRawBodyFromRequest();
 
         log.info("Using raw body from filter for HMAC verification");

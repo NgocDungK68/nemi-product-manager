@@ -19,8 +19,6 @@ public class NhanhvnConfig {
     private String urlProducts;
     private String urlOrders;
     private String apiVersion;
-    private String verifyToken;
-    private String secretKey;
     private ProductConfig product;
     private OrderConfig order;
     private SyncConfig sync;

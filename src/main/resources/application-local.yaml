@@ -28,7 +28,7 @@ spring:
   #        format_sql: true
 
 server:
-  port: 5200
+  port: 5201
   error:
     include-stacktrace: never
 
@@ -51,8 +51,6 @@ nhanhvn:
   url-access-token: app/getaccesstoken
   url-products: product/list
   url-orders: order/list
-  verify-token: nemiWebhook123!@#
-  secret-key: NHdyJR8NKO2v8Md7Nwb06o1n0nOAW5YcLBeQs4DdyoLmoXJK8jz6Hf3nQcadBx2m5Ys9kGydcKs0g3Kn94rVgXyU1nhmDtQSZipWJjiHo5A6ffCamfsL81DXUSm9n3AT
   recent-days: 30 # số ngày gần nhất để lấy sản phẩm
   product:
     status:
@@ -86,18 +84,12 @@ nhanhvn:
     batch-size: 100
     page-size: 100
 pancake:
-  secret: elqsF9ERiFWGacWQO9Gg5XC4kXojot
   base-url: https://pos.pages.fm/api/v1
-  api-key: 10b76cf31be245848c8361287cee2adf
   is-sync-all-product: false
   is-sync-all-order: false
   recent-days: 30
   shop-id: 1720119150
   timeout: 30000
-  x-api-key: elqsF9ERiFWGacWQO9Gg5XC4kXojot
-  retry:
-    max-attempts: 3
-    backoff-delay: 2000
   order:
     status:
       mapping:
@@ -124,8 +116,6 @@ pancake:
     page-start: 1
 
 sapo:
-  client-id: 4f7707502a2b4dabb25b2b08e4bf36ba
-  client-secret: 6774cbee20e240a5a527c0497ce283e0
   url: https://nemi-test02.mysapo.net/
   recent-days: 30 # số ngày gần nhất để lấy sản phẩm
   is-sync-all-product: false

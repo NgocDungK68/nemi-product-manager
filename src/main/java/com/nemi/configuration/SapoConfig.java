@@ -13,8 +13,6 @@ import java.util.Optional;
 @Configuration
 @ConfigurationProperties("sapo")
 public class SapoConfig {
-    private String clientId;
-    private String clientSecret;
     private String url;
     private BatchConfig sync;
     private Integer recentDays;
@@ -44,7 +42,6 @@ public class SapoConfig {
         private int batchSize;
     }
     private String baseUrl;
-    private String storeName;
     private Webhook webhook;
     private String urlRegisterWebhook;
     
