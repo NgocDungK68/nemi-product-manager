@@ -1,6 +1,6 @@
 package com.nemi.annotation;
 
-import com.nemi.config.security.SapoWebhookFilter;
+import com.nemi.filter.SapoWebhookFilter;
 import com.nemi.configuration.SapoConfig;
 import com.nemi.constant.SapoConstants;
 import com.nemi.util.JsonUtils;
@@ -40,7 +40,7 @@ public class SapoAuthChecker {
 
         log.debug("Using client secret for HMAC verification");
 
-        // ✅ Lấy raw body từ filter cache (đã được SapoWebhookFilter lưu sẵn)
+        // Lấy raw body từ filter cache (đã được SapoWebhookFilter lưu sẵn)
         String rawBody = getRawBodyFromRequest();
         if (rawBody != null) {
             log.info("Using raw body from filter for HMAC verification");
@@ -75,10 +75,6 @@ public class SapoAuthChecker {
         return null;
     }
 
-    public boolean checkSignature(Map<String, String> headers, String body, String posId) {
-        return checkSignature(headers, (Object) body, posId);
-    }
-
     /**
      * Chuẩn hóa JSON để loại bỏ khác biệt về format giữa "" và null, 0.0 và 0
      */
@@ -86,16 +82,8 @@ public class SapoAuthChecker {
         if (json == null) return "";
 
         String normalized = json;
-        // Chuẩn hóa nội dung JSON trước khi tính HMAC
-        //  Chuyển content rỗng "" -> null
-        normalized = normalized.replace("\"content\":\"\"", "\"content\":null");
-
-        //  Chuyển price 0.0 -> 0
-        normalized = normalized.replace("\"price\":0.0", "\"price\":0");
-
         // Loại bỏ khoảng trắng thừa (phòng trường hợp JSON không chuẩn)
         normalized = normalized.trim();
-
 
         log.debug("Normalized JSON for HMAC: {}", normalized.length() > 200 ? normalized.substring(0, 200) + "..." : normalized);
         return normalized;
