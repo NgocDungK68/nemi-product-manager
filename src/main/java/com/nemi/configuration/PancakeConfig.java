@@ -19,11 +19,9 @@ import java.util.Optional;
 
 public class PancakeConfig {
     private String baseUrl;
-    private String apiKey;
     private String shopId;
     private int timeout;
     private Sync sync;
-    private String xApiKey;
     private Boolean isSyncAllProduct;    // added
     private Boolean isSyncAllOrder;      // added
     private Integer recentDays;          // added
