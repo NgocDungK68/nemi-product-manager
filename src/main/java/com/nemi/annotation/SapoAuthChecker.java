@@ -42,15 +42,9 @@ public class SapoAuthChecker {
 
         // ✅ Lấy raw body từ filter cache (đã được SapoWebhookFilter lưu sẵn)
         String rawBody = getRawBodyFromRequest();
-        if (rawBody != null) {
-            log.info("Using raw body from filter for HMAC verification");
-            return verifyHmac(rawBody, clientSecret, hmacHeader);
-        }
 
-        // Fallback: dùng parsed body (có thể sai format)
-        log.warn("Raw body not found, falling back to parsed body (may fail!)");
-        String normalizedBody = normalizeJson(JsonUtils.toJson(body));
-        return verifyHmac(normalizedBody, clientSecret, hmacHeader);
+        log.info("Using raw body from filter for HMAC verification");
+        return verifyHmac(rawBody, clientSecret, hmacHeader);
     }
 
     /**
@@ -73,32 +67,6 @@ public class SapoAuthChecker {
             log.debug("Could not retrieve raw body from request attributes: {}", e.getMessage());
         }
         return null;
-    }
-
-    public boolean checkSignature(Map<String, String> headers, String body, String posId) {
-        return checkSignature(headers, (Object) body, posId);
-    }
-
-    /**
-     * Chuẩn hóa JSON để loại bỏ khác biệt về format giữa "" và null, 0.0 và 0
-     */
-    private String normalizeJson(String json) {
-        if (json == null) return "";
-
-        String normalized = json;
-        // Chuẩn hóa nội dung JSON trước khi tính HMAC
-        //  Chuyển content rỗng "" -> null
-        normalized = normalized.replace("\"content\":\"\"", "\"content\":null");
-
-        //  Chuyển price 0.0 -> 0
-        normalized = normalized.replace("\"price\":0.0", "\"price\":0");
-
-        // Loại bỏ khoảng trắng thừa (phòng trường hợp JSON không chuẩn)
-        normalized = normalized.trim();
-
-
-        log.debug("Normalized JSON for HMAC: {}", normalized.length() > 200 ? normalized.substring(0, 200) + "..." : normalized);
-        return normalized;
     }
 
     private boolean verifyHmac(String body, String secret, String hmacHeader) {
