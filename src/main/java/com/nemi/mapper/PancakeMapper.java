@@ -56,7 +56,6 @@ public class PancakeMapper {
 
         ProductEntity product = ProductEntity.builder()
                 .posId(posId)
-                .productId(String.valueOf(apiProducts.getId()))
                 .code(apiProducts.getProduct().getDisplayId())
                 .name(apiProducts.getProduct().getName())
                 .productId(apiProducts.getProductId())
@@ -137,6 +136,7 @@ public class PancakeMapper {
                 .shippingFee(apiOrders.getShippingFee())
                 .totalPrice(apiOrders.getTotalPrice())
                 .customerEmail(apiOrders.getBillEmail())
+                .discountAmount(apiOrders.getTotalDiscount())
                 .status(status)
                 .createdBy(userName)
                 .build();
