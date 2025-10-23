@@ -138,6 +138,7 @@ public class PancakeMapper {
                 .customerEmail(apiOrders.getBillEmail())
                 .discountAmount(apiOrders.getTotalDiscount())
                 .status(status)
+                .saleId(apiOrders.getMarketer().getId())
                 .createdBy(userName)
                 .build();
     }

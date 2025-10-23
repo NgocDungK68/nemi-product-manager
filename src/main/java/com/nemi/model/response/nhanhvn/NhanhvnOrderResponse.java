@@ -66,7 +66,7 @@ public class NhanhvnOrderResponse {
         private long returnFromId;
         private long idReturn;
         private long createdById;
-        private long saleId;
+        private int saleId;
         private long technicalStaffId;
         private long packedById;
         private long customerCareId;

@@ -62,6 +62,8 @@ public class OrderEntity extends BaseEntity {
     @JsonProperty("discount_amount")
     private BigDecimal discountAmount;
 
+    @JsonProperty("sale_id")
+    private String saleId;
 }
 
 

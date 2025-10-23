@@ -344,6 +344,7 @@ public class SapoServiceImpl implements PosManagementService {
                 .config(tokenEncryptionService.encrypt(JsonUtils.toJson(configMap)))
                 .expiredTime(null)
                 .companyId(String.valueOf(claimUtil.getCompanyId()))
+                .departmentId(claimUtil.getDepartmentId())
                 .createdBy(claimUtil.getUserName())
                 .build();
 

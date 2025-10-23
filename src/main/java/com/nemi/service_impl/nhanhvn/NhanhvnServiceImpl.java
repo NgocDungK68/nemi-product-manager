@@ -339,6 +339,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 .expiredTime(expiredTime)
                 .webhookToken(encryptionService.encrypt(webhookToken))
                 .companyId(String.valueOf(claimUtil.getCompanyId()))
+                .departmentId(claimUtil.getDepartmentId())
                 .createdBy(claimUtil.getUserName())
                 .build();
 

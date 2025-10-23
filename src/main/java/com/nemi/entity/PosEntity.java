@@ -27,6 +27,9 @@ public class PosEntity extends BaseEntity {
     @Column(name = "company_id", nullable = false)
     private String companyId;
 
+    @Column(name = "department_id", nullable = true)
+    private String departmentId;
+
     @Column(name = "pos_name", nullable = false, length = 100)
     // ten doi tac
     private String posName;

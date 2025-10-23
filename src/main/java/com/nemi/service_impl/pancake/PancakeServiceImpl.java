@@ -100,6 +100,7 @@ public class PancakeServiceImpl implements PosManagementService {
                     .config(encryptionService.encrypt(JsonUtils.toJson(configMap)))
                     .expiredTime(expiredTime)
                     .companyId(String.valueOf(claimUtil.getCompanyId()))
+                    .departmentId(claimUtil.getDepartmentId())
                     .createdBy(claimUtil.getUserName())
                     .webhookToken(encryptionService.encrypt(webhookToken))
                     .build();

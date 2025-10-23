@@ -111,6 +111,7 @@ public class NhanhvnMapper {
                 .shippingFee(apiOrder.getCarrier().getShipFee())
                 .totalPrice(totalProductPrice(apiOrder))
                 .status(status)
+                .saleId(String.valueOf(apiOrder.getInfo().getSaleId()))
                 .updatedBy(username)
                 .build();
     }
