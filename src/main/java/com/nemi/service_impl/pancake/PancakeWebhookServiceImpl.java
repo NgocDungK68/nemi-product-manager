@@ -177,15 +177,15 @@ public class PancakeWebhookServiceImpl implements WebhookService {
 
     private boolean handleProductWebhook(String posId, Object webhookResponse) {
 
-        PancakeProductWebhookRequest pancakeOrderWebhookRequest = JsonUtils.map(webhookResponse, PancakeProductWebhookRequest.class);
-        log.info("[PancakeWebhookServiceImpl.handleOrderUpdate] Received Product Webhook: {}", pancakeOrderWebhookRequest);
+        PancakeProductWebhookRequest pancakeProductWebhookRequest = JsonUtils.map(webhookResponse, PancakeProductWebhookRequest.class);
+        log.info("[PancakeWebhookServiceImpl.handleOrderUpdate] Received Product Webhook: {}", pancakeProductWebhookRequest);
 
         // Convert OrderEntity
 
-        ProductEntity product = convertToProductEntity(posId, pancakeOrderWebhookRequest);
+        ProductEntity product = convertToProductEntity(posId, pancakeProductWebhookRequest);
 
         if (ObjectUtils.isEmpty(product)) {
-            log.error("[PancakeWebhookServiceImpl.handleOrderUpdate] Failed to convert orderData={} to OrderEntity", pancakeOrderWebhookRequest.getId());
+            log.error("[PancakeWebhookServiceImpl.handleOrderUpdate] Failed to convert orderData={} to OrderEntity", pancakeProductWebhookRequest.getId());
             return false;
         }
 
@@ -201,15 +201,15 @@ public class PancakeWebhookServiceImpl implements WebhookService {
                 product.getProductId(), product.getCode());
 
         // Sync variant
-        List<ProductVariantEntity> productVariantEntities = convertToVariantEntities(posId, pancakeOrderWebhookRequest.getVariations());
+        List<ProductVariantEntity> productVariantEntities = convertToVariantEntities(posId, pancakeProductWebhookRequest.getVariations());
 
 
         if (CollectionUtils.isEmpty(productVariantEntities)) {
-            log.error("[PancakeWebhookServiceImpl.handleOrderUpdate] Failed to update order data: {}", pancakeOrderWebhookRequest);
+            log.error("[PancakeWebhookServiceImpl.handleOrderUpdate] Failed to update order data: {}", pancakeProductWebhookRequest);
             return false;
         }
 
-        productVariantRepository.deleteByProductId(pancakeOrderWebhookRequest.getId());
+        productVariantRepository.deleteByProductId(pancakeProductWebhookRequest.getId());
 
         productVariantRepository.saveAll(productVariantEntities);
 
