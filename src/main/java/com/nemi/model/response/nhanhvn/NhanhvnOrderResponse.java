@@ -58,7 +58,7 @@ public class NhanhvnOrderResponse {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class Info {
-        private long id;
+        private String id;
         private int type;
         private int mode;
         private int exportType;

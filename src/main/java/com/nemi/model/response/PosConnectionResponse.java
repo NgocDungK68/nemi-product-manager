@@ -19,12 +19,14 @@ public class PosConnectionResponse {
     private String id;
     private String posName;
     private String status;
-    private String reAuthLink;
+    private Object reAuthMethod;
     private String webhookToken;
     private LocalDateTime expiredTime;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-
+    private String webhookUrl;
+    private String keyValue; //for pancake
+    private String departmentId;
     public static PosConnectionResponse toPosConnectionResponse(PosEntity pos) {
         if (pos == null) {
             return null;
@@ -37,6 +39,7 @@ public class PosConnectionResponse {
                 .expiredTime(pos.getExpiredTime())
                 .createdAt(pos.getCreatedAt())
                 .updatedAt(pos.getUpdatedAt())
+                .departmentId(pos.getDepartmentId())
                 .build();
     }
 
@@ -45,7 +48,7 @@ public class PosConnectionResponse {
                 .id(entity.getId())
                 .posName(entity.getPosName())
                 .status(PosStatus.EXPIRED.name())
-                .reAuthLink(reAuthLink)
+                .reAuthMethod(reAuthLink)
                 .expiredTime(entity.getExpiredTime())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())

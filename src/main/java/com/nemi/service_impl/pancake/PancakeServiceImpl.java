@@ -84,10 +84,9 @@ public class PancakeServiceImpl implements PosManagementService {
     public PosConnectionResponse connectPos(PosConnectionRequest posConnectionRequest) {
         try {
             String userId = claimUtil.getUserId();
+         String departmentId = claimUtil.getDepartmentId();
             Map<String, String> configMap = new HashMap<>();
             configMap.put(PancakeConstatns.SHOP_ID, posConnectionRequest.getShopId());
-
-            LocalDateTime expiredTime = LocalDateTime.now().plusYears(1);
 
             String webhookToken = generalPosService.generateWebhookToken(posConnectionRequest.getShopId());
 
@@ -98,17 +97,24 @@ public class PancakeServiceImpl implements PosManagementService {
                     .status(PosStatus.ACTIVE.name())
                     .accessToken(encryptionService.encrypt(posConnectionRequest.getApiKey()))
                     .config(encryptionService.encrypt(JsonUtils.toJson(configMap)))
-                    .expiredTime(expiredTime)
                     .companyId(String.valueOf(claimUtil.getCompanyId()))
                     .departmentId(claimUtil.getDepartmentId())
                     .createdBy(claimUtil.getUserName())
                     .webhookToken(encryptionService.encrypt(webhookToken))
+                    .departmentId(departmentId)
                     .build();
 
             posRepository.save(posEntityBuilder);
 
+            String webhookUrl = generalPosService.creatWebhookUrl(posEntityBuilder.getId(), PosName.PANCAKE.getValue());
+            String keyValue = generalPosService.creatKeyValueMap(PancakeConstatns.WEBHOOK_TOKEN, webhookToken);
+
             PosConnectionResponse posConnectionResponse = PosConnectionResponse.toPosConnectionResponse(posEntityBuilder);
             posConnectionResponse.setWebhookToken(webhookToken);
+            posConnectionResponse.setWebhookUrl(webhookUrl);
+            posConnectionResponse.setKeyValue(keyValue);
+            posConnectionResponse.setDepartmentId(departmentId);
+
             log.info("Pancake response is {}", posConnectionResponse);
             return posConnectionResponse;
         } catch (Exception e) {
@@ -119,7 +125,7 @@ public class PancakeServiceImpl implements PosManagementService {
 
     @Override
     @Async("syncExecutor")
-    public void syncProduct(String posId) {
+    public void syncProduct(String posId,String departmentId) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
                 .startTime(LocalDateTime.now())
@@ -143,6 +149,8 @@ public class PancakeServiceImpl implements PosManagementService {
 
             List<ProductEntity> allProducts = new ArrayList<>();
             List<ProductVariantEntity> allVariants = new ArrayList<>();
+
+            String userName = claimUtil.getUserName();
 
             while (true) {
 
@@ -171,8 +179,8 @@ public class PancakeServiceImpl implements PosManagementService {
                     request.setPageNumber(request.getPageNumber() + 1);
                 }
 
-                List<ProductEntity> pageProducts = pancakeMapper.convertToProductEntities(posId, response.getData());
-                List<ProductVariantEntity> pageVariants = pancakeMapper.convertToVariantEntities(posId, response.getData());
+                List<ProductEntity> pageProducts = pancakeMapper.convertToProductEntities(posId, response.getData(), userName, departmentId);
+                List<ProductVariantEntity> pageVariants = pancakeMapper.convertToVariantEntities(posId, response.getData(),userName);
 
 
                 allProducts.addAll(pageProducts);
@@ -209,7 +217,7 @@ public class PancakeServiceImpl implements PosManagementService {
 
     @Override
     @Async("syncExecutor")
-    public void syncOrder(String posId) {
+    public void syncOrder(String posId, String departmentId) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
                 .startTime(LocalDateTime.now())
@@ -259,12 +267,11 @@ public class PancakeServiceImpl implements PosManagementService {
                     request.setPageNumber(request.getPageNumber() + 1);
                 }
 
-                List<OrderEntity> pageOrders = pancakeMapper.convertToOrderEntities(posId, response.getData(), userName);
+                List<OrderEntity> pageOrders = pancakeMapper.convertToOrderEntities(posId, response.getData(), userName, departmentId);
                 List<OrderItemEntity> pageOrderItems = pancakeMapper.convertToOrderItemEntities(response.getData(), userName);
 
                 allOrders.addAll(pageOrders);
                 allOrderItems.addAll(pageOrderItems);
-
 
             }
 

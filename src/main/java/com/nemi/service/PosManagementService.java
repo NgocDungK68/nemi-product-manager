@@ -11,6 +11,6 @@ public interface PosManagementService {
      */
     PosConnectionResponse connectPos(PosConnectionRequest posConnectionRequest);
 
-    void syncProduct(String posId );
-    void syncOrder(String posId);
+    void syncProduct(String posId,String departmentId);
+    void syncOrder(String posId,String departmentId);
 }

@@ -10,12 +10,14 @@ import com.nemi.enums.WeightUnit;
 import com.nemi.model.request.nhanhvn.NhanhvnOrderWebhookRequest;
 import com.nemi.model.response.nhanhvn.NhanhvnOrderResponse;
 import com.nemi.model.response.nhanhvn.NhanhvnProductResponse;
+import com.nemi.utils.PosUtils;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -25,10 +27,10 @@ import java.util.Objects;
 public class NhanhvnMapper {
     private final NhanhvnConfig nhanhvnConfig;
 
-    public List<ProductEntity> convertToProductEntities(String posId, List<NhanhvnProductResponse.ProductData> apiProducts, String username) {
+    public List<ProductEntity> convertToProductEntities(String posId, List<NhanhvnProductResponse.ProductData> apiProducts, String username, String departmentId) {
         return apiProducts.stream()
                 .map(apiProduct -> {
-                    ProductEntity productEntity = convertToProductEntity(posId, apiProduct,  username);
+                    ProductEntity productEntity = convertToProductEntity(posId, apiProduct, username, departmentId);
                     if (ObjectUtils.isNotEmpty(productEntity)) productEntity.setCreatedBy(username);
                     return productEntity;
                 })
@@ -36,7 +38,7 @@ public class NhanhvnMapper {
                 .toList();
     }
 
-    public ProductEntity convertToProductEntity(String posId, NhanhvnProductResponse.ProductData apiProduct, String username) {
+    public ProductEntity convertToProductEntity(String posId, NhanhvnProductResponse.ProductData apiProduct, String username, String departmentId) {
         if (!(apiProduct.getParentId()).equals(NhanhvnConstants.PARENT_PRODUCT)) return null;
 
         String status = nhanhvnConfig.getProductStatusMapping(apiProduct.getStatus());
@@ -48,15 +50,16 @@ public class NhanhvnMapper {
                 .name(apiProduct.getName())
                 .status(status)
                 .updatedBy(username)
+                .departmentId(departmentId)
                 .build();
     }
 
     public List<ProductVariantEntity> convertToVariantEntities(String posId,
-                                                                List<NhanhvnProductResponse.ProductData> apiProducts,
-                                                                String username) {
+                                                               List<NhanhvnProductResponse.ProductData> apiProducts,
+                                                               String username) {
         return apiProducts.stream()
                 .map(apiProduct -> {
-                    ProductVariantEntity variantEntity = convertToVariantEntity(posId, apiProduct,  username);
+                    ProductVariantEntity variantEntity = convertToVariantEntity(posId, apiProduct, username);
                     if (ObjectUtils.isNotEmpty(variantEntity)) variantEntity.setCreatedBy(username);
                     return variantEntity;
                 })
@@ -67,6 +70,10 @@ public class NhanhvnMapper {
     public ProductVariantEntity convertToVariantEntity(String posId,
                                                        NhanhvnProductResponse.ProductData apiProduct,
                                                        String username) {
+
+        LocalDateTime createdAt = PosUtils.convertEpochSecondsToVNTime(apiProduct.getCreatedAt());
+        LocalDateTime updatedAt = PosUtils.convertEpochSecondsToVNTime(apiProduct.getUpdatedAt());
+
         if ((apiProduct.getParentId()).equals(NhanhvnConstants.PARENT_PRODUCT)) return null;
         return ProductVariantEntity.builder()
                 .variantId(String.valueOf(apiProduct.getId()))
@@ -80,23 +87,31 @@ public class NhanhvnMapper {
                 .weight(apiProduct.getShipping().getWeight())
                 .weightUnit(WeightUnit.GAM.getValue())
                 .updatedBy(username)
+                .createdAt(createdAt)
+                .updatedAt(updatedAt)
                 .build();
     }
 
     public List<OrderEntity> convertToOrderEntities(String posId,
-                                                     List<NhanhvnOrderResponse.OrderData> apiOrders,
-                                                     String username) {
+                                                    List<NhanhvnOrderResponse.OrderData> apiOrders,
+                                                    String username, String departmentId) {
         return apiOrders.stream()
                 .map(apiOrder -> {
-                    OrderEntity entity = convertToOrderEntity(posId, apiOrder, username);
+                    OrderEntity entity = convertToOrderEntity(posId, apiOrder, username, departmentId);
                     entity.setCreatedBy(username);
                     return entity;
                 })
                 .toList();
     }
 
-    public OrderEntity convertToOrderEntity(String posId, NhanhvnOrderResponse.OrderData apiOrder, String username) {
+    public OrderEntity convertToOrderEntity(String posId, NhanhvnOrderResponse.OrderData apiOrder, String username, String departmentId) {
         String status = nhanhvnConfig.getOrderStatusMapping(apiOrder.getInfo().getStatus());
+
+        Long createdAtEpoch = apiOrder.getInfo().getCreatedAt();
+        Long updatedAtEpoch = apiOrder.getInfo().getUpdatedAt();
+
+        LocalDateTime createdAt = PosUtils.convertEpochSecondsToVNTime(createdAtEpoch);
+        LocalDateTime updatedAt = PosUtils.convertEpochSecondsToVNTime(updatedAtEpoch);
 
         return OrderEntity.builder()
                 .posId(posId)
@@ -104,7 +119,7 @@ public class NhanhvnMapper {
                 .orderCode(apiOrder.getCarrier().getCarrierCode())
                 .customerName(apiOrder.getShippingAddress().getName())
                 .customerEmail(apiOrder.getShippingAddress().getEmail())
-                .customerPhone(apiOrder.getShippingAddress().getMobile())// khi user co du thi them custemer phone va email
+                .customerPhone(apiOrder.getShippingAddress().getMobile())
                 .shippingAddress(apiOrder.getShippingAddress().getAddress())
                 .shippingMethod(apiOrder.getCarrier().getName())
                 .paymentMethod(apiOrder.getPayment().getBusinessPayment().toString())
@@ -113,8 +128,12 @@ public class NhanhvnMapper {
                 .status(status)
                 .saleId(String.valueOf(apiOrder.getInfo().getSaleId()))
                 .updatedBy(username)
+                .createdAt(createdAt)
+                .updatedAt(updatedAt)
+                .departmentId(departmentId)
                 .build();
     }
+
 
     public List<OrderItemEntity> convertToOrderItemEntities(List<NhanhvnOrderResponse.OrderData> apiOrders, String username) {
         return apiOrders.stream()
@@ -124,18 +143,25 @@ public class NhanhvnMapper {
     }
 
     public List<OrderItemEntity> convertToOrderItemEntity(NhanhvnOrderResponse.OrderData apiOrder, String username) {
+
+        LocalDateTime createdAt = PosUtils.convertEpochSecondsToVNTime(apiOrder.getInfo().getCreatedAt());
+        LocalDateTime updatedAt = PosUtils.convertEpochSecondsToVNTime(apiOrder.getInfo().getUpdatedAt());
+
+
         List<OrderItemEntity> orderItemEntities = new ArrayList<>();
         for (NhanhvnOrderResponse.Product product : apiOrder.getProducts()) {
             BigDecimal quantity = BigDecimal.valueOf(product.getQuantity());
             orderItemEntities.add(OrderItemEntity.builder()
                     .orderItemId(String.valueOf(product.getId()))
-                    .orderId(apiOrder.getChannel().getAppOrderId())
+                    .orderId(apiOrder.getInfo().getId())
                     .quantity(product.getQuantity())
                     .sku(product.getImeiId())
                     .price(product.getPrice())
                     .totalPrice(product.getPrice().multiply(quantity))
                     .productName(product.getName())
                     .updatedBy(username)
+                    .createdAt(createdAt)
+                    .updatedAt(updatedAt)
                     .build());
         }
 
@@ -145,6 +171,7 @@ public class NhanhvnMapper {
     //---------------webhook order request---------------------
     public OrderEntity convertToOrderEntity(String posId, NhanhvnOrderWebhookRequest orderWebhookRequest, String username) {
         String status = nhanhvnConfig.getOrderStatusMapping(orderWebhookRequest.getInfo().getStatus());
+
 
         return OrderEntity.builder()
                 .posId(posId)

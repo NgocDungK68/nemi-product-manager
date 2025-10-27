@@ -11,6 +11,7 @@ public class PancakeConstatns {
     public static final String END_DATE_TIME = "endDateTime";
 
     public static final String WEBHOOK_TOKEN = "webhook-token";
+    public static final String PANCAKE_TIME_FORMAT = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS";
 
     private PancakeConstatns() {
     }

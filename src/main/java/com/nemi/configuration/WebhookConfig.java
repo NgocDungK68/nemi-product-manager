@@ -15,6 +15,8 @@ import java.util.Map;
 @ConfigurationProperties(prefix = "webhook")
 public class WebhookConfig {
 
+    private String baseUrl;
+    private String version;
 
     private Map<String, List<String>> allowedIps;
 
@@ -56,6 +58,8 @@ public class WebhookConfig {
 
         return cfg;
     }
+
+
 
 
 }

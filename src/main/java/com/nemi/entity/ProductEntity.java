@@ -1,6 +1,7 @@
 package com.nemi.entity;
 
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -44,4 +45,7 @@ public class ProductEntity extends BaseEntity {
 
     @Column(name = "images", columnDefinition = "TEXT")
     private String images;
+
+    @JsonProperty("department_id")
+    private String departmentId;
 }

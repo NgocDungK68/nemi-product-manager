@@ -7,7 +7,9 @@ import com.nemi.model.response.PosConnectionResponse;
 import com.nemi.model.response.StatusResponse;
 import com.nemi.service.GeneralPosService;
 import com.nemi.service.PosManagementService;
+import com.nemi.service.ReAuthService;
 import com.nemi.service.factory.PosManagementFactory;
+import com.nemi.service.factory.ReAuthPosFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,6 +22,7 @@ import java.util.List;
 public class PosManagementController {
     private final PosManagementFactory posManagementFactory;
     private final GeneralPosService generalPosService;
+    private final ReAuthPosFactory reAuthPosFactory;
 
     // POS-specific endpoints (require posName)
     @PostMapping("/{posName}/pos")
@@ -27,8 +30,8 @@ public class PosManagementController {
                                                             @RequestBody PosConnectionRequest posConnectionRequest) {
         PosManagementService posManagementService = posManagementFactory.getPosName(posName);
         PosConnectionResponse posConnectionResponse = posManagementService.connectPos(posConnectionRequest);
-        posManagementService.syncProduct(posConnectionResponse.getId());
-        posManagementService.syncOrder(posConnectionResponse.getId());
+        posManagementService.syncProduct(posConnectionResponse.getId(),posConnectionResponse.getDepartmentId());
+        posManagementService.syncOrder(posConnectionResponse.getId(),posConnectionResponse.getDepartmentId());
 
         return ResponseEntity.ok(posConnectionResponse);
     }
@@ -36,6 +39,7 @@ public class PosManagementController {
     // Common endpoints (no posName needed - cleaner API)
     @GetMapping("/pos")
     public ResponseEntity<List<PosConnectionResponse>> listAllPos() {
+
         List<PosConnectionResponse> listPosConnection = generalPosService.getAllPos();
         return ResponseEntity.ok(listPosConnection);
     }
@@ -57,8 +61,8 @@ public class PosManagementController {
     public ResponseEntity<PosConnectionResponse> manualSync(@PathVariable String posId,@RequestParam( defaultValue = "false") boolean isSyncAll) {
         PosEntity posEntity = generalPosService.getPos(posId);
         PosManagementService posManagementService = posManagementFactory.getPosName(posEntity.getPosName());
-        posManagementService.syncProduct(posId);
-        posManagementService.syncOrder(posId);
+        posManagementService.syncProduct(posId,posEntity.getDepartmentId());
+        posManagementService.syncOrder(posId,posEntity.getDepartmentId());
         return ResponseEntity.ok(PosConnectionResponse.toPosConnectionResponse(posEntity));
     }
 }

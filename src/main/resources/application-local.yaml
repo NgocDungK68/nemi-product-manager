@@ -179,6 +179,8 @@ logging:
 
 
 webhook:
+  base-url: https://nemi-dev-02.ecombase.net/nemi-product-manager/webhook
+  version: v1
   allowed-ips:
     nhanhvn:
       - 34.80.130.93

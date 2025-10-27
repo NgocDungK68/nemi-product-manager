@@ -93,7 +93,8 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
             }
 
-            String userId = claimUtil.getUserId();
+            String departmentId = claimUtil.getDepartmentId();
+
             Map<String, String> configMap = buildConfigMap(posConnectionRequest);
             LocalDateTime expiredTime = Instant.ofEpochSecond(tokenResponse.getData().getExpiredAt())
                     .atZone(ZoneId.systemDefault())
@@ -101,10 +102,16 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
             String webhookToken = generalPosService.generateWebhookToken(posConnectionRequest.getBusinessId());
 
+             String connectUrl = generalPosService.buildReAuthLink(configMap);
 
-            PosEntity newPos = createNewPos(tokenResponse, configMap, expiredTime, webhookToken);
+            PosEntity newPos = createNewPos(tokenResponse, configMap, expiredTime, webhookToken, connectUrl);
+
+            String webhookUrl = generalPosService.creatWebhookUrl(newPos.getId(), PosName.NHANHVN.getValue());
+
             PosConnectionResponse posConnectionResponse = PosConnectionResponse.toPosConnectionResponse(newPos);
+            posConnectionResponse.setWebhookUrl(webhookUrl);
             posConnectionResponse.setWebhookToken(webhookToken);
+            posConnectionResponse.setDepartmentId(departmentId);
 
             log.info("[NhanhvnServiceImpl.connectPos] Connected successfully: {}", newPos.getId());
             return posConnectionResponse;
@@ -116,7 +123,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
     @Override
     @Async("syncExecutor")
-    public void syncProduct(String posId) {
+    public void syncProduct(String posId,String departmentId) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
                 .startTime(LocalDateTime.now())
@@ -181,7 +188,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 }
 
                 // product
-                List<ProductEntity> pageProducts = nhanhvnMapper.convertToProductEntities(posId, response.getData(), username);
+                List<ProductEntity> pageProducts = nhanhvnMapper.convertToProductEntities(posId, response.getData(), username,departmentId);
                 allProducts.addAll(pageProducts);
                 log.info("[NhanhvnServiceImpl.syncProduct] Fetched {} products, total so far: {}", pageProducts.size(), allProducts.size());
 
@@ -220,7 +227,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
     @Override
     @Async("syncExecutor")
-    public void syncOrder(String posId) {
+    public void syncOrder(String posId,String departmentId) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
                 .startTime(LocalDateTime.now())
@@ -278,7 +285,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 }
 
                 // order
-                List<OrderEntity> pageOrders = nhanhvnMapper.convertToOrderEntities(posId, response.getData(), username);
+                List<OrderEntity> pageOrders = nhanhvnMapper.convertToOrderEntities(posId, response.getData(), username,departmentId);
                 allOrders.addAll(pageOrders);
                 log.info("[NhanhvnServiceImpl.syncOrder] Fetched {} orders, total so far: {}", pageOrders.size(), pageOrders.size());
 
@@ -326,7 +333,8 @@ public class NhanhvnServiceImpl implements PosManagementService {
     private PosEntity createNewPos(NhanhvnAccessTokenResponse tokenResponse,
                                    Map<String, String> configMap,
                                    LocalDateTime expiredTime,
-                                   String webhookToken) {
+                                   String webhookToken,
+                                   String urlConnect) {
         // Encrypt access token before storing
         String encryptedToken = encryptionService.encrypt(tokenResponse.getData().getAccessToken());
 
@@ -341,6 +349,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 .companyId(String.valueOf(claimUtil.getCompanyId()))
                 .departmentId(claimUtil.getDepartmentId())
                 .createdBy(claimUtil.getUserName())
+                .urlConnect(urlConnect)
                 .build();
 
         return posRepository.save(newPos);

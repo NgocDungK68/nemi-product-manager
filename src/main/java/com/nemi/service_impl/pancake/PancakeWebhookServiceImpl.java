@@ -23,6 +23,7 @@ import com.nemi.repository.ProductVariantRepository;
 import com.nemi.repository.WebhookHistoryRepository;
 import com.nemi.service.WebhookService;
 import com.nemi.util.JsonUtils;
+import com.nemi.utils.PosUtils;
 import io.jsonwebtoken.lang.Objects;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -56,6 +59,7 @@ public class PancakeWebhookServiceImpl implements WebhookService {
     private final WebhookHistoryRepository webhookHistoryRepository;
     private final ProductVariantRepository productVariantRepository;
     private final ProductRepository productRepository;
+
 
 
     @Override
@@ -113,11 +117,6 @@ public class PancakeWebhookServiceImpl implements WebhookService {
         return switch (event) {
             case ORDER -> handleOrderWebhook(posId, body);
             case PRODUCT -> handleProductWebhook(posId, body);
-//            case ORDER_DELETE -> handleOrderWebhook(posId, request); luc nao cx update
-            default -> {
-                log.warn("[PancakeWebhookServiceImpl.handleEvent] Unsupported webhook type: {}", event);
-                yield false;
-            }
         };
     }
 
@@ -127,9 +126,6 @@ public class PancakeWebhookServiceImpl implements WebhookService {
      * - Có thể gồm nhiều history/status_history
      */
     private boolean handleOrderWebhook(String posId, Object webhookResponse) {
-
-//        PancakeOrderWebhookRequest pancakeOrderWebhookRequest = JsonUtils.map(webhookResponse, PancakeOrderWebhookRequest.class);
-//        log.info("[PancakeWebhookServiceImpl.handleOrderUpdate] Received Order Webhook: {}", pancakeOrderWebhookRequest);
 
         PancakeOrderResponse.DataItem orderData = objectMapper.convertValue(
                 webhookResponse, PancakeOrderResponse.DataItem.class
@@ -174,6 +170,7 @@ public class PancakeWebhookServiceImpl implements WebhookService {
 
         return true;
     }
+
 
     private boolean handleProductWebhook(String posId, Object webhookResponse) {
 
@@ -224,6 +221,8 @@ public class PancakeWebhookServiceImpl implements WebhookService {
                         .collect(Collectors.joining(",")))
                 .orElse(null);
 
+        LocalDateTime insertedAt =  PosUtils.pancakeParseTime(pancakeOrderWebhookRequest.getInsertedAt());
+
 
         ProductEntity product = ProductEntity.builder()
                 .posId(posId)
@@ -231,6 +230,7 @@ public class PancakeWebhookServiceImpl implements WebhookService {
                 .code(pancakeOrderWebhookRequest.getDisplayId())
                 .name(pancakeOrderWebhookRequest.getName())
                 .description(pancakeOrderWebhookRequest.getNoteProduct())
+                .createdAt(insertedAt)
                 .build();
 
         Boolean isRemoved = pancakeOrderWebhookRequest.getIsRemoved();
@@ -295,6 +295,14 @@ public class PancakeWebhookServiceImpl implements WebhookService {
                 .map(PancakeOrderResponse.Partner::getExtendCode)
                 .orElse(null);
 
+        String saleId = Optional.ofNullable(apiOrders.getMarketer())
+                .map(marketer -> String.valueOf(marketer.getId()))
+                .orElse(null);
+
+
+        LocalDateTime insertedAt =  PosUtils.pancakeParseTime(apiOrders.getInsertedAt());
+        LocalDateTime updatedAt =  PosUtils.pancakeParseTime(apiOrders.getUpdatedAt());
+
         return OrderEntity.builder()
                 .posId(posId)
                 .orderId(String.valueOf(apiOrders.getId()))
@@ -309,6 +317,9 @@ public class PancakeWebhookServiceImpl implements WebhookService {
                 .customerEmail(apiOrders.getBillEmail())
                 .discountAmount(apiOrders.getTotalDiscount())
                 .updatedBy(PosName.WEBHOOK.getValue())
+                .saleId(saleId)
+                .createdAt(insertedAt)
+                .updatedAt(updatedAt)
                 .build();
     }
 

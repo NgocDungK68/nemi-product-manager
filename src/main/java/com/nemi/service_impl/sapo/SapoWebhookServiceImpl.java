@@ -297,7 +297,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
             }
 
             // Tạo order mới
-            OrderEntity order = sapoMapper.convertToOrderEntity(posId, payload, "webhook");
+            OrderEntity order = sapoMapper.convertToOrderEntity(posId, payload, "webhook",null);
             log.info("Creating new Sapo order: {}", externalOrderId);
             orderRepository.save(order);
 

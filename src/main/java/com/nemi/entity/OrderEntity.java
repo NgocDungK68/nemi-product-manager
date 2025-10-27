@@ -64,6 +64,9 @@ public class OrderEntity extends BaseEntity {
 
     @JsonProperty("sale_id")
     private String saleId;
+
+    @JsonProperty("department_id")
+    private String departmentId;
 }
 
 

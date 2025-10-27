@@ -36,7 +36,6 @@ import com.nemi.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ObjectUtils;
-import org.springframework.http.HttpHeaders;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -161,7 +160,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
                     return false;
                 }
 
-                ProductEntity parentEntity = nhanhvnMapper.convertToProductEntity(posId, parentOfVariant, PosName.WEBHOOK.getValue());
+                ProductEntity parentEntity = nhanhvnMapper.convertToProductEntity(posId, parentOfVariant, PosName.WEBHOOK.getValue(), null);
                 parentEntity.setCreatedBy(parentOfVariantEntity.get().getCreatedBy());
                 productRepository.save(parentEntity);
                 log.info("[NhanhvnWebhookServiceImpl.handleProductAdd] Converted variant with id={} to product", parentEntity.getProductId());
@@ -193,7 +192,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
         }
 
         if ((productData.getParentId()).equals(NhanhvnConstants.PARENT_PRODUCT)) {   // Trường hợp call về body sản phẩm cha
-            ProductEntity productEntity = nhanhvnMapper.convertToProductEntity(posId, productData, PosName.WEBHOOK.getValue());
+            ProductEntity productEntity = nhanhvnMapper.convertToProductEntity(posId, productData, PosName.WEBHOOK.getValue(), null);
             productRepository.save(productEntity);
             log.info("[NhanhvnWebhookServiceImpl.handleProductUpdate] Successfully update 1 product with id={}", productEntity.getProductId());
             return true;
@@ -238,7 +237,7 @@ public class NhanhvnWebhookServiceImpl implements WebhookService {
                     return false;
                 }
 
-                ProductEntity parentProductEntity = nhanhvnMapper.convertToProductEntity(posId, parentProduct, PosName.WEBHOOK.getValue());
+                ProductEntity parentProductEntity = nhanhvnMapper.convertToProductEntity(posId, parentProduct, PosName.WEBHOOK.getValue(), null);
                 parentProductEntity.setCreatedBy(parentOfVariantEntity.get().getCreatedBy());
                 productRepository.save(parentProductEntity);
                 log.info("[NhanhvnWebhookServiceImpl.handleProductUpdate] Converted variant with id={} to product", parentProductEntity.getProductId());

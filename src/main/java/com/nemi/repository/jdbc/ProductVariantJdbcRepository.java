@@ -37,37 +37,42 @@ public class ProductVariantJdbcRepository extends BaseBatchRepository<ProductVar
     @Override
     protected String getSql() {
         return """
-                INSERT INTO product_manager.product_variant (
-                    variant_id,
-                    pos_id,
-                    product_id,
-                    sku,
-                    barcode,
-                    price,
-                    inventory_quantity,
-                    fulfillable_quantity,
-                    weight,
-                    weight_unit,
-                    attributes,
-                    warehouse_quantities
-                )
-                VALUES (
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-                )
-                ON CONFLICT (variant_id, pos_id)
-                DO UPDATE SET
-                    product_id           = EXCLUDED.product_id,
-                    sku                  = EXCLUDED.sku,
-                    barcode              = EXCLUDED.barcode,
-                    price                = EXCLUDED.price,
-                    inventory_quantity   = EXCLUDED.inventory_quantity,
-                    fulfillable_quantity = EXCLUDED.fulfillable_quantity,
-                    weight               = EXCLUDED.weight,
-                    weight_unit          = EXCLUDED.weight_unit,
-                    attributes           = EXCLUDED.attributes,
-                    warehouse_quantities = EXCLUDED.warehouse_quantities;
-                """;
+            INSERT INTO product_manager.product_variant (
+                variant_id,
+                pos_id,
+                product_id,
+                sku,
+                barcode,
+                price,
+                inventory_quantity,
+                fulfillable_quantity,
+                weight,
+                weight_unit,
+                attributes,
+                warehouse_quantities,
+                created_at,
+                updated_at
+            )
+            VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            )
+            ON CONFLICT (variant_id, pos_id)
+            DO UPDATE SET
+                product_id           = EXCLUDED.product_id,
+                sku                  = EXCLUDED.sku,
+                barcode              = EXCLUDED.barcode,
+                price                = EXCLUDED.price,
+                inventory_quantity   = EXCLUDED.inventory_quantity,
+                fulfillable_quantity = EXCLUDED.fulfillable_quantity,
+                weight               = EXCLUDED.weight,
+                weight_unit          = EXCLUDED.weight_unit,
+                attributes           = EXCLUDED.attributes,
+                warehouse_quantities = EXCLUDED.warehouse_quantities,
+                created_at           = EXCLUDED.created_at,
+                updated_at           = EXCLUDED.updated_at;
+            """;
     }
+
 
 
     @Override
@@ -84,6 +89,8 @@ public class ProductVariantJdbcRepository extends BaseBatchRepository<ProductVar
         ps.setString(10, productVariantEntity.getWeightUnit());
         ps.setString(11, productVariantEntity.getAttributes());
         ps.setString(12, productVariantEntity.getWarehouseQuantities());
+        ps.setObject(13, productVariantEntity.getCreatedAt());
+        ps.setObject(14, productVariantEntity.getUpdatedAt());
     }
 
 //    public void insertProductsVariantParallel(List<ProductVariantEntity> products) {
