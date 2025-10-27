@@ -11,4 +11,5 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class StatusResponse {
     private String status;
+    private String type;
 }

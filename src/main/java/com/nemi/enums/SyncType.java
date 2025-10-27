@@ -4,8 +4,8 @@ import lombok.Getter;
 
 @Getter
 public enum SyncType {
-    ORDER("order and order_item"),
-    PRODUCT("product and product_variant")
+    ORDER("ORDER"),
+    PRODUCT("PRODUCT")
     ;
 
     private final String value;
