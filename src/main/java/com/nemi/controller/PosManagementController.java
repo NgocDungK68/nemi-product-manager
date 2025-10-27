@@ -1,16 +1,25 @@
 package com.nemi.controller;
 
 import com.nemi.entity.PosEntity;
+import com.nemi.enums.Status;
+import com.nemi.exception.TechnicalAlertCode;
+import com.nemi.exception.TechnicalException;
+import com.nemi.exception.ValidationException;
+import com.nemi.exception.pojo.AlertMessages;
+import com.nemi.exception.pojo.IAlertCode;
 import com.nemi.model.request.ChangeStatusRequest;
 import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.response.PosConnectionResponse;
 import com.nemi.model.response.StatusResponse;
+import com.nemi.repository.PosRepository;
 import com.nemi.service.GeneralPosService;
 import com.nemi.service.PosManagementService;
 import com.nemi.service.ReAuthService;
 import com.nemi.service.factory.PosManagementFactory;
 import com.nemi.service.factory.ReAuthPosFactory;
+import com.nemi.util.ClaimUtil;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,12 +31,18 @@ import java.util.List;
 public class PosManagementController {
     private final PosManagementFactory posManagementFactory;
     private final GeneralPosService generalPosService;
-    private final ReAuthPosFactory reAuthPosFactory;
+    private final PosRepository posRepository;
+    private final ClaimUtil claimUtil;
 
     // POS-specific endpoints (require posName)
     @PostMapping("/{posName}/pos")
     public ResponseEntity<PosConnectionResponse> connectPos(@PathVariable String posName,
                                                             @RequestBody PosConnectionRequest posConnectionRequest) {
+        PosEntity posEntity = posRepository.findByUserIdAndPosName(claimUtil.getUserId(), posName);
+        if (ObjectUtils.isNotEmpty(posEntity) && Status.ACTIVE.getValue().equals(posEntity.getStatus())) {
+            throw  new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_ALREADY_CONNECTED));
+        }
+
         PosManagementService posManagementService = posManagementFactory.getPosName(posName);
         PosConnectionResponse posConnectionResponse = posManagementService.connectPos(posConnectionRequest);
         posManagementService.syncProduct(posConnectionResponse.getId(),posConnectionResponse.getDepartmentId());
