@@ -84,7 +84,7 @@ public class PancakeServiceImpl implements PosManagementService {
     public PosConnectionResponse connectPos(PosConnectionRequest posConnectionRequest) {
         try {
             String userId = claimUtil.getUserId();
-         String departmentId = claimUtil.getDepartmentId();
+            String departmentId = claimUtil.getDepartmentId();
             Map<String, String> configMap = new HashMap<>();
             configMap.put(PancakeConstatns.SHOP_ID, posConnectionRequest.getShopId());
 
@@ -103,7 +103,6 @@ public class PancakeServiceImpl implements PosManagementService {
                     .webhookToken(encryptionService.encrypt(webhookToken))
                     .departmentId(departmentId)
                     .build();
-
             posRepository.save(posEntityBuilder);
 
             String webhookUrl = generalPosService.creatWebhookUrl(posEntityBuilder.getId(), PosName.PANCAKE.getValue());
@@ -125,7 +124,7 @@ public class PancakeServiceImpl implements PosManagementService {
 
     @Override
     @Async("syncExecutor")
-    public void syncProduct(String posId,String departmentId) {
+    public void syncProduct(String posId, String departmentId) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
                 .startTime(LocalDateTime.now())
@@ -180,7 +179,7 @@ public class PancakeServiceImpl implements PosManagementService {
                 }
 
                 List<ProductEntity> pageProducts = pancakeMapper.convertToProductEntities(posId, response.getData(), userName, departmentId);
-                List<ProductVariantEntity> pageVariants = pancakeMapper.convertToVariantEntities(posId, response.getData(),userName);
+                List<ProductVariantEntity> pageVariants = pancakeMapper.convertToVariantEntities(posId, response.getData(), userName);
 
 
                 allProducts.addAll(pageProducts);

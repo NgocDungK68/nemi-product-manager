@@ -39,6 +39,7 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -104,7 +105,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
              String connectUrl = generalPosService.buildReAuthLink(configMap);
 
-            PosEntity newPos = createNewPos(tokenResponse, configMap, expiredTime, webhookToken, connectUrl);
+            PosEntity newPos = createNewPos(tokenResponse, configMap, expiredTime, webhookToken, connectUrl,posConnectionRequest.getPosId());
 
             String webhookUrl = generalPosService.creatWebhookUrl(newPos.getId(), PosName.NHANHVN.getValue());
 
@@ -334,7 +335,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
                                    Map<String, String> configMap,
                                    LocalDateTime expiredTime,
                                    String webhookToken,
-                                   String urlConnect) {
+                                   String urlConnect, String posId) {
         // Encrypt access token before storing
         String encryptedToken = encryptionService.encrypt(tokenResponse.getData().getAccessToken());
 
@@ -351,6 +352,9 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 .createdBy(claimUtil.getUserName())
                 .urlConnect(urlConnect)
                 .build();
+        if(StringUtils.isNotEmpty(posId)){
+            newPos.setId(posId);
+        }
 
         return posRepository.save(newPos);
     }
