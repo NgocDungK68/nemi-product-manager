@@ -6,10 +6,11 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
-@Builder
-@NoArgsConstructor
 @AllArgsConstructor
-public class StatusResponse {
-    private String status;
-    private String type;
+@NoArgsConstructor
+@Builder
+public class ProductBasicResponse {
+    private String id;
+    private String name;
+    private String image;
 }

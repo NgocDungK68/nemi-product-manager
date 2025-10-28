@@ -9,7 +9,7 @@ import com.nemi.exception.pojo.IAlertCode;
  * Các loại lỗi, thuộc về Validation
  */
 public enum ValidationAlertCode implements IAlertCode {
-    ARGUMENT_TYPE_MISMATCH("400001", "Thiếu tham số", AlertType.ERROR),
+    POS_ALREADY_CONNECTED("400001", "Pos đã được connect", AlertType.ERROR),
     ARGUMENT_FIELD_INVALID("400002", "Tham số không hợp lệ", AlertType.ERROR),
     DATA_INVALID("400003", "Giá trị đầu vào không hợp lệ", AlertType.ERROR),
     EMAIL_EXISTED("400004", "Email đã tồn tại", AlertType.ERROR),

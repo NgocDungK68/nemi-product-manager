@@ -1,6 +1,5 @@
 package com.nemi.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.configuration.NhanhvnConfig;
 import com.nemi.configuration.WebhookConfig;
@@ -18,12 +17,10 @@ import com.nemi.repository.PosRepository;
 import com.nemi.repository.SyncHistoryRepository;
 import com.nemi.service.factory.ReAuthPosFactory;
 import com.nemi.util.ClaimUtil;
-import com.nemi.util.JsonUtils;
-import com.nemi.utils.PosUtils;
 import io.jsonwebtoken.lang.Objects;
-import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -44,17 +41,27 @@ public abstract class AbstractPosManagementService {
     protected final ClaimUtil claimUtil;
     protected final SyncHistoryRepository syncHistoryRepository;
     protected final ObjectMapper objectMapper;
-    protected final NhanhvnConfig  nhanhvnConfig;
-    private  final WebhookConfig webhookConfig;
+    protected final NhanhvnConfig nhanhvnConfig;
+    private final WebhookConfig webhookConfig;
     private final ReAuthPosFactory reAuthPosFactory;
 
     /**
      * Get POS status by ID
      */
-    public StatusResponse getPosStatus(String posId) {
-        SyncHistoryEntity syncHistoryEntity = syncHistoryRepository.findByPosId(posId)
-                .orElseThrow(() -> new TechnicalException(AlertMessages.alert(TechnicalAlertCode.SYNC_HISTORY_NOT_FOUND)));
-        return new StatusResponse(syncHistoryEntity.getSyncStatus());
+    public List<StatusResponse> getPosStatus(String posId) {
+        List<SyncHistoryEntity> histories = syncHistoryRepository.findAllByPosId(posId);
+        if (CollectionUtils.isEmpty(histories)) {
+            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.SYNC_HISTORY_NOT_FOUND));
+        }
+
+        return histories.stream()
+                .map(h -> {
+                    StatusResponse resp = new StatusResponse();
+                    resp.setStatus(h.getSyncStatus());
+                    resp.setType(h.getSyncType());
+                    return resp;
+                })
+                .collect(Collectors.toList());
     }
 
     /**
@@ -178,7 +185,7 @@ public abstract class AbstractPosManagementService {
         return posEntity.getExpiredTime().isBefore(LocalDateTime.now());
     }
 
-    public String buildReAuthLink(Map<String,String> configMap) {
+    public String buildReAuthLink(Map<String, String> configMap) {
         try {
 
             String appId = configMap.get(NhanhvnConstants.APP_ID);
@@ -200,10 +207,12 @@ public abstract class AbstractPosManagementService {
             throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.JSON_PARSE_ERROR));
         }
     }
-    public String generateWebhookToken(String shopId){
-        String rawData =  shopId + ":" + System.currentTimeMillis();
+
+    public String generateWebhookToken(String shopId) {
+        String rawData = shopId + ":" + System.currentTimeMillis();
         return Base64.getEncoder().encodeToString(rawData.getBytes());
     }
+
     public String creatWebhookUrl(String posId, String partner) {
         return UriComponentsBuilder
                 .fromHttpUrl(webhookConfig.getBaseUrl()) // https://nemi-dev-02.ecombase.net/nemi-product-manager
@@ -213,11 +222,9 @@ public abstract class AbstractPosManagementService {
                 .toUriString();
     }
 
-    public String creatKeyValueMap(String key, String value){
-        return  key + ":" + value;
+    public String creatKeyValueMap(String key, String value) {
+        return key + ":" + value;
     }
-
-
 
 
 }
