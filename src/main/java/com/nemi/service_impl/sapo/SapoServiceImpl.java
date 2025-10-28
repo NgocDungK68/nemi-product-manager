@@ -135,6 +135,7 @@ public class SapoServiceImpl implements PosManagementService {
                 .startTime(LocalDateTime.now())
                 .syncStatus(PosStatus.FAIL.name())
                 .syncType(SyncType.PRODUCT.getValue())
+                .posName(PosName.SAPO.getValue())
                 .build();
         try {
             String username = claimUtil.getUserName();
@@ -156,7 +157,7 @@ public class SapoServiceImpl implements PosManagementService {
             );
 
             if (isInvalidRequest(request)) {
-                syncHistoryRepository.save(toSyncHistory(history, (SyncErrorMessage.MISSING_CONFIG), false));
+                syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.MISSING_CONFIG.getMessage(), false));
                 log.error("[NhanhvnServiceImpl.syncProduct] Missing required config for posId={}", posId);
                 return;
             }
@@ -179,7 +180,7 @@ public class SapoServiceImpl implements PosManagementService {
                 // Check if API response is present
                 if (responseOpt.isEmpty()) {
                     log.error("[SapoServiceImpl.syncProduct] API returned empty response");
-                    syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
+                    syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR.getMessage(), false));
                     return;
                 }
 
@@ -224,26 +225,15 @@ public class SapoServiceImpl implements PosManagementService {
 
             // Chờ cả hai xong
             CompletableFuture.allOf(saveProductsFuture, saveVariantsFuture).join();
-            syncHistoryRepository.save(toSyncHistory(history, null, true));
+            syncHistoryRepository.save(generalPosService.toSyncHistory(history, null, true));
 
             log.info("Successfully synced {} products and {} variants from Sapo", allProducts.size(), allVariants.size());
         } catch (Exception e) {
             log.error("Failed to sync Sapo data - {}", e.getMessage(), e);
-            syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
+            syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR.getMessage(), false));
         }
     }
 
-
-    private SyncHistoryEntity toSyncHistory(SyncHistoryEntity syncHistoryEntity, SyncErrorMessage syncErrorMessage, Boolean isSyncSuccess) {
-        if (Boolean.FALSE.equals(isSyncSuccess)) {
-            syncHistoryEntity.setEndTime(LocalDateTime.now());
-            syncHistoryEntity.setErrorMessage(syncErrorMessage != null ? syncErrorMessage.getMessage() : null);
-            return syncHistoryEntity;
-        }
-        syncHistoryEntity.setSyncStatus(PosStatus.SUCCESS.name());
-        syncHistoryEntity.setEndTime(LocalDateTime.now());
-        return syncHistoryEntity;
-    }
 
 
     @Override
@@ -253,6 +243,7 @@ public class SapoServiceImpl implements PosManagementService {
                 .startTime(LocalDateTime.now())
                 .syncStatus(PosStatus.FAIL.name())
                 .syncType(SyncType.ORDER.getValue())
+                .posName(PosName.SAPO.getValue())
                 .build();
         try {
             PosEntity posEntity = generalPosService.getPos(posId);
@@ -271,7 +262,7 @@ public class SapoServiceImpl implements PosManagementService {
             );
 
             if (isInvalidRequest(request)) {
-                syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.MISSING_CONFIG, false));
+                syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.MISSING_CONFIG.getMessage(), false));
                 log.error("Missing required config for posId={}", posId);
                 return;
             }
@@ -289,7 +280,7 @@ public class SapoServiceImpl implements PosManagementService {
             while (true) {
                 Optional<SapoOrderResponse> responseOpt = sapoClient.getOrders(request);
                 if (ObjectUtils.isEmpty(responseOpt)) {
-                    syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.ORDER_CONNECTION_FAILED, false));
+                    syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.ORDER_CONNECTION_FAILED.getMessage(), false));
                     log.error("No response from Sapo API when fetching orders, posId={}", posId);
                     break;
                 }
@@ -322,12 +313,12 @@ public class SapoServiceImpl implements PosManagementService {
                     generalPosService.saveAllAsync(allOrderItems, batchSize, orderItemRepository, PosConstants.ORDER_ITEM);
 
             CompletableFuture.allOf(saveOrdersFuture, saveOrderItemsFuture).join();
-            syncHistoryRepository.save(toSyncHistory(history, null, true));
+            syncHistoryRepository.save(generalPosService.toSyncHistory(history, null, true));
 
             log.info("Successfully synced {} order items from Pancake", allOrderItems.size());
         } catch (Exception e) {
             log.error("Failed to sync Pancake orders - {}", e.getMessage(), e);
-            syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.ORDER_TECHNICAL_ERROR, false));
+            syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.ORDER_TECHNICAL_ERROR.getMessage(), false));
         }
     }
 

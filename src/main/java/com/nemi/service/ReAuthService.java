@@ -7,7 +7,6 @@ import java.util.Map;
 public interface ReAuthService {
     String getPosName();
 
-    boolean isAccessTokenExpired(PosEntity posEntity);
 
     public String getReAuthLink(String posId);
 }

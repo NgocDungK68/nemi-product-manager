@@ -226,5 +226,16 @@ public abstract class AbstractPosManagementService {
         return key + ":" + value;
     }
 
+    public SyncHistoryEntity toSyncHistory(SyncHistoryEntity syncHistoryEntity, String syncErrorMessage, Boolean isSyncSuccess) {
+        if (Boolean.FALSE.equals(isSyncSuccess)) {
+            syncHistoryEntity.setEndTime(LocalDateTime.now());
+            syncHistoryEntity.setErrorMessage(syncErrorMessage);
+            return syncHistoryEntity;
+        }
+        syncHistoryEntity.setSyncStatus(PosStatus.SUCCESS.name());
+        syncHistoryEntity.setEndTime(LocalDateTime.now());
+        return syncHistoryEntity;
+    }
+
 
 }

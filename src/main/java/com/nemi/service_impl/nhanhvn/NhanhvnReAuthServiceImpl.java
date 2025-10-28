@@ -31,13 +31,6 @@ public class NhanhvnReAuthServiceImpl implements ReAuthService {
         return PosName.NHANHVN.getValue();
     }
 
-    @Override
-    public boolean isAccessTokenExpired(PosEntity posEntity) {
-        if (Objects.isEmpty(posEntity.getExpiredTime())) {
-            return false;
-        }
-        return posEntity.getExpiredTime().isBefore(LocalDateTime.now());
-    }
 
     public String getReAuthLink(String posId) {
         PosEntity pos = posRepository.findById(posId).orElseThrow(() ->

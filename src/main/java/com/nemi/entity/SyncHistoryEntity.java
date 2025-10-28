@@ -38,5 +38,8 @@ public class SyncHistoryEntity {
     @Column(name = "sync_type",length = 50)
     private String syncType;
 
+    @Column(name = "pos_name")
+    private String posName;
+
 
 }

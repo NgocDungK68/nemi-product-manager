@@ -130,6 +130,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 .startTime(LocalDateTime.now())
                 .syncStatus(PosStatus.FAIL.name())
                 .syncType(SyncType.PRODUCT.getValue())
+                .posName(PosName.NHANHVN.getValue())
                 .build();
         try {
             String username = claimUtil.getUserName();
@@ -154,7 +155,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
             request.setFilters(filters);
 
             if (isInvalidRequest(request)) {
-                syncHistoryRepository.save(toSyncHistory(history, (SyncErrorMessage.MISSING_CONFIG), false));
+                syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.MISSING_CONFIG.getMessage(), false));
                 log.error("[NhanhvnServiceImpl.syncProduct] Missing required config for posId={}", posId);
                 return;
             }
@@ -171,10 +172,9 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 Optional<NhanhvnProductResponse> responseOpt = nhanhvnClient.getProducts(request);
 
                 if (responseOpt.isEmpty()) {
-                    syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
+                    syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.PRODUCT_CONNECTION_FAILED.getMessage(), false));
                     log.error("[NhanhvnServiceImpl.syncProduct] Missing required config for posId={}," +
                             " Failed to fetch products with paginator: {}", posId, paginator);
-                    throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
                 }
 
                 NhanhvnProductResponse response = responseOpt.get();
@@ -183,9 +183,8 @@ public class NhanhvnServiceImpl implements PosManagementService {
                     if (response.getCode().equals(NhanhvnConstants.SUCCESS_CODE)) {
                         break;
                     }
-                    syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.CONNECTION_FAILED, false));
+                    syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.CONNECTION_FAILED.getMessage(), false));
                     log.info("[NhanhvnServiceImpl.syncProduct] No products found with paginator: {}", paginator);
-                    throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_FAILED));
                 }
 
                 // product
@@ -215,12 +214,12 @@ public class NhanhvnServiceImpl implements PosManagementService {
             // Chờ cả hai xong
             CompletableFuture.allOf(saveProductsFuture, saveVariantsFuture).join();
 
-            syncHistoryRepository.save(toSyncHistory(history, null, true));
+            syncHistoryRepository.save(generalPosService.toSyncHistory(history, null, true));
 
             log.info("[NhanhvnServiceImpl.syncProduct] Successfully synced {} products and {} variants from Nhanh.vn", allProducts.size(), allVariants.size());
         } catch (Exception e) {
             log.error("[NhanhvnServiceImpl.syncProduct] Failed to sync Nhanh.vn data - {}", e.getMessage(), e);
-            syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
+            syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR.getMessage()+ " - exception message: "  + e.getMessage(), false));
         }
     }
 
@@ -234,6 +233,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 .startTime(LocalDateTime.now())
                 .syncStatus(PosStatus.FAIL.name())
                 .syncType(SyncType.ORDER.getValue())
+                .posName(PosName.NHANHVN.getValue())
                 .build();
         try {
             String username = claimUtil.getUserName();
@@ -251,7 +251,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
             );
 
             if (isInvalidRequest(request)) {
-                syncHistoryRepository.save(toSyncHistory(history, (SyncErrorMessage.MISSING_CONFIG), false));
+                syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.MISSING_CONFIG.getMessage(), false));
                 log.error("[NhanhvnServiceImpl.syncOrder] Missing required config for posId={}", posId); // throw techial
                 return;
             }
@@ -268,7 +268,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
                 Optional<NhanhvnOrderResponse> responseOpt = nhanhvnClient.getOrders(request);
 
                 if (responseOpt.isEmpty()) {
-                    syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
+                    syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR.getMessage(), false));
                     log.error("[NhanhvnServiceImpl.syncOrder] Missing required config for posId={}," +
                             " Failed to fetch products with paginator: {}", posId, paginator);
                     return;
@@ -280,7 +280,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
                     if (response.getCode() == NhanhvnConstants.SUCCESS_CODE) {
                         break;
                     }
-                    syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.CONNECTION_FAILED, false));
+                    syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.CONNECTION_FAILED.getMessage(), false));
                     log.info("[NhanhvnServiceImpl.syncOrder] No order found with paginator: {}", paginator);
                     return;
                 }
@@ -310,26 +310,16 @@ public class NhanhvnServiceImpl implements PosManagementService {
                     generalPosService.saveAllAsync(allOrderItems, batchSize, orderItemRepository, PosConstants.ORDER_ITEM);
 
             CompletableFuture.allOf(saveOrdersFuture, saveOrderItemsFuture).join();
-            syncHistoryRepository.save(toSyncHistory(history, null, true));
+            syncHistoryRepository.save(generalPosService.toSyncHistory(history, null, true));
 
             log.info("[NhanhvnServiceImpl.syncOrder] Successfully synced {} orders and {} order items from Nhanh.vn", allOrders.size(), allOrderItems.size());
         } catch (Exception e) {
             log.error("[NhanhvnServiceImpl.syncOrder] Failed to sync Nhanh.vn data order - {}", e.getMessage(), e);
-            syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
+            syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR.getMessage()+ " - exception message: "  + e.getMessage(), false));
         }
     }
 
 
-    private SyncHistoryEntity toSyncHistory(SyncHistoryEntity syncHistoryEntity, SyncErrorMessage syncErrorMessage, Boolean isSyncSuccess) {
-        if (Boolean.FALSE.equals(isSyncSuccess)) {
-            syncHistoryEntity.setEndTime(LocalDateTime.now());
-            syncHistoryEntity.setErrorMessage(syncErrorMessage.getMessage());
-            return syncHistoryEntity;
-        }
-        syncHistoryEntity.setSyncStatus(PosStatus.SUCCESS.name());
-        syncHistoryEntity.setEndTime(LocalDateTime.now());
-        return syncHistoryEntity;
-    }
 
     private PosEntity createNewPos(NhanhvnAccessTokenResponse tokenResponse,
                                    Map<String, String> configMap,
