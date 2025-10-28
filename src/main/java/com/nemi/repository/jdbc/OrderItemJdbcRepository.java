@@ -49,7 +49,7 @@ public class OrderItemJdbcRepository extends BaseBatchRepository<OrderItemEntity
                 updated_at,
                 updated_by
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (order_item_id)
             DO UPDATE SET
                 sku                  = EXCLUDED.sku,

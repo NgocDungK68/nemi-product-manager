@@ -55,7 +55,7 @@ public class OrderJdbcRepository extends BaseBatchRepository<OrderEntity> {
             department_id,
             updated_by
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (pos_id, order_id)
         DO UPDATE SET
             order_code       = EXCLUDED.order_code,
