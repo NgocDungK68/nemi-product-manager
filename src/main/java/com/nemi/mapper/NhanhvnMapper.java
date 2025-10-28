@@ -43,14 +43,18 @@ public class NhanhvnMapper {
 
         String status = nhanhvnConfig.getProductStatusMapping(apiProduct.getStatus());
 
+        LocalDateTime createdAt = PosUtils.convertEpochSecondsToVNTime(apiProduct.getCreatedAt());
+        LocalDateTime updatedAt = PosUtils.convertEpochSecondsToVNTime(apiProduct.getUpdatedAt());
+
         return ProductEntity.builder()
                 .posId(posId)
                 .productId(String.valueOf(apiProduct.getId()))
                 .code(apiProduct.getCode())
                 .name(apiProduct.getName())
                 .status(status)
-                .updatedBy(username)
                 .departmentId(departmentId)
+                .createdAt(createdAt)
+                .updatedAt(updatedAt)
                 .build();
     }
 
@@ -86,7 +90,6 @@ public class NhanhvnMapper {
                 .fulfillableQuantity(apiProduct.getInventory().getAvailable())
                 .weight(apiProduct.getShipping().getWeight())
                 .weightUnit(WeightUnit.GAM.getValue())
-                .updatedBy(username)
                 .createdAt(createdAt)
                 .updatedAt(updatedAt)
                 .build();
@@ -127,7 +130,6 @@ public class NhanhvnMapper {
                 .totalPrice(totalProductPrice(apiOrder))
                 .status(status)
                 .saleId(String.valueOf(apiOrder.getInfo().getSaleId()))
-                .updatedBy(username)
                 .createdAt(createdAt)
                 .updatedAt(updatedAt)
                 .departmentId(departmentId)
@@ -159,7 +161,6 @@ public class NhanhvnMapper {
                     .price(product.getPrice())
                     .totalPrice(product.getPrice().multiply(quantity))
                     .productName(product.getName())
-                    .updatedBy(username)
                     .createdAt(createdAt)
                     .updatedAt(updatedAt)
                     .build());
@@ -172,6 +173,8 @@ public class NhanhvnMapper {
     public OrderEntity convertToOrderEntity(String posId, NhanhvnOrderWebhookRequest orderWebhookRequest, String username) {
         String status = nhanhvnConfig.getOrderStatusMapping(orderWebhookRequest.getInfo().getStatus());
 
+        LocalDateTime createdAt = PosUtils.convertEpochSecondsToVNTime(orderWebhookRequest.getInfo().getCreatedAt());
+        LocalDateTime updatedAt = PosUtils.convertEpochSecondsToVNTime(orderWebhookRequest.getInfo().getUpdatedAt());
 
         return OrderEntity.builder()
                 .posId(posId)
@@ -187,7 +190,8 @@ public class NhanhvnMapper {
                 .shippingFee(orderWebhookRequest.getCarrier().getShipFee())
                 .discountAmount(orderWebhookRequest.getInfo().getDiscount())
                 .status(status)
-                .updatedBy(username)
+                .createdAt(createdAt)
+                .updatedAt(updatedAt)
                 .build();
     }
 
@@ -195,6 +199,9 @@ public class NhanhvnMapper {
         List<OrderItemEntity> orderItemEntities = new ArrayList<>();
         for (NhanhvnOrderWebhookRequest.Product product : orderWebhookRequest.getProducts()) {
             BigDecimal quantity = BigDecimal.valueOf(product.getQuantity());
+            LocalDateTime createdAt = PosUtils.convertEpochSecondsToVNTime(orderWebhookRequest.getInfo().getCreatedAt());
+            LocalDateTime updatedAt = PosUtils.convertEpochSecondsToVNTime(orderWebhookRequest.getInfo().getUpdatedAt());
+
             orderItemEntities.add(OrderItemEntity.builder()
                     .orderItemId(String.valueOf(product.getId()))
                     .orderId(String.valueOf(orderWebhookRequest.getInfo().getId()))
@@ -203,7 +210,8 @@ public class NhanhvnMapper {
                     .price(product.getPrice())
                     .totalPrice(product.getPrice().multiply(quantity))
                     .productName(product.getName())
-                    .updatedBy(username)
+                    .createdAt(createdAt)
+                    .updatedAt(updatedAt)
                     .build());
         }
 

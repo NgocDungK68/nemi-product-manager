@@ -46,7 +46,8 @@ public class OrderItemJdbcRepository extends BaseBatchRepository<OrderItemEntity
                 created_by,
                 fulfillable_quantity,
                 created_at,
-                updated_at
+                updated_at,
+                updated_by
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (order_item_id)
@@ -60,7 +61,8 @@ public class OrderItemJdbcRepository extends BaseBatchRepository<OrderItemEntity
                 created_by           = EXCLUDED.created_by,
                 fulfillable_quantity = EXCLUDED.fulfillable_quantity,
                 created_at           = EXCLUDED.created_at,
-                updated_at           = EXCLUDED.updated_at;
+                updated_at           = EXCLUDED.updated_at,
+                updated_by           = EXCLUDED.updated_by;
             """;
     }
 
@@ -79,6 +81,7 @@ public class OrderItemJdbcRepository extends BaseBatchRepository<OrderItemEntity
         ps.setObject(10, item.getFulfillableQuantity());
         ps.setObject(11, item.getCreatedAt());
         ps.setObject(12, item.getUpdatedAt());
+        ps.setString(13, item.getUpdatedBy());
     }
 
     public void insertOrderItemParallel(List<OrderItemEntity> orderItemEntities) {

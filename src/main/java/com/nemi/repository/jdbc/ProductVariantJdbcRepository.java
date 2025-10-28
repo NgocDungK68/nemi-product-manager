@@ -51,10 +51,12 @@ public class ProductVariantJdbcRepository extends BaseBatchRepository<ProductVar
                 attributes,
                 warehouse_quantities,
                 created_at,
-                updated_at
+                updated_at,
+                created_by,
+                updated_by
             )
             VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
             )
             ON CONFLICT (variant_id, pos_id)
             DO UPDATE SET
@@ -69,7 +71,9 @@ public class ProductVariantJdbcRepository extends BaseBatchRepository<ProductVar
                 attributes           = EXCLUDED.attributes,
                 warehouse_quantities = EXCLUDED.warehouse_quantities,
                 created_at           = EXCLUDED.created_at,
-                updated_at           = EXCLUDED.updated_at;
+                updated_at           = EXCLUDED.updated_at,
+                created_by           = EXCLUDED.created_by,
+                updated_by           = EXCLUDED.updated_by;
             """;
     }
 
@@ -91,6 +95,8 @@ public class ProductVariantJdbcRepository extends BaseBatchRepository<ProductVar
         ps.setString(12, productVariantEntity.getWarehouseQuantities());
         ps.setObject(13, productVariantEntity.getCreatedAt());
         ps.setObject(14, productVariantEntity.getUpdatedAt());
+        ps.setString(15, productVariantEntity.getCreatedBy());
+        ps.setString(16, productVariantEntity.getUpdatedBy());
     }
 
 //    public void insertProductsVariantParallel(List<ProductVariantEntity> products) {

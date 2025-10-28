@@ -52,7 +52,8 @@ public class OrderJdbcRepository extends BaseBatchRepository<OrderEntity> {
             sale_id,
             created_at,
             updated_at,
-            department_id
+            department_id,
+            updated_by
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (pos_id, order_id)
@@ -71,7 +72,8 @@ public class OrderJdbcRepository extends BaseBatchRepository<OrderEntity> {
             sale_id          = EXCLUDED.sale_id,
             created_at       = EXCLUDED.created_at,
             updated_at       = EXCLUDED.updated_at,
-            department_id    = EXCLUDED.department_id;
+            department_id    = EXCLUDED.department_id,
+            updated_by       = EXCLUDED.updated_by;
         """;
     }
 
@@ -104,6 +106,7 @@ public class OrderJdbcRepository extends BaseBatchRepository<OrderEntity> {
         ps.setObject(15, o.getCreatedAt());
         ps.setObject(16, o.getUpdatedAt());
         ps.setString(17, o.getDepartmentId());
+        ps.setString(18, o.getUpdatedBy());
     }
 
 

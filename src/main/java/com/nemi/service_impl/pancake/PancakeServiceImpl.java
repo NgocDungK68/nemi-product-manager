@@ -197,7 +197,7 @@ public class PancakeServiceImpl implements PosManagementService {
             log.info("Successfully synced {} products from Pancake", allProducts.size());
 
         } catch (Exception e) {
-            log.error("Failed to sync Pancake products - {}", e.getMessage(), e);
+            log.error("Failed to sync Pancake products - {}", e.getMessage(), e); //500 ki tu
             syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.PRODUCT_TECHNICAL_ERROR, false));
 
         }
