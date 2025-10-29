@@ -18,6 +18,9 @@ import com.nemi.repository.SyncHistoryRepository;
 import com.nemi.service.factory.ReAuthPosFactory;
 import com.nemi.util.ClaimUtil;
 import io.jsonwebtoken.lang.Objects;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
@@ -44,24 +47,30 @@ public abstract class AbstractPosManagementService {
     protected final NhanhvnConfig nhanhvnConfig;
     private final WebhookConfig webhookConfig;
     private final ReAuthPosFactory reAuthPosFactory;
+    @PersistenceContext
+    private final EntityManager entityManager;
 
     /**
      * Get POS status by ID
      */
-    public List<StatusResponse> getPosStatus(String posId) {
+    public StatusResponse getPosStatus(String posId) {
         List<SyncHistoryEntity> histories = syncHistoryRepository.findAllByPosId(posId);
+        PosEntity pos = posRepository.findById(posId)
+                .orElseThrow(() -> {
+                    log.warn("POS with id={} not found, cannot get status", posId);
+                    return new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_NOTFOUND));
+                });
+
         if (CollectionUtils.isEmpty(histories)) {
             throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.SYNC_HISTORY_NOT_FOUND));
         }
 
-        return histories.stream()
-                .map(h -> {
-                    StatusResponse resp = new StatusResponse();
-                    resp.setStatus(h.getSyncStatus());
-                    resp.setType(h.getSyncType());
-                    return resp;
-                })
-                .collect(Collectors.toList());
+        Boolean isSuccess = histories.stream().anyMatch(h -> PosStatus.SUCCESS.name().equals(h.getSyncStatus()));
+
+        pos.setStatus(isSuccess ? PosStatus.ACTIVE.name() : PosStatus.ERROR.name());
+        posRepository.save(pos);
+
+        return new StatusResponse(pos.getStatus(), pos.getPosName());
     }
 
     /**
@@ -236,6 +245,4 @@ public abstract class AbstractPosManagementService {
         syncHistoryEntity.setEndTime(LocalDateTime.now());
         return syncHistoryEntity;
     }
-
-
 }

@@ -124,7 +124,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
     @Override
     @Async("syncExecutor")
-    public void syncProduct(String posId,String departmentId) {
+    public void syncProduct(String posId, String departmentId) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
                 .startTime(LocalDateTime.now())
@@ -227,7 +227,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
     @Override
     @Async("syncExecutor")
-    public void syncOrder(String posId,String departmentId) {
+    public void syncOrder(String posId, String departmentId) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
                 .startTime(LocalDateTime.now())
@@ -332,7 +332,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
         PosEntity newPos = PosEntity.builder()
                 .posName(PosName.NHANHVN.getValue())
                 .userId(claimUtil.getUserId())
-                .status(PosStatus.ACTIVE.name())
+                .status(PosStatus.PROCESSING.name())
                 .accessToken(encryptedToken)
                 .config(encryptionService.encrypt(JsonUtils.toJson(configMap)))
                 .expiredTime(expiredTime)

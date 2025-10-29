@@ -94,7 +94,7 @@ public class PancakeServiceImpl implements PosManagementService {
             PosEntity posEntityBuilder = PosEntity.builder()
                     .posName(PosName.PANCAKE.getValue())
                     .userId(userId)
-                    .status(PosStatus.ACTIVE.name())
+                    .status(PosStatus.PROCESSING.name())
                     .accessToken(encryptionService.encrypt(posConnectionRequest.getApiKey()))
                     .config(encryptionService.encrypt(JsonUtils.toJson(configMap)))
                     .companyId(String.valueOf(claimUtil.getCompanyId()))
@@ -114,7 +114,7 @@ public class PancakeServiceImpl implements PosManagementService {
             posConnectionResponse.setKeyValue(keyValue);
             posConnectionResponse.setDepartmentId(departmentId);
 
-            log.info("Pancake response is {}", posConnectionResponse);
+            log.debug("Pancake response is {}", posConnectionResponse);
             return posConnectionResponse;
         } catch (Exception e) {
             log.error("Exchange token failed: {}", e.getMessage(), e);
@@ -155,24 +155,26 @@ public class PancakeServiceImpl implements PosManagementService {
             while (true) {
 
                 Optional<PancakeProductResponse> responseOpt = pancakeClient.getProducts(request);
-                if (responseOpt.isEmpty()) { // handle tinh huonh nhu server loi
+                if (responseOpt.isEmpty()) {
                     syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.PRODUCT_CONNECTION_FAILED.getMessage(), false));
                     log.error("No response from Pancake API when fetching products, posId={}", posId);
                     productJdbcRepository.insertProductsParallel(allProducts);
                     productVariantJdbcRepository.insertProductsVariantParallel(allVariants);
 
+
                 }
 
                 PancakeProductResponse response = responseOpt.get();
-                if (!response.isSuccess()) { //hanle cac tinh huon call dc api nhung sai credentail
+                if (!response.isSuccess()) {
                     syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.PRODUCT_INVALID_CREDENTIAL.getMessage(), false));
                     log.error("Invalid API key or shopId when fetching products, posId={}", posId);
                     productJdbcRepository.insertProductsParallel(allProducts);
                     productVariantJdbcRepository.insertProductsVariantParallel(allVariants);
+
                 }
 
                 if (ObjectUtils.isEmpty(response.getData())) {
-                    log.info("No products found with page number: {}", request.getPageNumber());
+                    log.debug("No products found with posId={}, in page number: {}", posId, request.getPageNumber());
                     break;
                 } else {
                     request.setPageNumber(request.getPageNumber() + 1);
@@ -187,17 +189,17 @@ public class PancakeServiceImpl implements PosManagementService {
 
             }
             Long startDate = System.currentTimeMillis();
-            log.info("Start date {}", startDate);
+            log.debug("Start date {}, posId={}", startDate,posId);
             syncHistoryRepository.save(generalPosService.toSyncHistory(history, null, true));
             productJdbcRepository.insertProductsParallel(allProducts);
             productVariantJdbcRepository.insertProductsVariantParallel(allVariants);
             Long endDate = System.currentTimeMillis();
-            log.info("End date {}", endDate);
-            log.info("Successfully synced {} products from Pancake", allProducts.size());
+            log.debug("End date {}, posId={}", endDate, posId);
+            log.info("Successfully synced {} products from Pancake, posId={}", allProducts.size(), posId);
 
         } catch (Exception e) {
             log.error("Failed to sync Pancake products - {}", e.getMessage(), e); //500 ki tu
-            syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.PRODUCT_TECHNICAL_ERROR.getMessage() + " - exception message: "  + e.getMessage(), false));
+            syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.PRODUCT_TECHNICAL_ERROR.getMessage() + " - exception message: " + e.getMessage(), false));
 
         }
     }
@@ -228,6 +230,7 @@ public class PancakeServiceImpl implements PosManagementService {
                 if (responseOpt.isEmpty()) {
                     syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.ORDER_CONNECTION_FAILED.getMessage(), false));
                     log.error("No response from Pancake API when fetching orders, posId={}", posId);
+
                     if (!allOrders.isEmpty()) {
                         orderJdbcRepository.insertOrdersParallel(allOrders);
                     }
@@ -240,6 +243,7 @@ public class PancakeServiceImpl implements PosManagementService {
                 if (!response.getSuccess()) {
                     syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.ORDER_INVALID_CREDENTIAL.getMessage(), false));
                     log.error("Invalid API key or shopId when fetching orders, posId={}", posId);
+
                     if (!allOrders.isEmpty()) {
                         orderJdbcRepository.insertOrdersParallel(allOrders);
                     }
@@ -266,13 +270,15 @@ public class PancakeServiceImpl implements PosManagementService {
             orderJdbcRepository.insertOrdersParallel(allOrders);
             orderItemJdbcRepositoryl.insertOrderItemParallel(allOrderItems);
 
+
             syncHistoryRepository.save(generalPosService.toSyncHistory(history, null, true));
             log.info("Successfully synced {} order items  and {} orders from Pancake", allOrderItems.size(), allOrders.size());
 
         } catch (Exception e) {
             log.error("Failed to sync Pancake orders - {}", e.getMessage(), e);
-            syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.ORDER_TECHNICAL_ERROR.getMessage() + " - exception message: "  + e.getMessage(), false));
+            syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.ORDER_TECHNICAL_ERROR.getMessage() + " - exception message: " + e.getMessage(), false));
 
         }
     }
+
 }

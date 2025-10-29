@@ -314,7 +314,6 @@ public class SapoServiceImpl implements PosManagementService {
 
             CompletableFuture.allOf(saveOrdersFuture, saveOrderItemsFuture).join();
             syncHistoryRepository.save(generalPosService.toSyncHistory(history, null, true));
-
             log.info("Successfully synced {} order items from Pancake", allOrderItems.size());
         } catch (Exception e) {
             log.error("Failed to sync Pancake orders - {}", e.getMessage(), e);
@@ -329,7 +328,7 @@ public class SapoServiceImpl implements PosManagementService {
         PosEntity newPos = PosEntity.builder()
                 .posName(PosName.SAPO.getValue())
                 .userId(claimUtil.getUserId())
-                .status(PosStatus.ACTIVE.name())
+                .status(PosStatus.PROCESSING.name())
                 .accessToken(encryptedAccessToken)
                 .config(tokenEncryptionService.encrypt(JsonUtils.toJson(configMap)))
                 .expiredTime(null)
