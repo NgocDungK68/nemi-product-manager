@@ -70,7 +70,20 @@ public abstract class AbstractPosManagementService {
         pos.setStatus(isSuccess ? PosStatus.ACTIVE.name() : PosStatus.ERROR.name());
         posRepository.save(pos);
 
-        return new StatusResponse(pos.getStatus(), pos.getPosName());
+         List<StatusResponse.StatusDetail> list =  histories.stream()
+                .map(h -> {
+                    StatusResponse.StatusDetail resp = new StatusResponse.StatusDetail();
+                    resp.setStatus(h.getSyncStatus());
+                    resp.setType(h.getSyncType());
+                    return resp;
+                })
+                .collect(Collectors.toList());
+
+         return StatusResponse.builder()
+                 .statusDetails(list)
+                 .statusConnect(pos.getStatus())
+                 .build();
+
     }
 
     /**

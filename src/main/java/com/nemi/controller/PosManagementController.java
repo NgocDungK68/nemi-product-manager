@@ -67,7 +67,7 @@ public class PosManagementController {
 
     @GetMapping("/pos/{posId}/status")
     public ResponseEntity<StatusResponse> getStatusPos(@PathVariable String posId) {
-        StatusResponse statusResponse = generalPosService.getPosStatus(posId);
+         StatusResponse statusResponse = generalPosService.getPosStatus(posId);
         return ResponseEntity.ok(statusResponse);
     }
 
