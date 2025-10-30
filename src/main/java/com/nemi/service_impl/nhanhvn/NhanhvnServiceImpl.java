@@ -184,18 +184,18 @@ public class NhanhvnServiceImpl implements PosManagementService {
                         break;
                     }
                     syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.CONNECTION_FAILED.getMessage(), false));
-                    log.info("[NhanhvnServiceImpl.syncProduct] No products found with paginator: {}", paginator);
+                    log.info("[NhanhvnServiceImpl.syncProduct] No products found with paginator: {}, posId: {}", paginator,posId);
                 }
 
                 // product
                 List<ProductEntity> pageProducts = nhanhvnMapper.convertToProductEntities(posId, response.getData(), username,departmentId);
                 allProducts.addAll(pageProducts);
-                log.info("[NhanhvnServiceImpl.syncProduct] Fetched {} products, total so far: {}", pageProducts.size(), allProducts.size());
+                log.info("[NhanhvnServiceImpl.syncProduct] Fetched {} products, total so far: {}, posId: {}", pageProducts.size(), allProducts.size(),posId);
 
                 // variant
                 List<ProductVariantEntity> pageVariants = nhanhvnMapper.convertToVariantEntities(posId, response.getData(), username);
                 allVariants.addAll(pageVariants);
-                log.info("[NhanhvnServiceImpl.syncProduct] Fetched {} variants, total so far: {}", pageVariants.size(), allVariants.size());
+                log.info("[NhanhvnServiceImpl.syncProduct] Fetched {} variants, total so far: {}, posId: {}", pageVariants.size(), allVariants.size(),posId);
 
                 // xử lý next
                 if (ObjectUtils.isNotEmpty(response.getPaginator()) && ObjectUtils.isNotEmpty(response.getPaginator().getNext())) {
@@ -216,7 +216,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
 
             syncHistoryRepository.save(generalPosService.toSyncHistory(history, null, true));
 
-            log.info("[NhanhvnServiceImpl.syncProduct] Successfully synced {} products and {} variants from Nhanh.vn", allProducts.size(), allVariants.size());
+            log.info("[NhanhvnServiceImpl.syncProduct] Successfully synced {} products and {} variants from Nhanh.vn, posId: {}", allProducts.size(), allVariants.size(),posId);
         } catch (Exception e) {
             log.error("[NhanhvnServiceImpl.syncProduct] Failed to sync Nhanh.vn data - {}", e.getMessage(), e);
             syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR.getMessage()+ " - exception message: "  + e.getMessage(), false));
@@ -281,19 +281,19 @@ public class NhanhvnServiceImpl implements PosManagementService {
                         break;
                     }
                     syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.CONNECTION_FAILED.getMessage(), false));
-                    log.info("[NhanhvnServiceImpl.syncOrder] No order found with paginator: {}", paginator);
+                    log.info("[NhanhvnServiceImpl.syncOrder] No order found with paginator: {}, posId: {}", paginator,posId);
                     return;
                 }
 
                 // order
                 List<OrderEntity> pageOrders = nhanhvnMapper.convertToOrderEntities(posId, response.getData(), username,departmentId);
                 allOrders.addAll(pageOrders);
-                log.info("[NhanhvnServiceImpl.syncOrder] Fetched {} orders, total so far: {}", pageOrders.size(), pageOrders.size());
+                log.info("[NhanhvnServiceImpl.syncOrder] Fetched {} orders, total so far: {}, posId: {}", pageOrders.size(), pageOrders.size(),posId);
 
 
                 List<OrderItemEntity> pageOrderItem = nhanhvnMapper.convertToOrderItemEntities(response.getData(), username);
                 allOrderItems.addAll(pageOrderItem);
-                log.info("[NhanhvnServiceImpl.syncOrder] Fetched {} order items, total so far: {}", pageOrderItem.size(), pageOrderItem.size());
+                log.info("[NhanhvnServiceImpl.syncOrder] Fetched {} order items, total so far: {}, posId: {}", pageOrderItem.size(), pageOrderItem.size(),posId);
 
                 // xử lý next
                 if (ObjectUtils.isNotEmpty(response.getPaginator()) && ObjectUtils.isNotEmpty(response.getPaginator().getNext())) {
@@ -312,7 +312,7 @@ public class NhanhvnServiceImpl implements PosManagementService {
             CompletableFuture.allOf(saveOrdersFuture, saveOrderItemsFuture).join();
             syncHistoryRepository.save(generalPosService.toSyncHistory(history, null, true));
 
-            log.info("[NhanhvnServiceImpl.syncOrder] Successfully synced {} orders and {} order items from Nhanh.vn", allOrders.size(), allOrderItems.size());
+            log.info("[NhanhvnServiceImpl.syncOrder] Successfully synced {} orders and {} order items from Nhanh.vn, posId: {}", allOrders.size(), allOrderItems.size(),posId);
         } catch (Exception e) {
             log.error("[NhanhvnServiceImpl.syncOrder] Failed to sync Nhanh.vn data order - {}", e.getMessage(), e);
             syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR.getMessage()+ " - exception message: "  + e.getMessage(), false));

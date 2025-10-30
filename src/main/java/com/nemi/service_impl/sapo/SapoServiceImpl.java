@@ -118,7 +118,7 @@ public class SapoServiceImpl implements PosManagementService {
                     tokenResponse.getAccessToken(),
                     newPos.getId()
             );
-            log.info("Registered {} webhooks for POS: {}", webhooks.size(), newPos.getId());
+            log.info("Registered {} webhooks for POS: {}, posId: {}", webhooks.size(), newPos.getId());
 
             log.info("Sapo response is {}", posConnectionResponse);
             return posConnectionResponse;
@@ -179,7 +179,7 @@ public class SapoServiceImpl implements PosManagementService {
 
                 // Check if API response is present
                 if (responseOpt.isEmpty()) {
-                    log.error("[SapoServiceImpl.syncProduct] API returned empty response");
+                    log.error("[SapoServiceImpl.syncProduct] API returned empty response, posId: {}",posId);
                     syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR.getMessage(), false));
                     return;
                 }
@@ -205,7 +205,7 @@ public class SapoServiceImpl implements PosManagementService {
                         allVariants.addAll(variants);
                     }
                 }
-                log.info("Fetched {} products and {} variants", products.size(), allVariants.size());
+                log.info("Fetched {} products and {} variants, posId: {}", products.size(), allVariants.size(),posId);
 
                 // Continue pagination if fetched full page
                 if (products.size() >= productLimit) {
@@ -227,7 +227,7 @@ public class SapoServiceImpl implements PosManagementService {
             CompletableFuture.allOf(saveProductsFuture, saveVariantsFuture).join();
             syncHistoryRepository.save(generalPosService.toSyncHistory(history, null, true));
 
-            log.info("Successfully synced {} products and {} variants from Sapo", allProducts.size(), allVariants.size());
+            log.info("Successfully synced {} products and {} variants from Sapo,, posId: {}", allProducts.size(), allVariants.size(),posId);
         } catch (Exception e) {
             log.error("Failed to sync Sapo data - {}", e.getMessage(), e);
             syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR.getMessage(), false));
@@ -287,7 +287,7 @@ public class SapoServiceImpl implements PosManagementService {
 
                 SapoOrderResponse response = responseOpt.get();
                 if (ObjectUtils.isEmpty(response.getOrders())) {
-                    log.info("No orders found with paginator: page={}, limit={}", paginator.getPage(), paginator.getLimit());
+                    log.info("No orders found with paginator: page={}, limit={}, posId: {}", paginator.getPage(), paginator.getLimit(),posId);
                     break;
                 }
 
@@ -314,7 +314,7 @@ public class SapoServiceImpl implements PosManagementService {
 
             CompletableFuture.allOf(saveOrdersFuture, saveOrderItemsFuture).join();
             syncHistoryRepository.save(generalPosService.toSyncHistory(history, null, true));
-            log.info("Successfully synced {} order items from Pancake", allOrderItems.size());
+            log.info("Successfully synced {} order items from Pancake, posId: {}", allOrderItems.size(),posId);
         } catch (Exception e) {
             log.error("Failed to sync Pancake orders - {}", e.getMessage(), e);
             syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.ORDER_TECHNICAL_ERROR.getMessage(), false));

@@ -114,7 +114,7 @@ public class PancakeServiceImpl implements PosManagementService {
             posConnectionResponse.setKeyValue(keyValue);
             posConnectionResponse.setDepartmentId(departmentId);
 
-            log.debug("Pancake response is {}", posConnectionResponse);
+            log.debug("Pancake response is {}, posId: {}", posConnectionResponse, posEntityBuilder.getId());
             return posConnectionResponse;
         } catch (Exception e) {
             log.error("Exchange token failed: {}", e.getMessage(), e);
@@ -253,7 +253,7 @@ public class PancakeServiceImpl implements PosManagementService {
                 }
 
                 if (ObjectUtils.isEmpty(response.getData())) {
-                    log.info("No orders found with page number: {}", request.getPageNumber());
+                    log.info("No orders found with page number: {}, posId: {}", request.getPageNumber(), posId);
                     break;
                 } else {
                     request.setPageNumber(request.getPageNumber() + 1);
@@ -272,7 +272,7 @@ public class PancakeServiceImpl implements PosManagementService {
 
 
             syncHistoryRepository.save(generalPosService.toSyncHistory(history, null, true));
-            log.info("Successfully synced {} order items  and {} orders from Pancake", allOrderItems.size(), allOrders.size());
+            log.info("Successfully synced {} order items  and {} orders from Pancake, posId: {}", allOrderItems.size(), allOrders.size(), posId);
 
         } catch (Exception e) {
             log.error("Failed to sync Pancake orders - {}", e.getMessage(), e);
