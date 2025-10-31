@@ -24,6 +24,7 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -249,6 +250,9 @@ public abstract class AbstractPosManagementService {
     }
 
     public SyncHistoryEntity toSyncHistory(SyncHistoryEntity syncHistoryEntity, String syncErrorMessage, Boolean isSyncSuccess) {
+        if(StringUtils.isNotEmpty(syncErrorMessage) && syncErrorMessage.length() > 500) {
+            syncErrorMessage = syncErrorMessage.substring(0, 500);
+        }
         if (Boolean.FALSE.equals(isSyncSuccess)) {
             syncHistoryEntity.setEndTime(LocalDateTime.now());
             syncHistoryEntity.setErrorMessage(syncErrorMessage);
