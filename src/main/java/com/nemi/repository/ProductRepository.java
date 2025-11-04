@@ -2,6 +2,8 @@ package com.nemi.repository;
 
 import com.nemi.entity.ProductEntity;
 import com.nemi.entity.ProductId;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -21,4 +23,9 @@ public interface ProductRepository extends JpaRepository<ProductEntity, ProductI
     List<ProductEntity> searchByProductIdsOrSkus(@Param("companyId") Integer companyId,
                                                  @Param("productIds") List<String> productIds,
                                                  @Param("skus") List<String> skus);
+
+    @Query("select p from ProductEntity p join PosEntity pos on p.posId = pos.id " +
+            "where pos.departmentId = :departmentId " +
+            "and (p.productId like concat('%', :search,'%') or (p.name like concat('%', :search,'%'))) ")
+    Page<ProductEntity> clientSearch(@Param("search") String search, @Param("departmentId") String departmentId, Pageable pageable);
 }

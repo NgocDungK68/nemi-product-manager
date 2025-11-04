@@ -205,3 +205,8 @@ webhook:
         limit: 60
         window-size: 60000
         segment-size: 1000
+
+nemi:
+  feign:
+    user-manager:
+      base-url: http://localhost:5200
