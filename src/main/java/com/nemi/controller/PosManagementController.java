@@ -42,11 +42,6 @@ public class PosManagementController {
     @PostMapping("/{posName}/pos")
     public ResponseEntity<PosConnectionResponse> connectPos(@PathVariable String posName,
                                                             @RequestBody PosConnectionRequest posConnectionRequest) {
-        PosEntity posEntity = posRepository.findByUserIdAndPosName(claimUtil.getUserId(), posName);
-        if (ObjectUtils.isNotEmpty(posEntity) && Status.ACTIVE.getValue().equals(posEntity.getStatus())) {
-            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_ALREADY_CONNECTED));
-        }
-
         PosManagementService posManagementService = posManagementFactory.getPosName(posName);
         PosConnectionResponse posConnectionResponse = posManagementService.connectPos(posConnectionRequest);
 
@@ -85,21 +80,6 @@ public class PosManagementController {
         posManagementService.syncProduct(posId, posEntity.getDepartmentId());
         posManagementService.syncOrder(posId, posEntity.getDepartmentId());
         return ResponseEntity.ok(PosConnectionResponse.toPosConnectionResponse(posEntity));
-    }
-
-    public void updateStatusIfProcessing(String posId, boolean isSuccess) {
-        PosEntity posEntity = posRepository.findById(posId).orElseThrow();
-
-        if (PosStatus.PROCESSING.name().equals(posEntity.getStatus())) {
-            posEntity.setStatus(isSuccess ? PosStatus.ACTIVE.name() : PosStatus.FAIL.name());
-            posRepository.save(posEntity);
-        } else if (!isSuccess) {
-            // Nếu cái trước đã ghi FAILURE thì không cần ghi nữa
-            if (!PosStatus.FAIL.name().equals(posEntity.getStatus())) {
-                posEntity.setStatus(PosStatus.FAIL.name());
-                posRepository.save(posEntity);
-            }
-        }
     }
 
 }
