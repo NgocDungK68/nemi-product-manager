@@ -1,11 +1,6 @@
 package com.nemi.controller;
 
 import com.nemi.entity.PosEntity;
-import com.nemi.enums.PosStatus;
-import com.nemi.enums.Status;
-import com.nemi.exception.TechnicalAlertCode;
-import com.nemi.exception.TechnicalException;
-import com.nemi.exception.pojo.AlertMessages;
 import com.nemi.model.request.ChangeStatusRequest;
 import com.nemi.model.request.PosConnectionRequest;
 import com.nemi.model.response.PosConnectionResponse;
@@ -16,7 +11,6 @@ import com.nemi.service.PosManagementService;
 import com.nemi.service.factory.PosManagementFactory;
 import com.nemi.util.ClaimUtil;
 import lombok.RequiredArgsConstructor;
-import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -71,7 +65,6 @@ public class PosManagementController {
         PosConnectionResponse posConnectionResponse = generalPosService.setPosStatus(changeStatusRequest);
         return ResponseEntity.ok(posConnectionResponse);
     }
-    // test pancake
 
     @PostMapping("/pos/{posId}/sync")
     public ResponseEntity<PosConnectionResponse> manualSync(@PathVariable String posId, @RequestParam(defaultValue = "false") boolean isSyncAll) {

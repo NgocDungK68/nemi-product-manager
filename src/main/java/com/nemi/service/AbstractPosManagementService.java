@@ -1,9 +1,9 @@
 package com.nemi.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.configuration.NhanhvnConfig;
 import com.nemi.configuration.WebhookConfig;
 import com.nemi.constant.NhanhvnConstants;
+import com.nemi.constant.PancakeConstatns;
 import com.nemi.entity.PosEntity;
 import com.nemi.entity.SyncHistoryEntity;
 import com.nemi.enums.PosStatus;
@@ -18,9 +18,6 @@ import com.nemi.repository.SyncHistoryRepository;
 import com.nemi.service.factory.ReAuthPosFactory;
 import com.nemi.util.ClaimUtil;
 import io.jsonwebtoken.lang.Objects;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
@@ -44,12 +41,10 @@ public abstract class AbstractPosManagementService {
     protected final PosRepository posRepository;
     protected final ClaimUtil claimUtil;
     protected final SyncHistoryRepository syncHistoryRepository;
-    protected final ObjectMapper objectMapper;
     protected final NhanhvnConfig nhanhvnConfig;
     private final WebhookConfig webhookConfig;
     private final ReAuthPosFactory reAuthPosFactory;
-    @PersistenceContext
-    private final EntityManager entityManager;
+    private final EncryptionService encryptionService;
 
     /**
      * Get POS status by ID
@@ -66,12 +61,12 @@ public abstract class AbstractPosManagementService {
             throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.SYNC_HISTORY_NOT_FOUND));
         }
 
-        Boolean isSuccess = histories.stream().anyMatch(h -> PosStatus.SUCCESS.name().equals(h.getSyncStatus()));
+        boolean isSuccess = histories.stream().anyMatch(h -> PosStatus.SUCCESS.name().equals(h.getSyncStatus()));
 
         pos.setStatus(isSuccess ? PosStatus.ACTIVE.name() : PosStatus.ERROR.name());
         posRepository.save(pos);
 
-         List<StatusResponse.StatusDetail> list =  histories.stream()
+        List<StatusResponse.StatusDetail> list = histories.stream()
                 .map(h -> {
                     StatusResponse.StatusDetail resp = new StatusResponse.StatusDetail();
                     resp.setStatus(h.getSyncStatus());
@@ -80,10 +75,10 @@ public abstract class AbstractPosManagementService {
                 })
                 .collect(Collectors.toList());
 
-         return StatusResponse.builder()
-                 .statusDetails(list)
-                 .statusConnect(pos.getStatus())
-                 .build();
+        return StatusResponse.builder()
+                .statusDetails(list)
+                .statusConnect(pos.getStatus())
+                .build();
 
     }
 
@@ -129,7 +124,12 @@ public abstract class AbstractPosManagementService {
                     }
 
                     // Trường hợp token còn hạn, status ACTIVE
-                    return PosConnectionResponse.toPosConnectionResponse(pos);
+                    PosConnectionResponse posConnectionResponse = PosConnectionResponse.toPosConnectionResponse(pos);
+                    posConnectionResponse.setWebhookUrl(creatWebhookUrl(pos.getId(), pos.getPosName()));
+                    String webhookToken = encryptionService.decrypt(pos.getWebhookToken());
+                    posConnectionResponse.setWebhookToken(webhookToken);
+                    posConnectionResponse.setKeyValue(creatKeyValueMap(PancakeConstatns.WEBHOOK_TOKEN, webhookToken));
+                    return posConnectionResponse;
                 })
                 .collect(Collectors.toList());
     }
@@ -250,7 +250,7 @@ public abstract class AbstractPosManagementService {
     }
 
     public SyncHistoryEntity toSyncHistory(SyncHistoryEntity syncHistoryEntity, String syncErrorMessage, Boolean isSyncSuccess) {
-        if(StringUtils.isNotEmpty(syncErrorMessage) && syncErrorMessage.length() > 500) {
+        if (StringUtils.isNotEmpty(syncErrorMessage) && syncErrorMessage.length() > 500) {
             syncErrorMessage = syncErrorMessage.substring(0, 500);
         }
         if (Boolean.FALSE.equals(isSyncSuccess)) {
