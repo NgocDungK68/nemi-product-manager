@@ -34,31 +34,38 @@ public class OrderItemJdbcRepository extends BaseBatchRepository<OrderItemEntity
     @Override
     protected String getSql() {
         return """
-                INSERT INTO product_manager.order_item (
-                    order_item_id,
-                    order_id,
-                    sku,
-                    variant_name,
-                    quantity,
-                    price,
-                    total_price,
-                    product_name,
-                    created_by,
-                    fulfillable_quantity
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT (order_item_id)
-                DO UPDATE SET
-                    sku                 = EXCLUDED.sku,
-                    variant_name        = EXCLUDED.variant_name,
-                    quantity            = EXCLUDED.quantity,
-                    price               = EXCLUDED.price,
-                    total_price         = EXCLUDED.total_price,
-                    product_name        = EXCLUDED.product_name,
-                    created_by          = EXCLUDED.created_by,
-                    fulfillable_quantity = EXCLUDED.fulfillable_quantity;
-                """;
+            INSERT INTO product_manager.order_item (
+                order_item_id,
+                order_id,
+                sku,
+                variant_name,
+                quantity,
+                price,
+                total_price,
+                product_name,
+                created_by,
+                fulfillable_quantity,
+                created_at,
+                updated_at,
+                updated_by
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (order_item_id)
+            DO UPDATE SET
+                sku                  = EXCLUDED.sku,
+                variant_name         = EXCLUDED.variant_name,
+                quantity             = EXCLUDED.quantity,
+                price                = EXCLUDED.price,
+                total_price          = EXCLUDED.total_price,
+                product_name         = EXCLUDED.product_name,
+                created_by           = EXCLUDED.created_by,
+                fulfillable_quantity = EXCLUDED.fulfillable_quantity,
+                created_at           = EXCLUDED.created_at,
+                updated_at           = EXCLUDED.updated_at,
+                updated_by           = EXCLUDED.updated_by;
+            """;
     }
+
 
     @Override
     protected void setValues(PreparedStatement ps, OrderItemEntity item) throws SQLException {
@@ -72,6 +79,9 @@ public class OrderItemJdbcRepository extends BaseBatchRepository<OrderItemEntity
         ps.setString(8, item.getProductName());
         ps.setString(9, item.getCreatedBy());
         ps.setObject(10, item.getFulfillableQuantity());
+        ps.setObject(11, item.getCreatedAt());
+        ps.setObject(12, item.getUpdatedAt());
+        ps.setString(13, item.getUpdatedBy());
     }
 
     public void insertOrderItemParallel(List<OrderItemEntity> orderItemEntities) {

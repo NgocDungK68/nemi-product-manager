@@ -76,8 +76,8 @@ public class NhanhvnOrderWebhookRequest {
         private Sale sale;
         private TechnicalStaff technicalStaff;
         private CustomerCare customerCare;
-        private Integer createdAt;
-        private Integer updatedAt;
+        private Long createdAt;
+        private Long updatedAt;
         private String description;
         private List<OrderPartDeliveries> orderPartDeliveries;
         private String trackingUrl;

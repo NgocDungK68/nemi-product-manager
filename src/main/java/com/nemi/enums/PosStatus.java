@@ -2,9 +2,10 @@ package com.nemi.enums;
 
 public enum PosStatus {
     ACTIVE,
-    PENDING,
+    PROCESSING,
     EXPIRED,
     INACTIVE,
     SUCCESS,
-    FAIL
+    FAIL,
+    ERROR
 }

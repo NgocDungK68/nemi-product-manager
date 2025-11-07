@@ -2,27 +2,34 @@ package com.nemi.utils;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nemi.constant.PancakeConstatns;
 import com.nemi.constant.PosConstants;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
 import jakarta.servlet.http.HttpServletRequest;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.ObjectUtils;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Enumeration;
 import java.util.Map;
 import java.util.TreeMap;
 
 @Slf4j
+
 public class PosUtils {
-    PosUtils (){}
+    PosUtils() {
+    }
+
     private static final ObjectMapper mapper = new ObjectMapper();
+
 
     public static Map<String, String> extractHeaders(HttpServletRequest request) {
         Map<String, String> headers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
@@ -58,7 +65,8 @@ public class PosUtils {
         try {
             return mapper.readValue(
                     config,
-                    new TypeReference<>() {}
+                    new TypeReference<>() {
+                    }
             );
         } catch (Exception e) {
             log.error("Failed to convert to Config Map: {}", e.getMessage(), e);
@@ -66,6 +74,7 @@ public class PosUtils {
         }
     }
 
+    // LocalDate to Long
     public static long toEpochSecond(LocalDateTime dateTime) {
         if (dateTime == null) {
             return 0L;
@@ -78,5 +87,47 @@ public class PosUtils {
         }
     }
 
+    public static LocalDateTime pancakeParseTime(String time) {
 
+        if (ObjectUtils.isEmpty(time) || ObjectUtils.isEmpty(time.trim())) {
+            return null;
+        }
+        DateTimeFormatter formatter =
+                DateTimeFormatter.ofPattern(PancakeConstatns.PANCAKE_TIME_FORMAT);
+
+
+        LocalDateTime insertedAt = LocalDateTime.parse(
+                time, formatter);
+
+
+        ZonedDateTime vietnamTime = insertedAt
+                .atZone(ZoneId.of(PosConstants.UTC))
+                .withZoneSameInstant(ZoneId.of(PosConstants.VIETNAM_TIMEZONE));
+
+        return vietnamTime.toLocalDateTime();
+
+    }
+
+    // Long to LocalDate
+    public static LocalDateTime convertEpochSecondsToVNTime(Long epochSeconds) {
+        if (epochSeconds == null) return null;
+        return LocalDateTime.ofInstant(
+                Instant.ofEpochSecond(epochSeconds),
+                ZoneId.of(PosConstants.VIETNAM_TIMEZONE)
+        );
+    }
+
+    /**
+     * Truncate string to maximum length
+     *
+     * @param input     the string to truncate
+     * @param maxLength maximum length allowed
+     * @return truncated string or original if shorter than maxLength
+     */
+    public static String truncate(String input, int maxLength) {
+        if (StringUtils.isEmpty(input) || input.length() <= maxLength) {
+            return input;
+        }
+        return input.substring(0, maxLength);
+    }
 }

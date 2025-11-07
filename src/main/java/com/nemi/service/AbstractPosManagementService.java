@@ -1,9 +1,9 @@
 package com.nemi.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nemi.configuration.NhanhvnConfig;
+import com.nemi.configuration.WebhookConfig;
 import com.nemi.constant.NhanhvnConstants;
+import com.nemi.constant.PancakeConstatns;
 import com.nemi.entity.PosEntity;
 import com.nemi.entity.SyncHistoryEntity;
 import com.nemi.enums.PosStatus;
@@ -15,15 +15,19 @@ import com.nemi.model.response.PosConnectionResponse;
 import com.nemi.model.response.StatusResponse;
 import com.nemi.repository.PosRepository;
 import com.nemi.repository.SyncHistoryRepository;
+import com.nemi.service.factory.ReAuthPosFactory;
 import com.nemi.util.ClaimUtil;
+import com.nemi.utils.PosUtils;
 import io.jsonwebtoken.lang.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -32,20 +36,50 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @RequiredArgsConstructor
+
 public abstract class AbstractPosManagementService {
     protected final PosRepository posRepository;
     protected final ClaimUtil claimUtil;
     protected final SyncHistoryRepository syncHistoryRepository;
-    protected final ObjectMapper objectMapper;
-    protected final NhanhvnConfig  nhanhvnConfig;
+    protected final NhanhvnConfig nhanhvnConfig;
+    private final WebhookConfig webhookConfig;
+    private final ReAuthPosFactory reAuthPosFactory;
+    private final EncryptionService encryptionService;
 
     /**
      * Get POS status by ID
      */
     public StatusResponse getPosStatus(String posId) {
-        SyncHistoryEntity syncHistoryEntity = syncHistoryRepository.findByPosId(posId)
-                .orElseThrow(() -> new TechnicalException(AlertMessages.alert(TechnicalAlertCode.SYNC_HISTORY_NOT_FOUND)));
-        return new StatusResponse(syncHistoryEntity.getSyncStatus());
+        List<SyncHistoryEntity> histories = syncHistoryRepository.findAllByPosId(posId);
+        PosEntity pos = posRepository.findById(posId)
+                .orElseThrow(() -> {
+                    log.warn("POS with id={} not found, cannot get status", posId);
+                    return new TechnicalException(AlertMessages.alert(TechnicalAlertCode.POS_CONNECTION_NOTFOUND));
+                });
+
+        if (CollectionUtils.isEmpty(histories)) {
+            throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.SYNC_HISTORY_NOT_FOUND));
+        }
+
+        boolean isSuccess = histories.stream().anyMatch(h -> PosStatus.SUCCESS.name().equals(h.getSyncStatus()));
+
+        pos.setStatus(isSuccess ? PosStatus.ACTIVE.name() : PosStatus.ERROR.name());
+        posRepository.save(pos);
+
+        List<StatusResponse.StatusDetail> list = histories.stream()
+                .map(h -> {
+                    StatusResponse.StatusDetail resp = new StatusResponse.StatusDetail();
+                    resp.setStatus(h.getSyncStatus());
+                    resp.setType(h.getSyncType());
+                    return resp;
+                })
+                .collect(Collectors.toList());
+
+        return StatusResponse.builder()
+                .statusDetails(list)
+                .statusConnect(pos.getStatus())
+                .build();
+
     }
 
     /**
@@ -84,12 +118,18 @@ public abstract class AbstractPosManagementService {
                             log.info("POS expired for userId={}, posId={}", userId, pos.getId());
                         }
 
-                        String reAuthLink = buildReAuthLink(pos);
-                        return PosConnectionResponse.expired(pos, reAuthLink);
+                        ReAuthService reAuthService = reAuthPosFactory.getReAuthService(pos.getPosName());
+
+                        return PosConnectionResponse.expired(pos, reAuthService.getReAuthLink(pos.getId()));
                     }
 
                     // Trường hợp token còn hạn, status ACTIVE
-                    return PosConnectionResponse.toPosConnectionResponse(pos);
+                    PosConnectionResponse posConnectionResponse = PosConnectionResponse.toPosConnectionResponse(pos);
+                    posConnectionResponse.setWebhookUrl(creatWebhookUrl(pos.getId(), pos.getPosName()));
+                    String webhookToken = encryptionService.decrypt(pos.getWebhookToken());
+                    posConnectionResponse.setWebhookToken(webhookToken);
+                    posConnectionResponse.setKeyValue(creatKeyValueMap(PancakeConstatns.WEBHOOK_TOKEN, webhookToken));
+                    return posConnectionResponse;
                 })
                 .collect(Collectors.toList());
     }
@@ -168,13 +208,8 @@ public abstract class AbstractPosManagementService {
         return posEntity.getExpiredTime().isBefore(LocalDateTime.now());
     }
 
-    public String buildReAuthLink(PosEntity posEntity) {
+    public String buildReAuthLink(Map<String, String> configMap) {
         try {
-            Map<String, String> configMap = objectMapper.readValue(
-                    posEntity.getConfig(),
-                    new TypeReference<>() {
-                    }
-            );
 
             String appId = configMap.get(NhanhvnConstants.APP_ID);
             String businessId = configMap.get(NhanhvnConstants.BUSINESS_ID);
@@ -194,5 +229,35 @@ public abstract class AbstractPosManagementService {
             log.error("Build Nhanh.vn reAuth link failed: {}", e.getMessage(), e);
             throw new TechnicalException(AlertMessages.alert(TechnicalAlertCode.JSON_PARSE_ERROR));
         }
+    }
+
+    public String generateWebhookToken(String shopId) {
+        String rawData = shopId + ":" + System.currentTimeMillis();
+        return Base64.getEncoder().encodeToString(rawData.getBytes());
+    }
+
+    public String creatWebhookUrl(String posId, String partner) {
+        return UriComponentsBuilder
+                .fromHttpUrl(webhookConfig.getBaseUrl()) // https://nemi-dev-02.ecombase.net/nemi-product-manager
+                .pathSegment(webhookConfig.getVersion()) // v1
+                .pathSegment(partner)                   // partner
+                .pathSegment(posId)                     // posId
+                .toUriString();
+    }
+
+    public String creatKeyValueMap(String key, String value) {
+        return key + ":" + value;
+    }
+
+    public SyncHistoryEntity toSyncHistory(SyncHistoryEntity syncHistoryEntity, String syncErrorMessage, Boolean isSyncSuccess) {
+        syncErrorMessage = PosUtils.truncate(syncErrorMessage, 500);
+        if (Boolean.FALSE.equals(isSyncSuccess)) {
+            syncHistoryEntity.setEndTime(LocalDateTime.now());
+            syncHistoryEntity.setErrorMessage(syncErrorMessage);
+            return syncHistoryEntity;
+        }
+        syncHistoryEntity.setSyncStatus(PosStatus.SUCCESS.name());
+        syncHistoryEntity.setEndTime(LocalDateTime.now());
+        return syncHistoryEntity;
     }
 }

@@ -102,7 +102,7 @@ public class SapoServiceImpl implements PosManagementService {
                 log.error("Sapo response does not contain accessToken: {}", tokenResponse);
             }
 
-            PosEntity newPos = createNewPos(tokenResponse, configMap);
+            PosEntity newPos = createNewPos(tokenResponse, configMap, posConnectionRequest.getStoreName());
             PosConnectionResponse posConnectionResponse = PosConnectionResponse.toPosConnectionResponse(newPos);
 
             // Delete old webhooks (posId khác) trước khi đăng ký mới
@@ -118,7 +118,7 @@ public class SapoServiceImpl implements PosManagementService {
                     tokenResponse.getAccessToken(),
                     newPos.getId()
             );
-            log.info("Registered {} webhooks for POS: {}", webhooks.size(), newPos.getId());
+            log.info("Registered {} webhooks for POS: {}, posId: {}", webhooks.size(), newPos.getId());
 
             log.info("Sapo response is {}", posConnectionResponse);
             return posConnectionResponse;
@@ -129,24 +129,25 @@ public class SapoServiceImpl implements PosManagementService {
     }
 
     @Override
-    public void syncProduct(String posId ) {
+    public void syncProduct(String posId, String departmentId) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
                 .startTime(LocalDateTime.now())
                 .syncStatus(PosStatus.FAIL.name())
                 .syncType(SyncType.PRODUCT.getValue())
+                .posName(PosName.SAPO.getValue())
                 .build();
         try {
             String username = claimUtil.getUserName();
             //B1 : Lay posentity va validate posName
             PosEntity posEntity = generalPosService.getPos(posId);
-            
+
             // Decrypt access token before using for API calls
             String decryptedToken = tokenEncryptionService.decrypt(posEntity.getAccessToken());
-            
+
             // Decrypt config before using
             String decryptedConfig = tokenEncryptionService.decrypt(posEntity.getConfig());
-            
+
             // B2: parse config
             SapoRequest request = SapoRequest.buildRequest(
                     decryptedConfig,
@@ -156,7 +157,7 @@ public class SapoServiceImpl implements PosManagementService {
             );
 
             if (isInvalidRequest(request)) {
-                syncHistoryRepository.save(toSyncHistory(history, (SyncErrorMessage.MISSING_CONFIG), false));
+                syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.MISSING_CONFIG.getMessage(), false));
                 log.error("[NhanhvnServiceImpl.syncProduct] Missing required config for posId={}", posId);
                 return;
             }
@@ -178,8 +179,8 @@ public class SapoServiceImpl implements PosManagementService {
 
                 // Check if API response is present
                 if (responseOpt.isEmpty()) {
-                    log.error("[SapoServiceImpl.syncProduct] API returned empty response");
-                    syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
+                    log.error("[SapoServiceImpl.syncProduct] API returned empty response, posId: {}",posId);
+                    syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR.getMessage(), false));
                     return;
                 }
 
@@ -195,7 +196,7 @@ public class SapoServiceImpl implements PosManagementService {
 
                 // Convert products and variants using SapoMapper
                 for (SapoProductResponse.Product sapoProduct : products) {
-                    ProductEntity productEntity = sapoMapper.convertToProductEntity(posId, sapoProduct, username);
+                    ProductEntity productEntity = sapoMapper.convertToProductEntity(posId, sapoProduct, username, departmentId);
                     allProducts.add(productEntity);
 
                     // Convert variants
@@ -204,7 +205,7 @@ public class SapoServiceImpl implements PosManagementService {
                         allVariants.addAll(variants);
                     }
                 }
-                log.info("Fetched {} products and {} variants", products.size(), allVariants.size());
+                log.info("Fetched {} products and {} variants, posId: {}", products.size(), allVariants.size(),posId);
 
                 // Continue pagination if fetched full page
                 if (products.size() >= productLimit) {
@@ -224,45 +225,35 @@ public class SapoServiceImpl implements PosManagementService {
 
             // Chờ cả hai xong
             CompletableFuture.allOf(saveProductsFuture, saveVariantsFuture).join();
-            syncHistoryRepository.save(toSyncHistory(history, null, true));
+            syncHistoryRepository.save(generalPosService.toSyncHistory(history, null, true));
 
-            log.info("Successfully synced {} products and {} variants from Sapo", allProducts.size(), allVariants.size());
+            log.info("Successfully synced {} products and {} variants from Sapo,, posId: {}", allProducts.size(), allVariants.size(),posId);
         } catch (Exception e) {
             log.error("Failed to sync Sapo data - {}", e.getMessage(), e);
-            syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR, false));
+            syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.TECHNICAL_ERROR.getMessage(), false));
         }
     }
 
-
-    private SyncHistoryEntity toSyncHistory(SyncHistoryEntity syncHistoryEntity, SyncErrorMessage syncErrorMessage, Boolean isSyncSuccess) {
-        if (Boolean.FALSE.equals(isSyncSuccess)) {
-            syncHistoryEntity.setEndTime(LocalDateTime.now());
-            syncHistoryEntity.setErrorMessage(syncErrorMessage != null ? syncErrorMessage.getMessage() : null);
-            return syncHistoryEntity;
-        }
-        syncHistoryEntity.setSyncStatus(PosStatus.SUCCESS.name());
-        syncHistoryEntity.setEndTime(LocalDateTime.now());
-        return syncHistoryEntity;
-    }
 
 
     @Override
-    public void syncOrder(String posId) {
+    public void syncOrder(String posId, String departmentId) {
         SyncHistoryEntity history = SyncHistoryEntity.builder()
                 .posId(posId)
                 .startTime(LocalDateTime.now())
                 .syncStatus(PosStatus.FAIL.name())
                 .syncType(SyncType.ORDER.getValue())
+                .posName(PosName.SAPO.getValue())
                 .build();
         try {
             PosEntity posEntity = generalPosService.getPos(posId);
-            
+
             // Decrypt access token before using for API calls
             String decryptedToken = tokenEncryptionService.decrypt(posEntity.getAccessToken());
-            
+
             // Decrypt config before using
             String decryptedConfig = tokenEncryptionService.decrypt(posEntity.getConfig());
-            
+
             SapoRequest request = SapoRequest.buildRequest(
                     decryptedConfig,
                     decryptedToken,
@@ -271,7 +262,7 @@ public class SapoServiceImpl implements PosManagementService {
             );
 
             if (isInvalidRequest(request)) {
-                syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.MISSING_CONFIG, false));
+                syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.MISSING_CONFIG.getMessage(), false));
                 log.error("Missing required config for posId={}", posId);
                 return;
             }
@@ -289,19 +280,19 @@ public class SapoServiceImpl implements PosManagementService {
             while (true) {
                 Optional<SapoOrderResponse> responseOpt = sapoClient.getOrders(request);
                 if (ObjectUtils.isEmpty(responseOpt)) {
-                    syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.ORDER_CONNECTION_FAILED, false));
+                    syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.ORDER_CONNECTION_FAILED.getMessage(), false));
                     log.error("No response from Sapo API when fetching orders, posId={}", posId);
                     break;
                 }
 
                 SapoOrderResponse response = responseOpt.get();
                 if (ObjectUtils.isEmpty(response.getOrders())) {
-                    log.info("No orders found with paginator: page={}, limit={}", paginator.getPage(), paginator.getLimit());
+                    log.info("No orders found with paginator: page={}, limit={}, posId: {}", paginator.getPage(), paginator.getLimit(),posId);
                     break;
                 }
 
                 String username = claimUtil.getUserName();
-                List<OrderEntity> pageOrders = sapoMapper.convertToOrderEntities(posId, response.getOrders(), username);
+                List<OrderEntity> pageOrders = sapoMapper.convertToOrderEntities(posId, response.getOrders(), username, departmentId);
                 allOrders.addAll(pageOrders);
 
                 List<OrderItemEntity> pageOrderItems = sapoMapper.convertToOrderItemEntities(response.getOrders(), username);
@@ -322,28 +313,27 @@ public class SapoServiceImpl implements PosManagementService {
                     generalPosService.saveAllAsync(allOrderItems, batchSize, orderItemRepository, PosConstants.ORDER_ITEM);
 
             CompletableFuture.allOf(saveOrdersFuture, saveOrderItemsFuture).join();
-            syncHistoryRepository.save(toSyncHistory(history, null, true));
-
-            log.info("Successfully synced {} orders from Pancake", allOrders.size());
-            log.info("Successfully synced {} order items from Pancake", allOrderItems.size());
+            syncHistoryRepository.save(generalPosService.toSyncHistory(history, null, true));
+            log.info("Successfully synced {} order items from Pancake, posId: {}", allOrderItems.size(),posId);
         } catch (Exception e) {
             log.error("Failed to sync Pancake orders - {}", e.getMessage(), e);
-            syncHistoryRepository.save(toSyncHistory(history, SyncErrorMessage.ORDER_TECHNICAL_ERROR, false));
+            syncHistoryRepository.save(generalPosService.toSyncHistory(history, SyncErrorMessage.ORDER_TECHNICAL_ERROR.getMessage(), false));
         }
     }
 
-    private PosEntity createNewPos(SapoAccessTokenResponse tokenResponse, Map<String, String> configMap) {
+    private PosEntity createNewPos(SapoAccessTokenResponse tokenResponse, Map<String, String> configMap, String webhookToken) {
         // Encrypt access token before storing in database
         String encryptedAccessToken = tokenEncryptionService.encrypt(tokenResponse.getAccessToken());
 
         PosEntity newPos = PosEntity.builder()
                 .posName(PosName.SAPO.getValue())
                 .userId(claimUtil.getUserId())
-                .status(PosStatus.ACTIVE.name())
+                .status(PosStatus.PROCESSING.name())
                 .accessToken(encryptedAccessToken)
                 .config(tokenEncryptionService.encrypt(JsonUtils.toJson(configMap)))
                 .expiredTime(null)
                 .companyId(String.valueOf(claimUtil.getCompanyId()))
+                .departmentId(claimUtil.getDepartmentId())
                 .createdBy(claimUtil.getUserName())
                 .build();
 

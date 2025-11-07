@@ -44,11 +44,11 @@ public class TestController {
         return "Test service api successful";
     }
 
-    @PostMapping("/public-api/testReAuth/{posId}")
-    public String testReAuth(@PathVariable String posId) {
-        PosEntity posEntity = posRepository.findById(posId).orElse(null);
-        return generalPosService.buildReAuthLink(posEntity);
-    }
+//    @PostMapping("/public-api/testReAuth/{posId}")
+//    public String testReAuth(@PathVariable String posId) {
+//        PosEntity posEntity = posRepository.findById(posId).orElse(null);
+//        return generalPosService.buildReAuthLink(posEntity);
+//    }
 
     @PostMapping("/public-api/pancake/{posId}")
     public ResponseEntity<String> connectPos(@PathVariable String posId) {

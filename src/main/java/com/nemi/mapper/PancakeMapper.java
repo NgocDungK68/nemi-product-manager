@@ -9,12 +9,14 @@ import com.nemi.enums.Status;
 import com.nemi.enums.WeightUnit;
 import com.nemi.model.response.pancake.PancakeOrderResponse;
 import com.nemi.model.response.pancake.PancakeProductResponse;
-import com.nemi.util.ClaimUtil;
+import com.nemi.service.GeneralPosService;
+import com.nemi.utils.PosUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -26,18 +28,17 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class PancakeMapper {
     private final PancakeConfig pancakeConfig;
-    private final ClaimUtil claimUtil;
 
     public List<ProductEntity> convertToProductEntities( // return btg
                                                          String posId,
-                                                         List<PancakeProductResponse.ProductData> apiProducts
+                                                         List<PancakeProductResponse.ProductData> apiProducts, String userName, String departmentId
     ) {
         return apiProducts.stream()  // hoặc parallelStream()
-                .map(apiProduct -> convertToProductEntity(posId, apiProduct))
+                .map(apiProduct -> convertToProductEntity(posId, apiProduct, userName, departmentId))
                 .collect(Collectors.toList());
     }
 
-    public ProductEntity convertToProductEntity(String posId, PancakeProductResponse.ProductData apiProducts) {
+    public ProductEntity convertToProductEntity(String posId, PancakeProductResponse.ProductData apiProducts, String userName, String departmentId) {
 
         String images = Optional.ofNullable(apiProducts.getImages())
                 .map(list -> list.stream()
@@ -54,15 +55,20 @@ public class PancakeMapper {
                 .orElse(null);
 
 
+        LocalDateTime insertedAt = PosUtils.pancakeParseTime(apiProducts.getInsertedAt());
+
+
         ProductEntity product = ProductEntity.builder()
                 .posId(posId)
-                .productId(String.valueOf(apiProducts.getId()))
                 .code(apiProducts.getProduct().getDisplayId())
                 .name(apiProducts.getProduct().getName())
                 .productId(apiProducts.getProductId())
                 .description(apiProducts.getProduct().getNoteProduct())
                 .images(images)
                 .category(categories)
+                .createdBy(userName)
+                .departmentId(departmentId)
+                .createdAt(insertedAt)
                 .build();
         if (Boolean.TRUE.equals(apiProducts.getIsLocked())) {
             product.setStatus(Status.INACTIVE.getValue());
@@ -74,21 +80,23 @@ public class PancakeMapper {
 
     public List<ProductVariantEntity> convertToVariantEntities(
             String posId,
-            List<PancakeProductResponse.ProductData> apiProducts
+            List<PancakeProductResponse.ProductData> apiProducts, String userName
     ) {
         return apiProducts.stream()  // can nhac paralle stream
-                .map(apiProduct -> convertToVariantEntity(posId, apiProduct))
+                .map(apiProduct -> convertToVariantEntity(posId, apiProduct, userName))
                 .collect(Collectors.toList());
     }
 
 
-    public ProductVariantEntity convertToVariantEntity(String posId, PancakeProductResponse.ProductData apiProduct) {
+    public ProductVariantEntity convertToVariantEntity(String posId, PancakeProductResponse.ProductData apiProduct, String userName) {
 
         Integer remainQuantity = Optional.ofNullable(apiProduct.getVariationsWarehouses())
                 .filter(list -> !list.isEmpty())
                 .map(list -> list.get(0))
                 .map(PancakeProductResponse.VariationWarehouse::getRemainQuantity)
                 .orElse(null);
+
+        LocalDateTime insertedAt = PosUtils.pancakeParseTime(apiProduct.getInsertedAt());
 
 
         return ProductVariantEntity.builder()
@@ -102,17 +110,19 @@ public class PancakeMapper {
                 .fulfillableQuantity(remainQuantity)
                 .weight(apiProduct.getWeight())
                 .weightUnit(WeightUnit.GAM.getValue())
+                .createdAt(insertedAt)
+                .createdBy(userName)
                 .build();
     }
 
-    public List<OrderEntity> convertToOrderEntities(String posId, List<PancakeOrderResponse.DataItem> apiOrders, String userName) {
+    public List<OrderEntity> convertToOrderEntities(String posId, List<PancakeOrderResponse.DataItem> apiOrders, String userName, String departmentId) {
         return apiOrders.stream()
-                .map(orders -> convertToOrderEntity(posId, orders, userName))
+                .map(orders -> convertToOrderEntity(posId, orders, userName, departmentId))
                 .filter(Objects::nonNull)
                 .toList();
     }
 
-    public OrderEntity convertToOrderEntity(String posId, PancakeOrderResponse.DataItem apiOrders, String userName) {
+    public OrderEntity convertToOrderEntity(String posId, PancakeOrderResponse.DataItem apiOrders, String userName, String departmentId) {
         String status = pancakeConfig.getStatusMapping(apiOrders.getStatus(), apiOrders.getStatusName());
         log.info("status of orderId {} is {}", apiOrders.getId(), status);
 
@@ -124,6 +134,13 @@ public class PancakeMapper {
         String orderCode = Optional.ofNullable(apiOrders.getPartner())
                 .map(PancakeOrderResponse.Partner::getExtendCode)
                 .orElse(null);
+
+        String saleId = Optional.ofNullable(apiOrders.getMarketer())
+                .map(marketer -> String.valueOf(marketer.getId()))
+                .orElse(null);
+
+        LocalDateTime insertedAt =  PosUtils.pancakeParseTime(apiOrders.getInsertedAt());
+        LocalDateTime updatedAt =  PosUtils.pancakeParseTime(apiOrders.getUpdatedAt());
 
 
         return OrderEntity.builder()
@@ -137,8 +154,13 @@ public class PancakeMapper {
                 .shippingFee(apiOrders.getShippingFee())
                 .totalPrice(apiOrders.getTotalPrice())
                 .customerEmail(apiOrders.getBillEmail())
+                .discountAmount(apiOrders.getTotalDiscount())
                 .status(status)
+                .saleId(saleId)
+                .createdAt(insertedAt)
+                .updatedAt(updatedAt)
                 .createdBy(userName)
+                .departmentId(departmentId)
                 .build();
     }
 
@@ -153,6 +175,10 @@ public class PancakeMapper {
     public List<OrderItemEntity> convertToOrderItemEntity(PancakeOrderResponse.DataItem apiOrder, String userName) {
         List<OrderItemEntity> orderItemEntities = new ArrayList<>();
         for (PancakeOrderResponse.Item product : apiOrder.getItems()) {
+
+            LocalDateTime insertedAt =  PosUtils.pancakeParseTime(apiOrder.getInsertedAt());
+            LocalDateTime updatedAt =  PosUtils.pancakeParseTime(apiOrder.getUpdatedAt());
+
             BigDecimal quantity = BigDecimal.valueOf(product.getQuantity());
             orderItemEntities.add(OrderItemEntity.builder()
                     .orderItemId(String.valueOf(product.getId()))
@@ -164,6 +190,8 @@ public class PancakeMapper {
                     .totalPrice(product.getVariationInfo().getRetailPrice().multiply(quantity))
                     .productName(product.getVariationInfo().getName())
                     .createdBy(userName)
+                    .createdAt(insertedAt)
+                    .updatedAt(updatedAt)
                     .build());
         }
         return orderItemEntities;

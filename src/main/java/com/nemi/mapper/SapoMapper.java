@@ -27,22 +27,22 @@ import java.util.stream.Collectors;
 @Slf4j
 public class SapoMapper {
     private final SapoConfig sapoConfig;
+     // no usage ??
+//    public List<ProductEntity> convertToProductEntities(String posId, List<SapoProductResponse.Product> apiProducts, String username) {
+//        return apiProducts.stream()
+//                .map(apiProduct -> {
+//                    ProductEntity productEntity = convertToProductEntity(posId, apiProduct, username);
+//                    if (ObjectUtils.isNotEmpty(productEntity)) {
+//                        productEntity.setCreatedBy(username);
+//                        productEntity.setUpdatedBy(username);
+//                    }
+//                    return productEntity;
+//                })
+//                .filter(Objects::nonNull)
+//                .toList();
+//    }
 
-    public List<ProductEntity> convertToProductEntities(String posId, List<SapoProductResponse.Product> apiProducts, String username) {
-        return apiProducts.stream()
-                .map(apiProduct -> {
-                    ProductEntity productEntity = convertToProductEntity(posId, apiProduct, username);
-                    if (ObjectUtils.isNotEmpty(productEntity)) {
-                        productEntity.setCreatedBy(username);
-                        productEntity.setUpdatedBy(username);
-                    }
-                    return productEntity;
-                })
-                .filter(Objects::nonNull)
-                .toList();
-    }
-
-    public ProductEntity convertToProductEntity(String posId, SapoProductResponse.Product apiProduct, String username) {
+    public ProductEntity convertToProductEntity(String posId, SapoProductResponse.Product apiProduct, String username,String departmentId) {
         ProductEntity product = new ProductEntity();
 
         product.setPosId(posId);
@@ -54,6 +54,7 @@ public class SapoMapper {
         product.setBrand(apiProduct.getVendor());
         product.setCategory(apiProduct.getProductType());
         product.setStatus(apiProduct.getStatus().toUpperCase());
+        product.setDepartmentId(departmentId);
         product.setImages(JsonUtils.toJson(apiProduct.getImages().stream()
                 .map(SapoProductResponse.Image::getSrc) // Dùng method reference
                 .collect(Collectors.toList())));
@@ -142,14 +143,14 @@ public class SapoMapper {
         return attributes;
     }
 
-    public List<OrderEntity> convertToOrderEntities(String posId, List<SapoOrderResponse.Order> apiOrders, String username) {
+    public List<OrderEntity> convertToOrderEntities(String posId, List<SapoOrderResponse.Order> apiOrders, String username,String departmentId) {
         return apiOrders.stream()
-                .map(orders -> convertToOrderEntity(posId, orders, username))
+                .map(orders -> convertToOrderEntity(posId, orders, username,departmentId))
                 .filter(Objects::nonNull)
                 .toList();
     }
 
-    public OrderEntity convertToOrderEntity(String posId, SapoOrderResponse.Order order, String username) {
+    public OrderEntity convertToOrderEntity(String posId, SapoOrderResponse.Order order, String username,String departmentId) {
         String status = sapoConfig.getStatusMapping(order.getStatus());
 
         // Lấy fulfillment và origin address một cách đơn giản
@@ -171,9 +172,11 @@ public class SapoMapper {
                 .shippingMethod(Optional.ofNullable(fulfillment).map(SapoOrderResponse.Fulfillment::getDeliveryMethod).orElse(null))
                 .totalPrice(order.getTotalPrice())
                 .shippingFee(BigDecimal.ZERO)
+                .saleId(order.getUserId())
                 .discountAmount(order.getTotalDiscounts())
                 .createdBy(username)
                 .updatedBy(username)
+                .departmentId(departmentId)
                 .build();
     }
 

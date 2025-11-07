@@ -19,6 +19,7 @@ public class SapoConstants {
     public static final String WEBHOOKS = "webhooks";
     public static final String CREATE_ON_MIN = "created_on_min";
     public static final String CREATE_ON_MAX = "created_on_max";
+    public static final String X_SAPO_SIGNATURE = "x-bizweb-hmac-sha256";
 
     // URL paths
 

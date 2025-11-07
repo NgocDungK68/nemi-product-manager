@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.Getter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 
 import java.util.HashMap;
 import java.util.Optional;
@@ -14,13 +15,13 @@ import java.util.Optional;
 @Configuration
 @ConfigurationProperties("pancake")
 @Getter
+@EnableMethodSecurity(prePostEnabled = true) // add tam de test aop vi dang tat security config
+
 public class PancakeConfig {
     private String baseUrl;
-    private String apiKey;
     private String shopId;
     private int timeout;
     private Sync sync;
-    private String xApiKey;
     private Boolean isSyncAllProduct;    // added
     private Boolean isSyncAllOrder;      // added
     private Integer recentDays;          // added

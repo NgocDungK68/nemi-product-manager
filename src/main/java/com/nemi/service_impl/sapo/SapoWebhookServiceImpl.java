@@ -26,6 +26,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,6 +56,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
 
     @Override
     @Transactional
+    @PreAuthorize("@sapoAuth.checkSignature(#headers, #body, #posId)")
     public boolean processWebhook(String posId, String posName, Map<String, String> headers, Object body) {
         WebhookHistoryEntity webhookHistory = WebhookHistoryEntity.builder()
                 .header(JsonUtils.toJson(headers))
@@ -295,7 +297,7 @@ public class SapoWebhookServiceImpl implements WebhookService {
             }
 
             // Tạo order mới
-            OrderEntity order = sapoMapper.convertToOrderEntity(posId, payload, "webhook");
+            OrderEntity order = sapoMapper.convertToOrderEntity(posId, payload, "webhook",null);
             log.info("Creating new Sapo order: {}", externalOrderId);
             orderRepository.save(order);
 

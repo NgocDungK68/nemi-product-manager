@@ -1,5 +1,6 @@
 package com.nemi.controller;
 
+import com.nemi.annotation.CheckXRealIp;
 import com.nemi.constant.WebhookConstants;
 import com.nemi.service.WebhookService;
 import com.nemi.service.factory.WebhookFactory;
@@ -13,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.io.BufferedReader;
+import java.io.IOException;
 import java.util.Map;
 
 @RestController
@@ -31,11 +34,12 @@ public class WebhookController {
      * - POST /webhook/pancake -> webhookType = "pancake"
      * - POST /webhook/sapo -> webhookType = "sapo"
      */
+    @CheckXRealIp
     @PostMapping("/{posName}/{posId}")
     public void receiveWebhook(
             @PathVariable String posName,
             @PathVariable String posId,
-            @RequestBody Object body) {
+            @RequestBody Object body) {  // ← Dùng Object (Spring tự parse)
 
         log.info("=== UNIFIED WEBHOOK RECEIVED ===");
         log.info("Webhook type: {}, PosId: {}", posName, posId);
@@ -43,7 +47,17 @@ public class WebhookController {
         Map<String, String> headers = PosUtils.extractHeaders(httpServletRequest);
         log.debug("Webhook headers:");
         headers.forEach((k, v) -> log.debug("  {} = {}", k, v));
-        log.debug("Webhook body: {}", body);
+        
+        // Raw body đã được SapoWebhookFilter cache vào request attribute
+        // SapoAuthChecker sẽ tự lấy từ attribute để verify HMAC
+        Object rawBodyAttr = httpServletRequest.getAttribute("CACHED_RAW_BODY");
+        if (rawBodyAttr != null) {
+            log.info("Raw body cached by filter: {}", rawBodyAttr.toString().substring(0, Math.min(100, rawBodyAttr.toString().length())) + "...");
+        } else {
+            log.debug("Raw body not cached (not sapo webhook or filter not working)");
+        }
+        
+        log.debug("Parsed body: {}", body);
 
         // Get appropriate webhook service using factory
         WebhookService webhookService = webhookFactory.getWebhookService(posName);

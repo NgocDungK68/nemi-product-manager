@@ -10,17 +10,13 @@ import java.util.Map;
 @Getter
 @AllArgsConstructor
 public enum PancakeEvent {
-    INVENTORY_CHANGE("inventoryChange", WebhookConstants.SyncType.SYSTEM, WebhookConstants.EventType.INVENTORY_CHANGE),
-    ORDER_ADD("create", WebhookConstants.SyncType.ORDER, WebhookConstants.EventType.ADD),
-    ORDER_UPDATE("update", WebhookConstants.SyncType.ORDER, WebhookConstants.EventType.UPDATE),
-    ORDER_DELETE("delete", WebhookConstants.SyncType.ORDER, WebhookConstants.EventType.DELETE);
+
+    ORDER("orders", WebhookConstants.SyncType.ORDER),
+    PRODUCT("products", WebhookConstants.SyncType.PRODUCT);
     private static final Map<String, PancakeEvent> CONSTANTS = new HashMap<>();
 
     private final String value;
     private final String syncType;
-    private final String eventType;
-
-
     static {
         for (PancakeEvent e : PancakeEvent.values()) {
             CONSTANTS.put(e.value, e);

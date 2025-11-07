@@ -38,6 +38,8 @@ public class SapoOrderResponse {
         private String currency;
         private String email;
         private String phone;
+        @JsonProperty("user_id")
+        private String userId;
         @JsonProperty("customer_group_id")
         private Long customerGroupId;
         @JsonProperty("fulfillment_status")

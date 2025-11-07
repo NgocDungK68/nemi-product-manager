@@ -46,9 +46,14 @@ public class ProductJdbcRepository extends BaseBatchRepository<ProductEntity> {
                     images,
                     category,
                     status,
-                    created_by
+                    created_by,
+                    created_at,
+                    updated_at,
+                    department_id,
+                    updated_by
+             
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (product_id, pos_id)
                 DO UPDATE
                 SET
@@ -59,7 +64,11 @@ public class ProductJdbcRepository extends BaseBatchRepository<ProductEntity> {
                     images       = EXCLUDED.images,
                     category     = EXCLUDED.category,
                     status       = EXCLUDED.status,
-                    created_by   = EXCLUDED.created_by;
+                    created_by   = EXCLUDED.created_by,
+                    created_at   = EXCLUDED.created_at,
+                    updated_at   = EXCLUDED.updated_at,
+                    department_id = EXCLUDED.department_id,
+                    updated_by   = EXCLUDED.updated_by;
                 """;
     }
 
@@ -76,6 +85,10 @@ public class ProductJdbcRepository extends BaseBatchRepository<ProductEntity> {
         ps.setString(8, productEntity.getCategory());
         ps.setString(9, productEntity.getStatus());
         ps.setString(10, productEntity.getCreatedBy());
+        ps.setObject(11, productEntity.getCreatedAt());
+        ps.setObject(12, productEntity.getUpdatedAt());
+        ps.setString(13, productEntity.getDepartmentId());
+        ps.setString(14, productEntity.getUpdatedBy());
     }
 
     public void insertProductsParallel(List<ProductEntity> products) {

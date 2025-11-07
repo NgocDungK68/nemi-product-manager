@@ -20,4 +20,7 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariantEn
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("delete from ProductVariantEntity v where v.productId = :productId and v.posId = :posId")
     int deleteAllByProductIdAndPosId(String productId, String posId);
+
+
+    void deleteByProductId(String productId);
 }
