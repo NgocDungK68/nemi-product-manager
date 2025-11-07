@@ -17,11 +17,11 @@ import com.nemi.repository.PosRepository;
 import com.nemi.repository.SyncHistoryRepository;
 import com.nemi.service.factory.ReAuthPosFactory;
 import com.nemi.util.ClaimUtil;
+import com.nemi.utils.PosUtils;
 import io.jsonwebtoken.lang.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -250,9 +250,7 @@ public abstract class AbstractPosManagementService {
     }
 
     public SyncHistoryEntity toSyncHistory(SyncHistoryEntity syncHistoryEntity, String syncErrorMessage, Boolean isSyncSuccess) {
-        if (StringUtils.isNotEmpty(syncErrorMessage) && syncErrorMessage.length() > 500) {
-            syncErrorMessage = syncErrorMessage.substring(0, 500);
-        }
+        syncErrorMessage = PosUtils.truncate(syncErrorMessage, 500);
         if (Boolean.FALSE.equals(isSyncSuccess)) {
             syncHistoryEntity.setEndTime(LocalDateTime.now());
             syncHistoryEntity.setErrorMessage(syncErrorMessage);
