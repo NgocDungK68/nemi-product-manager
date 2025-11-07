@@ -7,12 +7,9 @@ import com.nemi.constant.PosConstants;
 import com.nemi.exception.TechnicalAlertCode;
 import com.nemi.exception.TechnicalException;
 import com.nemi.exception.pojo.AlertMessages;
-import com.nemi.service.EncryptionService;
 import jakarta.servlet.http.HttpServletRequest;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.ObjectUtils;
 
 import java.time.Instant;
@@ -22,7 +19,6 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -91,7 +87,7 @@ public class PosUtils {
         }
     }
 
-    public static LocalDateTime pancakeParseTime(String time){
+    public static LocalDateTime pancakeParseTime(String time) {
 
         if (ObjectUtils.isEmpty(time) || ObjectUtils.isEmpty(time.trim())) {
             return null;
@@ -108,11 +104,9 @@ public class PosUtils {
                 .atZone(ZoneId.of(PosConstants.UTC))
                 .withZoneSameInstant(ZoneId.of(PosConstants.VIETNAM_TIMEZONE));
 
-        return  vietnamTime.toLocalDateTime();
+        return vietnamTime.toLocalDateTime();
 
     }
-
-
 
     // Long to LocalDate
     public static LocalDateTime convertEpochSecondsToVNTime(Long epochSeconds) {
@@ -121,5 +115,19 @@ public class PosUtils {
                 Instant.ofEpochSecond(epochSeconds),
                 ZoneId.of(PosConstants.VIETNAM_TIMEZONE)
         );
+    }
+
+    /**
+     * Truncate string to maximum length
+     *
+     * @param input     the string to truncate
+     * @param maxLength maximum length allowed
+     * @return truncated string or original if shorter than maxLength
+     */
+    public static String truncate(String input, int maxLength) {
+        if (StringUtils.isEmpty(input) || input.length() <= maxLength) {
+            return input;
+        }
+        return input.substring(0, maxLength);
     }
 }
